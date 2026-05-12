@@ -1,0 +1,70 @@
+package models
+
+type GlobalConfig struct {
+	// Cluster identity
+	WorkingDir   string `json:"workingDir" yaml:"workingDir" doc:"Absolute path to root working directory" minLength:"1"`
+	BaseDomain   string `json:"baseDomain" yaml:"baseDomain" doc:"Base DNS domain for the cluster" minLength:"1"`
+	ClusterName  string `json:"clusterName" yaml:"clusterName" doc:"OpenShift cluster name" minLength:"1"`
+
+	// Network
+	MachineNetwork string `json:"machineNetwork" yaml:"machineNetwork" doc:"Network CIDR for cluster nodes" pattern:"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/(3[0-2]|[12]?[0-9])$"`
+	APIVIP         string `json:"apiVIP" yaml:"apiVIP" doc:"Virtual IP for Kubernetes API server" pattern:"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"`
+	IngressVIP     string `json:"ingressVIP" yaml:"ingressVIP" doc:"Virtual IP for ingress wildcard" pattern:"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"`
+	RendezvousIP   string `json:"rendezvousIP" yaml:"rendezvousIP" doc:"IP of first control-plane node" pattern:"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"`
+	DefaultDNS     string `json:"defaultDNS" yaml:"defaultDNS" doc:"DNS server IP for cluster nodes" pattern:"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"`
+	DefaultGateway string `json:"defaultGateway" yaml:"defaultGateway" doc:"Default gateway IP for cluster nodes" pattern:"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"`
+	DefaultPrefix  int    `json:"defaultPrefix" yaml:"defaultPrefix" doc:"Subnet prefix length" minimum:"1" maximum:"32"`
+
+	// Landing zone
+	LZBMCIP       string  `json:"lzBmcIP" yaml:"lzBmcIP" doc:"Landing zone BMC IP for boot ISO serving" pattern:"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"`
+	LZBMCHostname *string `json:"lzBmcHostname,omitempty" yaml:"lzBmcHostname,omitempty" doc:"DNS hostname for landing zone BMC interface"`
+
+	// Quay
+	QuayUser                    string                       `json:"quayUser" yaml:"quayUser" doc:"Admin username for Quay registry" minLength:"1"`
+	QuayPassword                string                       `json:"quayPassword" yaml:"quayPassword" doc:"Admin password for Quay registry" minLength:"1"`
+	QuayBackend                 string                       `json:"quayBackend" yaml:"quayBackend" doc:"Quay image storage backend" enum:"RadosGWStorage,LocalStorage"`
+	QuayBackendRGWConfiguration *QuayBackendRGWConfiguration `json:"quayBackendRGWConfiguration,omitempty" yaml:"quayBackendRGWConfiguration,omitempty" doc:"RadosGW/S3 backend config (required when quayBackend is RadosGWStorage)"`
+
+	// Storage
+	BlockStorageBackend string  `json:"blockStorageBackend" yaml:"blockStorageBackend" doc:"Block storage backend" enum:"lvms,odf"`
+	StoragePlugin       *string `json:"storage_plugin,omitempty" yaml:"storage_plugin,omitempty" doc:"Modern replacement for blockStorageBackend" enum:"lvms,odf"`
+	ODFExternalConfig   *string `json:"odfExternalConfig,omitempty" yaml:"odfExternalConfig,omitempty" doc:"ODF external Ceph cluster config JSON (required when blockStorageBackend is odf)"`
+	LVMSConfig          any     `json:"lvmsConfig,omitempty" yaml:"lvmsConfig,omitempty" doc:"LVMS device selector configuration"`
+
+	// Plugins
+	EnabledPlugins []string `json:"enabled_plugins,omitempty" yaml:"enabled_plugins,omitempty" doc:"Plugins to deploy"`
+	Disconnected   *bool    `json:"disconnected,omitempty" yaml:"disconnected,omitempty" doc:"Air-gapped deployment mode (default: true)"`
+
+	// Auth
+	PullSecret any    `json:"pullSecret" yaml:"pullSecret" doc:"OpenShift pull secret object"`
+	SSHPubPath string `json:"sshPubPath" yaml:"sshPubPath" doc:"Path to SSH public key file" minLength:"1"`
+
+	// Nodes
+	AgentHosts []HostEntry `json:"agent_hosts" yaml:"agent_hosts" doc:"Control plane nodes (exactly 3)" minItems:"3" maxItems:"3"`
+
+	// Optional
+	MasterMaxPods    *int     `json:"masterMaxPods,omitempty" yaml:"masterMaxPods,omitempty" doc:"Maximum pods per node (default: 500)" minimum:"1"`
+	DiskEncryption   *bool    `json:"diskEncryption,omitempty" yaml:"diskEncryption,omitempty" doc:"Enable TPM v2 disk encryption"`
+	OCMirrorLogLevel  *string  `json:"ocMirrorLogLevel,omitempty" yaml:"ocMirrorLogLevel,omitempty" doc:"oc-mirror log level" enum:"trace,debug,info,error"`
+	DefaultNTPServers []string `json:"defaultNtpServers,omitempty" yaml:"defaultNtpServers,omitempty" doc:"Additional NTP server addresses"`
+}
+
+type CertificatesConfig struct {
+	SSLAPICertificateFullChain     *string `json:"sslAPICertificateFullChain,omitempty" yaml:"sslAPICertificateFullChain,omitempty" doc:"PEM-encoded full cert chain for API server"`
+	SSLAPICertificateKey           *string `json:"sslAPICertificateKey,omitempty" yaml:"sslAPICertificateKey,omitempty" doc:"PEM-encoded private key for API server cert"`
+	SSLIngressCertificateFullChain *string `json:"sslIngressCertificateFullChain,omitempty" yaml:"sslIngressCertificateFullChain,omitempty" doc:"PEM-encoded full cert chain for ingress wildcard"`
+	SSLIngressCertificateKey       *string `json:"sslIngressCertificateKey,omitempty" yaml:"sslIngressCertificateKey,omitempty" doc:"PEM-encoded private key for ingress cert"`
+	SSLCACertificate               *string `json:"sslCACertificate,omitempty" yaml:"sslCACertificate,omitempty" doc:"PEM-encoded root CA certificate"`
+	IronicHTTPSCertificate         *string `json:"ironicHTTPSCertificate,omitempty" yaml:"ironicHTTPSCertificate,omitempty" doc:"PEM-encoded TLS cert for Ironic vmedia HTTPS"`
+	IronicHTTPSKey                 *string `json:"ironicHTTPSKey,omitempty" yaml:"ironicHTTPSKey,omitempty" doc:"PEM-encoded private key for Ironic HTTPS cert"`
+}
+
+type CloudInfraConfig struct {
+	DiscoveryHosts []HostEntry `json:"discovery_hosts" yaml:"discovery_hosts" doc:"Worker nodes for hardware discovery"`
+}
+
+type EnclaveConfig struct {
+	Global       GlobalConfig       `json:"global" doc:"Primary cluster configuration (global.yaml)"`
+	Certificates CertificatesConfig `json:"certificates" doc:"TLS certificates (certificates.yaml)"`
+	CloudInfra   CloudInfraConfig   `json:"cloudInfra" doc:"Cloud infrastructure / discovery hosts (cloud_infra.yaml)"`
+}
