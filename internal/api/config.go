@@ -20,7 +20,7 @@ func NewConfigHandler(reader *config.Reader, writer *config.Writer, validator *v
 	return &ConfigHandler{reader: reader, writer: writer, validator: validator}
 }
 
-// --- Input / Output types ---
+// --- Full-config Input / Output types ---
 
 type GetConfigOutput struct {
 	Body models.EnclaveConfig
@@ -53,9 +53,20 @@ type PreviewConfigOutput struct {
 	}
 }
 
+// --- Section Input / Output types ---
+
+type SectionOutput[T any] struct {
+	Body T
+}
+
+type SectionInput[T any] struct {
+	Body T
+}
+
 // --- Registration ---
 
 func (h *ConfigHandler) Register(api huma.API) {
+	// Full-config endpoints
 	huma.Register(api, huma.Operation{
 		OperationID: "get-config",
 		Method:      http.MethodGet,
@@ -75,12 +86,12 @@ func (h *ConfigHandler) Register(api huma.API) {
 	}, h.writeConfig)
 
 	huma.Register(api, huma.Operation{
-		OperationID:   "validate-config",
-		Method:        http.MethodPost,
-		Path:          "/api/v1/config/validate",
-		Summary:       "Validate configuration",
-		Description:   "Validates the candidate configuration against Enclave JSON schemas and returns structured errors.",
-		Tags:          []string{"Config"},
+		OperationID: "validate-config",
+		Method:      http.MethodPost,
+		Path:        "/api/v1/config/validate",
+		Summary:     "Validate configuration",
+		Description: "Validates the candidate configuration against Enclave JSON schemas and returns structured errors.",
+		Tags:        []string{"Config"},
 	}, h.validateConfig)
 
 	huma.Register(api, huma.Operation{
@@ -91,9 +102,86 @@ func (h *ConfigHandler) Register(api huma.API) {
 		Description: "Returns the rendered YAML content for each config file without writing to disk.",
 		Tags:        []string{"Config"},
 	}, h.previewConfig)
+
+	// Section endpoints
+	registerSection(api, h, "lz", "Landing Zone", "Landing zone configuration",
+		func(cfg *models.EnclaveConfig) models.LandingZoneConfig { return cfg.Global.LandingZoneConfig },
+		func(cfg *models.EnclaveConfig, v models.LandingZoneConfig) { cfg.Global.LandingZoneConfig = v },
+	)
+	registerSection(api, h, "cluster", "Cluster", "Management cluster install configuration",
+		func(cfg *models.EnclaveConfig) models.ClusterConfig { return cfg.Global.ClusterConfig },
+		func(cfg *models.EnclaveConfig, v models.ClusterConfig) { cfg.Global.ClusterConfig = v },
+	)
+	registerSection(api, h, "network", "Network", "Host network configuration",
+		func(cfg *models.EnclaveConfig) models.NetworkConfig { return cfg.Global.NetworkConfig },
+		func(cfg *models.EnclaveConfig, v models.NetworkConfig) { cfg.Global.NetworkConfig = v },
+	)
+	registerSection(api, h, "quay", "Quay", "Quay registry configuration",
+		func(cfg *models.EnclaveConfig) models.QuayConfig { return cfg.Global.QuayConfig },
+		func(cfg *models.EnclaveConfig, v models.QuayConfig) { cfg.Global.QuayConfig = v },
+	)
+	registerSection(api, h, "storage", "Storage", "Block storage configuration",
+		func(cfg *models.EnclaveConfig) models.StorageConfig { return cfg.Global.StorageConfig },
+		func(cfg *models.EnclaveConfig, v models.StorageConfig) { cfg.Global.StorageConfig = v },
+	)
+	registerSection(api, h, "plugins", "Plugins", "Enabled plugins configuration",
+		func(cfg *models.EnclaveConfig) models.PluginsConfig { return cfg.Global.PluginsConfig },
+		func(cfg *models.EnclaveConfig, v models.PluginsConfig) { cfg.Global.PluginsConfig = v },
+	)
+	registerSection(api, h, "certificates", "Certificates", "TLS certificates",
+		func(cfg *models.EnclaveConfig) models.CertificatesConfig { return cfg.Certificates },
+		func(cfg *models.EnclaveConfig, v models.CertificatesConfig) { cfg.Certificates = v },
+	)
+	registerSection(api, h, "hosts", "Hosts", "Discovery hosts (cloud infrastructure)",
+		func(cfg *models.EnclaveConfig) models.CloudInfraConfig { return cfg.CloudInfra },
+		func(cfg *models.EnclaveConfig, v models.CloudInfraConfig) { cfg.CloudInfra = v },
+	)
 }
 
-// --- Handlers ---
+func registerSection[T any](
+	api huma.API,
+	h *ConfigHandler,
+	path, tag, summary string,
+	get func(*models.EnclaveConfig) T,
+	set func(*models.EnclaveConfig, T),
+) {
+	huma.Register(api, huma.Operation{
+		OperationID: "get-config-" + path,
+		Method:      http.MethodGet,
+		Path:        "/api/v1/config/" + path,
+		Summary:     "Load " + summary,
+		Tags:        []string{tag},
+	}, func(_ context.Context, _ *struct{}) (*SectionOutput[T], error) {
+		cfg, err := h.reader.ReadAll()
+		if err != nil {
+			return nil, huma.Error500InternalServerError("failed to read config", err)
+		}
+		return &SectionOutput[T]{Body: get(cfg)}, nil
+	})
+
+	huma.Register(api, huma.Operation{
+		OperationID: "write-config-" + path,
+		Method:      http.MethodPut,
+		Path:        "/api/v1/config/" + path,
+		Summary:     "Update " + summary,
+		Tags:        []string{tag},
+	}, func(_ context.Context, input *SectionInput[T]) (*struct{}, error) {
+		cfg, err := h.reader.ReadAll()
+		if err != nil {
+			return nil, huma.Error500InternalServerError("failed to read config", err)
+		}
+		set(cfg, input.Body)
+		if errs := h.validator.Validate(cfg); len(errs) > 0 {
+			return nil, huma.Error422UnprocessableEntity("config validation failed")
+		}
+		if err := h.writer.WriteAll(cfg); err != nil {
+			return nil, huma.Error500InternalServerError("failed to write config", err)
+		}
+		return nil, nil
+	})
+}
+
+// --- Full-config Handlers ---
 
 func (h *ConfigHandler) getConfig(_ context.Context, _ *struct{}) (*GetConfigOutput, error) {
 	cfg, err := h.reader.ReadAll()

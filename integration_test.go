@@ -25,52 +25,62 @@ func testConfig() models.EnclaveConfig {
 	disc := true
 	return models.EnclaveConfig{
 		Global: models.GlobalConfig{
-			WorkingDir:          "/home/enclave",
-			BaseDomain:          "enclave-test.nodns.in",
-			ClusterName:         "mgmt",
-			MachineNetwork:      "192.168.2.0/24",
-			APIVIP:              "192.168.2.10",
-			IngressVIP:          "192.168.2.11",
-			RendezvousIP:        "192.168.2.100",
-			DefaultDNS:          "192.168.2.1",
-			DefaultGateway:      "192.168.2.1",
-			DefaultPrefix:       24,
-			LZBMCIP:             "192.168.2.50",
-			QuayUser:            "admin",
-			QuayPassword:        "secret",
-			QuayBackend:         "LocalStorage",
-			BlockStorageBackend: "lvms",
-			PullSecret:          map[string]any{"auths": map[string]any{}},
-			SSHPubPath:          "/home/enclave/.ssh/id_rsa.pub",
-			Disconnected:        &disc,
-			AgentHosts: []models.HostEntry{
-				{
-					Name:            "cp-0",
-					MACAddress:      "aa:bb:cc:dd:ee:01",
-					IPAddress:       "192.168.2.100",
-					Redfish:         "192.168.2.200",
-					RedfishUser:     "admin",
-					RedfishPassword: "redfish-pass",
-					RootDisk:        "/dev/disk/by-path/pci-0000:00:11.4-ata-1.0",
+			LandingZoneConfig: models.LandingZoneConfig{
+				WorkingDir:   "/home/enclave",
+				LZBMCIP:      "192.168.2.50",
+				Disconnected: &disc,
+			},
+			ClusterConfig: models.ClusterConfig{
+				BaseDomain:     "enclave-test.nodns.in",
+				ClusterName:    "mgmt",
+				MachineNetwork: "192.168.2.0/24",
+				APIVIP:         "192.168.2.10",
+				IngressVIP:     "192.168.2.11",
+				RendezvousIP:   "192.168.2.100",
+				PullSecret:     map[string]any{"auths": map[string]any{}},
+				SSHPubPath:     "/home/enclave/.ssh/id_rsa.pub",
+				AgentHosts: []models.HostEntry{
+					{
+						Name:            "cp-0",
+						MACAddress:      "aa:bb:cc:dd:ee:01",
+						IPAddress:       "192.168.2.100",
+						Redfish:         "192.168.2.200",
+						RedfishUser:     "admin",
+						RedfishPassword: "redfish-pass",
+						RootDisk:        "/dev/disk/by-path/pci-0000:00:11.4-ata-1.0",
+					},
+					{
+						Name:            "cp-1",
+						MACAddress:      "aa:bb:cc:dd:ee:02",
+						IPAddress:       "192.168.2.101",
+						Redfish:         "192.168.2.201",
+						RedfishUser:     "admin",
+						RedfishPassword: "redfish-pass",
+						RootDisk:        "/dev/disk/by-path/pci-0000:00:11.4-ata-1.0",
+					},
+					{
+						Name:            "cp-2",
+						MACAddress:      "aa:bb:cc:dd:ee:03",
+						IPAddress:       "192.168.2.102",
+						Redfish:         "192.168.2.202",
+						RedfishUser:     "admin",
+						RedfishPassword: "redfish-pass",
+						RootDisk:        "/dev/disk/by-path/pci-0000:00:11.4-ata-1.0",
+					},
 				},
-				{
-					Name:            "cp-1",
-					MACAddress:      "aa:bb:cc:dd:ee:02",
-					IPAddress:       "192.168.2.101",
-					Redfish:         "192.168.2.201",
-					RedfishUser:     "admin",
-					RedfishPassword: "redfish-pass",
-					RootDisk:        "/dev/disk/by-path/pci-0000:00:11.4-ata-1.0",
-				},
-				{
-					Name:            "cp-2",
-					MACAddress:      "aa:bb:cc:dd:ee:03",
-					IPAddress:       "192.168.2.102",
-					Redfish:         "192.168.2.202",
-					RedfishUser:     "admin",
-					RedfishPassword: "redfish-pass",
-					RootDisk:        "/dev/disk/by-path/pci-0000:00:11.4-ata-1.0",
-				},
+			},
+			NetworkConfig: models.NetworkConfig{
+				DefaultDNS:     "192.168.2.1",
+				DefaultGateway: "192.168.2.1",
+				DefaultPrefix:  24,
+			},
+			QuayConfig: models.QuayConfig{
+				QuayUser:     "admin",
+				QuayPassword: "secret",
+				QuayBackend:  "LocalStorage",
+			},
+			StorageConfig: models.StorageConfig{
+				BlockStorageBackend: "lvms",
 			},
 		},
 		Certificates: models.CertificatesConfig{
@@ -219,6 +229,241 @@ func TestWriteConfigRoundTrip(t *testing.T) {
 		t.Fatal("round-trip: sslCACertificate is nil")
 	}
 	assertEqual(t, "sslCACertificate", *cfg.Certificates.SSLCACertificate, *got.Certificates.SSLCACertificate)
+}
+
+func TestGetConfigSection(t *testing.T) {
+	srv, _ := setupTestServer(t)
+	defer srv.Close()
+
+	cfg := testConfig()
+	body, _ := json.Marshal(cfg)
+
+	putReq, _ := http.NewRequest(http.MethodPut, srv.URL+"/api/v1/config", bytes.NewReader(body))
+	putReq.Header.Set("Content-Type", "application/json")
+	putResp, err := http.DefaultClient.Do(putReq)
+	if err != nil {
+		t.Fatalf("PUT: %v", err)
+	}
+	putResp.Body.Close()
+
+	t.Run("lz", func(t *testing.T) {
+		resp, err := http.Get(srv.URL + "/api/v1/config/lz")
+		if err != nil {
+			t.Fatalf("GET: %v", err)
+		}
+		defer resp.Body.Close()
+		var got models.LandingZoneConfig
+		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		assertEqual(t, "workingDir", cfg.Global.WorkingDir, got.WorkingDir)
+		assertEqual(t, "lzBmcIP", cfg.Global.LZBMCIP, got.LZBMCIP)
+	})
+
+	t.Run("cluster", func(t *testing.T) {
+		resp, err := http.Get(srv.URL + "/api/v1/config/cluster")
+		if err != nil {
+			t.Fatalf("GET: %v", err)
+		}
+		defer resp.Body.Close()
+		var got models.ClusterConfig
+		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		assertEqual(t, "clusterName", cfg.Global.ClusterName, got.ClusterName)
+		assertEqual(t, "baseDomain", cfg.Global.BaseDomain, got.BaseDomain)
+		assertEqual(t, "agent_hosts count", len(cfg.Global.AgentHosts), len(got.AgentHosts))
+	})
+
+	t.Run("network", func(t *testing.T) {
+		resp, err := http.Get(srv.URL + "/api/v1/config/network")
+		if err != nil {
+			t.Fatalf("GET: %v", err)
+		}
+		defer resp.Body.Close()
+		var got models.NetworkConfig
+		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		assertEqual(t, "defaultDNS", cfg.Global.DefaultDNS, got.DefaultDNS)
+		assertEqual(t, "defaultGateway", cfg.Global.DefaultGateway, got.DefaultGateway)
+		assertEqual(t, "defaultPrefix", cfg.Global.DefaultPrefix, got.DefaultPrefix)
+	})
+
+	t.Run("quay", func(t *testing.T) {
+		resp, err := http.Get(srv.URL + "/api/v1/config/quay")
+		if err != nil {
+			t.Fatalf("GET: %v", err)
+		}
+		defer resp.Body.Close()
+		var got models.QuayConfig
+		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		assertEqual(t, "quayUser", cfg.Global.QuayUser, got.QuayUser)
+		assertEqual(t, "quayBackend", cfg.Global.QuayBackend, got.QuayBackend)
+	})
+
+	t.Run("storage", func(t *testing.T) {
+		resp, err := http.Get(srv.URL + "/api/v1/config/storage")
+		if err != nil {
+			t.Fatalf("GET: %v", err)
+		}
+		defer resp.Body.Close()
+		var got models.StorageConfig
+		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		assertEqual(t, "blockStorageBackend", cfg.Global.BlockStorageBackend, got.BlockStorageBackend)
+	})
+
+	t.Run("certificates", func(t *testing.T) {
+		resp, err := http.Get(srv.URL + "/api/v1/config/certificates")
+		if err != nil {
+			t.Fatalf("GET: %v", err)
+		}
+		defer resp.Body.Close()
+		var got models.CertificatesConfig
+		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		if got.SSLCACertificate == nil {
+			t.Fatal("sslCACertificate is nil")
+		}
+		assertEqual(t, "sslCACertificate", *cfg.Certificates.SSLCACertificate, *got.SSLCACertificate)
+	})
+
+	t.Run("hosts", func(t *testing.T) {
+		resp, err := http.Get(srv.URL + "/api/v1/config/hosts")
+		if err != nil {
+			t.Fatalf("GET: %v", err)
+		}
+		defer resp.Body.Close()
+		var got models.CloudInfraConfig
+		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		assertEqual(t, "discovery_hosts count", len(cfg.CloudInfra.DiscoveryHosts), len(got.DiscoveryHosts))
+		assertEqual(t, "discovery_hosts[0].name", cfg.CloudInfra.DiscoveryHosts[0].Name, got.DiscoveryHosts[0].Name)
+	})
+}
+
+func TestWriteConfigSection(t *testing.T) {
+	srv, enclaveDir := setupTestServer(t)
+	defer srv.Close()
+
+	cfg := testConfig()
+	body, _ := json.Marshal(cfg)
+
+	putReq, _ := http.NewRequest(http.MethodPut, srv.URL+"/api/v1/config", bytes.NewReader(body))
+	putReq.Header.Set("Content-Type", "application/json")
+	putResp, err := http.DefaultClient.Do(putReq)
+	if err != nil {
+		t.Fatalf("PUT full config: %v", err)
+	}
+	putResp.Body.Close()
+
+	t.Run("update network leaves cluster untouched", func(t *testing.T) {
+		updated := models.NetworkConfig{
+			DefaultDNS:     "10.0.0.1",
+			DefaultGateway: "10.0.0.254",
+			DefaultPrefix:  16,
+		}
+		secBody, _ := json.Marshal(updated)
+		req, _ := http.NewRequest(http.MethodPut, srv.URL+"/api/v1/config/network", bytes.NewReader(secBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("PUT /config/network: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("expected 204, got %d", resp.StatusCode)
+		}
+
+		data, _ := os.ReadFile(filepath.Join(enclaveDir, "config", "global.yaml"))
+		var got models.GlobalConfig
+		if err := yaml.Unmarshal(data, &got); err != nil {
+			t.Fatalf("parsing global.yaml: %v", err)
+		}
+		assertEqual(t, "defaultDNS", "10.0.0.1", got.DefaultDNS)
+		assertEqual(t, "defaultGateway", "10.0.0.254", got.DefaultGateway)
+		assertEqual(t, "defaultPrefix", 16, got.DefaultPrefix)
+		assertEqual(t, "clusterName unchanged", cfg.Global.ClusterName, got.ClusterName)
+		assertEqual(t, "baseDomain unchanged", cfg.Global.BaseDomain, got.BaseDomain)
+		assertEqual(t, "quayUser unchanged", cfg.Global.QuayUser, got.QuayUser)
+	})
+
+	t.Run("update certificates leaves global untouched", func(t *testing.T) {
+		updated := models.CertificatesConfig{
+			SSLCACertificate: strPtr("-----BEGIN CERTIFICATE-----\nNEW\n-----END CERTIFICATE-----"),
+		}
+		secBody, _ := json.Marshal(updated)
+		req, _ := http.NewRequest(http.MethodPut, srv.URL+"/api/v1/config/certificates", bytes.NewReader(secBody))
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatalf("PUT /config/certificates: %v", err)
+		}
+		resp.Body.Close()
+		if resp.StatusCode != http.StatusNoContent {
+			t.Fatalf("expected 204, got %d", resp.StatusCode)
+		}
+
+		data, _ := os.ReadFile(filepath.Join(enclaveDir, "config", "certificates.yaml"))
+		var gotCerts models.CertificatesConfig
+		if err := yaml.Unmarshal(data, &gotCerts); err != nil {
+			t.Fatalf("parsing certificates.yaml: %v", err)
+		}
+		if gotCerts.SSLCACertificate == nil {
+			t.Fatal("sslCACertificate is nil after update")
+		}
+		assertEqual(t, "sslCACertificate", "-----BEGIN CERTIFICATE-----\nNEW\n-----END CERTIFICATE-----", *gotCerts.SSLCACertificate)
+
+		data, _ = os.ReadFile(filepath.Join(enclaveDir, "config", "global.yaml"))
+		var gotGlobal models.GlobalConfig
+		if err := yaml.Unmarshal(data, &gotGlobal); err != nil {
+			t.Fatalf("parsing global.yaml: %v", err)
+		}
+		assertEqual(t, "clusterName unchanged", cfg.Global.ClusterName, gotGlobal.ClusterName)
+	})
+}
+
+func TestWriteConfigSectionRoundTrip(t *testing.T) {
+	srv, _ := setupTestServer(t)
+	defer srv.Close()
+
+	want := models.StorageConfig{
+		BlockStorageBackend: "odf",
+		ODFExternalConfig:   strPtr(`{"key":"value"}`),
+	}
+	body, _ := json.Marshal(want)
+	putReq, _ := http.NewRequest(http.MethodPut, srv.URL+"/api/v1/config/storage", bytes.NewReader(body))
+	putReq.Header.Set("Content-Type", "application/json")
+	putResp, err := http.DefaultClient.Do(putReq)
+	if err != nil {
+		t.Fatalf("PUT: %v", err)
+	}
+	putResp.Body.Close()
+	if putResp.StatusCode != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d", putResp.StatusCode)
+	}
+
+	getResp, err := http.Get(srv.URL + "/api/v1/config/storage")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer getResp.Body.Close()
+
+	var got models.StorageConfig
+	if err := json.NewDecoder(getResp.Body).Decode(&got); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	assertEqual(t, "blockStorageBackend", want.BlockStorageBackend, got.BlockStorageBackend)
+	if got.ODFExternalConfig == nil {
+		t.Fatal("odfExternalConfig is nil after round-trip")
+	}
+	assertEqual(t, "odfExternalConfig", *want.ODFExternalConfig, *got.ODFExternalConfig)
 }
 
 func assertEqual[T comparable](t *testing.T, field string, want, got T) {
