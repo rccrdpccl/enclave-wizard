@@ -19,21 +19,27 @@ type Options struct {
 	EnclaveDir string `help:"Path to the Enclave repository root" default:"../enclave"`
 }
 
+func SetupAPI(mux *http.ServeMux, enclaveDir string) huma.API {
+	apiConfig := huma.DefaultConfig("Enclave Configuration Wizard", "0.1.0")
+	apiConfig.Info.Description = "API for managing Enclave deployment configuration files on the Landing Zone."
+	humaAPI := humago.New(mux, apiConfig)
+
+	reader := config.NewReader(enclaveDir)
+	writer := config.NewWriter(enclaveDir)
+	validator := validation.NewValidator(enclaveDir)
+	loader := plugins.NewLoader(enclaveDir)
+
+	api.NewConfigHandler(reader, writer, validator).Register(humaAPI)
+	api.NewDefaultsHandler(enclaveDir).Register(humaAPI)
+	api.NewPluginsHandler(loader).Register(humaAPI)
+
+	return humaAPI
+}
+
 func main() {
 	cli := humacli.New(func(hooks humacli.Hooks, opts *Options) {
 		mux := http.NewServeMux()
-		apiConfig := huma.DefaultConfig("Enclave Configuration Wizard", "0.1.0")
-		apiConfig.Info.Description = "API for managing Enclave deployment configuration files on the Landing Zone."
-		humaAPI := humago.New(mux, apiConfig)
-
-		reader := config.NewReader(opts.EnclaveDir)
-		writer := config.NewWriter(opts.EnclaveDir)
-		validator := validation.NewValidator(opts.EnclaveDir)
-		loader := plugins.NewLoader(opts.EnclaveDir)
-
-		api.NewConfigHandler(reader, writer, validator).Register(humaAPI)
-		api.NewDefaultsHandler(opts.EnclaveDir).Register(humaAPI)
-		api.NewPluginsHandler(loader).Register(humaAPI)
+		SetupAPI(mux, opts.EnclaveDir)
 
 		hooks.OnStart(func() {
 			fmt.Printf("Enclave Wizard API listening on :%d (enclave-dir: %s)\n", opts.Port, opts.EnclaveDir)
