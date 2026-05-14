@@ -20,3 +20,11 @@ clean:
 
 tidy:
 	$(GO) mod tidy
+
+deploy:
+	@test -n "$(TARGET)" || (echo "Usage: make deploy TARGET=root@host" && exit 1)
+	hack/deploy-wizard $(TARGET)
+
+teardown:
+	@test -n "$(TARGET)" || (echo "Usage: make teardown TARGET=root@host" && exit 1)
+	hack/teardown-wizard $(TARGET)

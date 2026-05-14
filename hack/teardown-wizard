@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <user@host>"
+    echo "Example: $0 root@myserver.example.com"
+    exit 1
+fi
+
+TARGET="$1"
+
+echo "=== Tearing down Enclave Wizard on ${TARGET} ==="
+
+ssh -o StrictHostKeyChecking=no "${TARGET}" '
+    systemctl stop enclave-wizard-ui 2>/dev/null || true
+    systemctl stop enclave-wizard-api 2>/dev/null || true
+    systemctl disable enclave-wizard-api 2>/dev/null || true
+    rm -f /etc/containers/systemd/enclave-wizard-*.container
+    rm -f /etc/containers/systemd/enclave-wizard-*.network
+    rm -f /etc/systemd/system/enclave-wizard-api.service
+    systemctl daemon-reload
+    podman rmi -f localhost/enclave-wizard-ui:dev 2>/dev/null || true
+    rm -f /usr/local/bin/enclave-wizard
+    rm -rf /opt/enclave /etc/enclave-wizard /tmp/quadlets /tmp/provision.sh /tmp/nginx-deploy.conf
+    firewall-cmd --remove-port=3001/tcp --permanent 2>/dev/null || true
+    firewall-cmd --remove-port=8080/tcp --permanent 2>/dev/null || true
+    firewall-cmd --reload 2>/dev/null || true
+'
+
+echo "Done."

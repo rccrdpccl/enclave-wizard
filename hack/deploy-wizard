@@ -1,0 +1,65 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <user@host>"
+    echo "Example: $0 root@myserver.example.com"
+    exit 1
+fi
+
+TARGET="$1"
+WIZARD_PORT=3001
+
+echo "=== Deploying Enclave Wizard to ${TARGET} ==="
+
+echo ""
+echo "[1/5] Building..."
+# Build Go binary for linux/amd64
+podman run --rm -v "${REPO_DIR}:/app:z" -w /app golang:latest \
+    sh -c "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o enclave-wizard ." 2>&1 | tail -5
+# Build UI container image
+podman build -q -f "${REPO_DIR}/ui/Containerfile" -t enclave-wizard-ui:dev "${REPO_DIR}/ui"
+
+echo "[2/5] Transferring..."
+scp -o StrictHostKeyChecking=no -q "${REPO_DIR}/enclave-wizard" "${TARGET}:/usr/local/bin/enclave-wizard"
+podman save enclave-wizard-ui:dev | ssh -o StrictHostKeyChecking=no "${TARGET}" "podman load" > /dev/null
+
+echo "[3/5] Copying files..."
+ssh -o StrictHostKeyChecking=no "${TARGET}" "rm -rf /tmp/quadlets /tmp/provision.sh /tmp/nginx-deploy.conf"
+scp -o StrictHostKeyChecking=no -q "${SCRIPT_DIR}/provision.sh" "${TARGET}:/tmp/provision.sh"
+scp -o StrictHostKeyChecking=no -q "${SCRIPT_DIR}/nginx-deploy.conf" "${TARGET}:/tmp/nginx-deploy.conf"
+scp -o StrictHostKeyChecking=no -qr "${SCRIPT_DIR}/quadlets" "${TARGET}:/tmp/quadlets"
+
+echo "[4/5] Provisioning..."
+ssh -o StrictHostKeyChecking=no "${TARGET}" "bash /tmp/provision.sh" 2>&1 | grep -v "^$"
+
+echo "[5/5] Verifying..."
+sleep 3
+HOST=$(echo "${TARGET}" | cut -d@ -f2)
+
+API_OK=false
+UI_OK=false
+PROXY_OK=false
+
+ssh -o StrictHostKeyChecking=no "${TARGET}" "curl -sf http://localhost:8080/api/v1/defaults" > /dev/null 2>&1 && API_OK=true
+ssh -o StrictHostKeyChecking=no "${TARGET}" "curl -sf http://localhost:${WIZARD_PORT}" > /dev/null 2>&1 && UI_OK=true
+curl -sf --connect-timeout 5 "http://${HOST}:${WIZARD_PORT}" > /dev/null 2>&1 && PROXY_OK=true
+
+echo ""
+echo "  API (local):    $( $API_OK && echo 'OK' || echo 'FAIL' )"
+echo "  UI (local):     $( $UI_OK && echo 'OK' || echo 'FAIL' )"
+echo "  UI (external):  $( $PROXY_OK && echo 'OK' || echo 'FAIL - check firewall or DNS' )"
+echo ""
+
+if $UI_OK; then
+    echo "Wizard URL: http://${HOST}:${WIZARD_PORT}/wizard"
+    echo ""
+    echo "To remove:  ./hack/teardown-wizard ${TARGET}"
+else
+    echo "Deployment failed. Check logs with:"
+    echo "  ssh ${TARGET} 'journalctl -u enclave-wizard-api -u enclave-wizard-ui --no-pager -n 20'"
+    exit 1
+fi

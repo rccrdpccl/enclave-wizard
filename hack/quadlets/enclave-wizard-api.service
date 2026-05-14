@@ -1,0 +1,12 @@
+[Unit]
+Description=Enclave Wizard API
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/enclave-wizard --port 8080 --enclave-dir /opt/enclave
+Restart=on-failure
+RestartSec=5
+WorkingDirectory=/opt/enclave
+
+[Install]
+WantedBy=multi-user.target
