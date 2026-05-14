@@ -1,0 +1,21 @@
+{
+  "$schema": "https://esm.sh/@openapitools/openapi-generator-cli@2.26.0/config.schema.json",
+  "spaces": 2,
+  "generator-cli": {
+    "version": "7.18.0",
+    "generators": {
+      "api-client": {
+        "inputSpec": "packages/api-client/api/openapi.yaml",
+        "output": "packages/api-client",
+        "generatorName": "typescript-fetch",
+        "additionalProperties": {
+          "npmName": "@enclave-wizard-ui/api-client",
+          "ensureUniqueParams": true,
+          "supportsES6": true,
+          "withInterfaces": true,
+          "importFileExtension": ".js"
+        }
+      }
+    }
+  }
+}

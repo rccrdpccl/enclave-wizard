@@ -1,0 +1,3 @@
+# Don't overwrite package.json or tsconfig
+package.json
+tsconfig.json

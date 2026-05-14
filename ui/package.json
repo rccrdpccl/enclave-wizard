@@ -1,0 +1,27 @@
+{
+  "name": "enclave-wizard-ui",
+  "type": "module",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "build:all": "yarn workspaces foreach -t --all run build",
+    "clean:all": "rm -rf out && yarn workspaces foreach --all -p run clean",
+    "check:all": "yarn workspaces foreach --all -p run check",
+    "check:fix:all": "yarn workspaces foreach --all -p run check:fix",
+    "test:all": "yarn workspaces foreach --all -p run test",
+    "typecheck:all": "yarn workspaces foreach --all -p run typecheck"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.0.6",
+    "@types/node": "^22.0.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vitejs/plugin-react-swc": "~4.3.0",
+    "typescript": "~5.7.0",
+    "vite": "~6.3.0"
+  },
+  "packageManager": "yarn@4.12.0"
+}
