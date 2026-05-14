@@ -1,0 +1,235 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+usage() {
+    echo "Create VMs with BMC emulation (sushy-tools) for use with the enclave wizard."
+    echo ""
+    echo "Usage: $0 <user@host> [options]"
+    echo ""
+    echo "Options:"
+    echo "  -n, --name NAME      VM name prefix (default: enclave-node)"
+    echo "  -c, --count N        Number of VMs to create (default: 3)"
+    echo "  -m, --memory MB      Memory per VM in MB (default: 16384)"
+    echo "  -v, --vcpus N        vCPUs per VM (default: 4)"
+    echo "  -d, --disk GB        Disk size per VM in GB (default: 100)"
+    echo "  -o, --output DIR     Output directory for host specs (default: ./out/hosts)"
+    echo ""
+    echo "Examples:"
+    echo "  $0 root@myserver.example.com                    # 3 VMs with defaults"
+    echo "  $0 root@myserver.example.com -c 5 -n worker     # 5 VMs named worker-01..05"
+    echo "  $0 root@myserver.example.com -c 3 -n hub-cp     # 3 hub control plane nodes"
+    exit 1
+}
+
+if [ $# -lt 1 ]; then
+    usage
+fi
+
+TARGET="$1"
+shift
+
+SSH="ssh -o StrictHostKeyChecking=no"
+VM_PREFIX="enclave-node"
+VM_COUNT=3
+VM_MEMORY=16384
+VM_VCPUS=4
+VM_DISK_GB=100
+OUTPUT_DIR="./out/hosts"
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -n|--name)   VM_PREFIX="$2"; shift 2;;
+        -c|--count)  VM_COUNT="$2"; shift 2;;
+        -m|--memory) VM_MEMORY="$2"; shift 2;;
+        -v|--vcpus)  VM_VCPUS="$2"; shift 2;;
+        -d|--disk)   VM_DISK_GB="$2"; shift 2;;
+        -o|--output) OUTPUT_DIR="$2"; shift 2;;
+        -h|--help)   usage;;
+        *)           echo "Unknown option: $1"; usage;;
+    esac
+done
+
+NETWORK_NAME="enclave-bmc"
+NETWORK_BRIDGE="enclave-bmc"
+NETWORK_SUBNET="192.168.223"
+SUSHY_IP="${NETWORK_SUBNET}.1"
+SUSHY_PORT="8100"
+SUSHY_CONTAINER="enclave-sushy-tools"
+SUSHY_IMAGE="quay.io/metal3-io/sushy-tools:latest"
+
+echo "=== Creating ${VM_COUNT} BMC-emulated VMs on ${TARGET} ==="
+echo "  Prefix: ${VM_PREFIX}"
+echo "  Specs:  ${VM_VCPUS} vCPUs, ${VM_MEMORY}MB RAM, ${VM_DISK_GB}GB disk"
+echo "  Network: ${NETWORK_SUBNET}.0/24 (${NETWORK_NAME})"
+echo "  Sushy:   ${SUSHY_IP}:${SUSHY_PORT}"
+echo ""
+
+# --- Ensure network and sushy-tools exist on target ---
+echo "[setup] Ensuring BMC network and sushy-tools..."
+${SSH} "${TARGET}" "
+    set -e
+
+    # Create libvirt network if not present
+    if ! virsh net-info ${NETWORK_NAME} &>/dev/null; then
+        cat > /tmp/${NETWORK_NAME}-net.xml <<NETEOF
+<network>
+  <name>${NETWORK_NAME}</name>
+  <forward mode='nat'>
+    <nat>
+      <port start='1024' end='65535'/>
+    </nat>
+  </forward>
+  <bridge name='${NETWORK_BRIDGE}' stp='on' delay='0'/>
+  <ip address='${SUSHY_IP}' netmask='255.255.255.0'>
+    <dhcp>
+      <range start='${NETWORK_SUBNET}.10' end='${NETWORK_SUBNET}.254'/>
+    </dhcp>
+  </ip>
+</network>
+NETEOF
+        virsh net-define /tmp/${NETWORK_NAME}-net.xml
+        virsh net-start ${NETWORK_NAME}
+        virsh net-autostart ${NETWORK_NAME}
+        rm /tmp/${NETWORK_NAME}-net.xml
+        echo '  Network created: ${NETWORK_NAME}'
+    else
+        virsh net-start ${NETWORK_NAME} 2>/dev/null || true
+        echo '  Network exists: ${NETWORK_NAME}'
+    fi
+
+    # Create sushy-tools config
+    cat > /tmp/${SUSHY_CONTAINER}.conf <<SEOF
+SUSHY_EMULATOR_LISTEN_IP = u\"${SUSHY_IP}\"
+SUSHY_EMULATOR_LISTEN_PORT = ${SUSHY_PORT}
+SUSHY_EMULATOR_LIBVIRT_URI = u\"qemu:///system\"
+SEOF
+
+    # Start sushy-tools if not running
+    if ! podman ps --format '{{.Names}}' | grep -q '^${SUSHY_CONTAINER}\$'; then
+        podman rm -f ${SUSHY_CONTAINER} 2>/dev/null || true
+        podman run -d \
+            --name ${SUSHY_CONTAINER} \
+            --network host \
+            -v /tmp/${SUSHY_CONTAINER}.conf:/etc/sushy/sushy-emulator.conf:Z \
+            -v /var/run/libvirt:/var/run/libvirt:Z \
+            ${SUSHY_IMAGE} \
+            sushy-emulator --config /etc/sushy/sushy-emulator.conf
+        echo '  Sushy-tools started: ${SUSHY_CONTAINER}'
+    else
+        echo '  Sushy-tools running: ${SUSHY_CONTAINER}'
+    fi
+"
+
+echo ""
+mkdir -p "${OUTPUT_DIR}"
+
+# --- Create VMs ---
+for i in $(seq 1 "${VM_COUNT}"); do
+    NUM=$(printf "%02d" "${i}")
+    VM_NAME="${VM_PREFIX}-${NUM}"
+    MAC=$(printf "00:60:2f:%02x:%02x:%02x" $((RANDOM%256)) $((RANDOM%256)) $((i)))
+
+    echo "[${i}/${VM_COUNT}] Creating ${VM_NAME} (MAC: ${MAC})..."
+
+    ${SSH} "${TARGET}" "
+        set -e
+        IMG_DIR=/var/lib/libvirt/images
+
+        # Remove existing VM with same name
+        virsh destroy ${VM_NAME} 2>/dev/null || true
+        virsh undefine ${VM_NAME} --remove-all-storage --nvram 2>/dev/null || true
+
+        # Create disk
+        qemu-img create -f qcow2 \${IMG_DIR}/${VM_NAME}.qcow2 ${VM_DISK_GB}G 2>/dev/null
+
+        # Create VM (defined but not booted)
+        virt-install \
+            --name ${VM_NAME} \
+            --memory ${VM_MEMORY} \
+            --vcpus ${VM_VCPUS} \
+            --disk path=\${IMG_DIR}/${VM_NAME}.qcow2,format=qcow2 \
+            --os-variant fedora-unknown \
+            --network network=${NETWORK_NAME},mac=${MAC} \
+            --boot uefi \
+            --graphics none \
+            --console pty,target_type=serial \
+            --noautoconsole \
+            --import \
+            --quiet
+
+        # Shut it off — we just want it defined for sushy
+        virsh destroy ${VM_NAME} 2>/dev/null || true
+    "
+
+    VM_UUID=$(${SSH} "${TARGET}" "virsh domuuid ${VM_NAME}")
+    REDFISH_URL="http://${SUSHY_IP}:${SUSHY_PORT}/redfish/v1/Systems/${VM_UUID}"
+
+    # Write host spec file
+    SPEC_FILE="${OUTPUT_DIR}/${VM_NAME}.yaml"
+    cat > "${SPEC_FILE}" <<EOF
+# Host spec for ${VM_NAME}
+# Use these values in the enclave wizard
+name: "${VM_NAME}"
+macAddress: "${MAC}"
+ipAddress: ""  # Assigned by DHCP on ${NETWORK_NAME} network (${NETWORK_SUBNET}.0/24)
+redfish: "${SUSHY_IP}"
+redfishUser: "admin"
+redfishPassword: "password"
+rootDisk: "/dev/vda"
+bmcSystemId: "${VM_UUID}"
+
+# Redfish BMC URL (full)
+bmcAddress: "redfish-virtualmedia+${REDFISH_URL}"
+
+# VM specs
+vcpus: ${VM_VCPUS}
+memory_mb: ${VM_MEMORY}
+disk_gb: ${VM_DISK_GB}
+network: ${NETWORK_NAME}
+EOF
+
+    echo "  UUID: ${VM_UUID}"
+    echo "  BMC:  ${REDFISH_URL}"
+    echo "  Spec: ${SPEC_FILE}"
+    echo ""
+done
+
+# --- Write combined summary ---
+SUMMARY_FILE="${OUTPUT_DIR}/${VM_PREFIX}-all.yaml"
+cat > "${SUMMARY_FILE}" <<EOF
+# Combined host specs for enclave wizard
+# Generated: $(date -Iseconds)
+# Target: ${TARGET}
+# Network: ${NETWORK_NAME} (${NETWORK_SUBNET}.0/24)
+# Sushy-tools: http://${SUSHY_IP}:${SUSHY_PORT}
+# BMC credentials: admin / password
+
+hosts:
+EOF
+
+for f in "${OUTPUT_DIR}/${VM_PREFIX}"-[0-9]*.yaml; do
+    NAME=$(grep "^name:" "$f" | awk '{print $2}' | tr -d '"')
+    MAC=$(grep "^macAddress:" "$f" | awk '{print $2}' | tr -d '"')
+    UUID=$(grep "^bmcSystemId:" "$f" | awk '{print $2}' | tr -d '"')
+    cat >> "${SUMMARY_FILE}" <<EOF
+  - name: "${NAME}"
+    macAddress: "${MAC}"
+    ipAddress: ""
+    redfish: "${SUSHY_IP}"
+    redfishUser: "admin"
+    redfishPassword: "password"
+    rootDisk: "/dev/vda"
+    bmcSystemId: "${UUID}"
+EOF
+done
+
+echo "=== Done ==="
+echo ""
+echo "Host specs:       ${OUTPUT_DIR}/${VM_PREFIX}-*.yaml"
+echo "Combined summary: ${SUMMARY_FILE}"
+echo ""
+echo "Verify BMC:"
+echo "  ssh ${TARGET} 'curl -s http://${SUSHY_IP}:${SUSHY_PORT}/redfish/v1/Systems | python3 -m json.tool'"
+echo ""
+echo "Destroy VMs:"
+echo "  ./hack/destroy-bmc-vms ${TARGET} -n ${VM_PREFIX} -c ${VM_COUNT}"

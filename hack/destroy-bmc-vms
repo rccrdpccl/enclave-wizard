@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <user@host> [-n prefix] [-c count]"
+    exit 1
+fi
+
+TARGET="$1"
+shift
+
+SSH="ssh -o StrictHostKeyChecking=no"
+VM_PREFIX="enclave-node"
+VM_COUNT=3
+DESTROY_INFRA=false
+
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -n|--name)   VM_PREFIX="$2"; shift 2;;
+        -c|--count)  VM_COUNT="$2"; shift 2;;
+        --all)       DESTROY_INFRA=true; shift;;
+        *)           shift;;
+    esac
+done
+
+echo "=== Destroying BMC VMs on ${TARGET} ==="
+
+for i in $(seq 1 "${VM_COUNT}"); do
+    NUM=$(printf "%02d" "${i}")
+    VM_NAME="${VM_PREFIX}-${NUM}"
+    echo "  Destroying ${VM_NAME}..."
+    ${SSH} "${TARGET}" "
+        virsh destroy ${VM_NAME} 2>/dev/null || true
+        virsh undefine ${VM_NAME} --remove-all-storage --nvram 2>/dev/null || true
+    "
+done
+
+if $DESTROY_INFRA; then
+    echo "  Destroying sushy-tools and network..."
+    ${SSH} "${TARGET}" "
+        podman rm -f enclave-sushy-tools 2>/dev/null || true
+        virsh net-destroy enclave-bmc 2>/dev/null || true
+        virsh net-undefine enclave-bmc 2>/dev/null || true
+        rm -f /tmp/enclave-sushy-tools.conf
+    "
+fi
+
+rm -rf ./out/hosts/${VM_PREFIX}-*.yaml 2>/dev/null || true
+
+echo "Done."
