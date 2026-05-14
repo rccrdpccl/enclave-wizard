@@ -1,0 +1,23 @@
+services:
+  wizard-ui:
+    build:
+      context: .
+      dockerfile: Containerfile.dev
+    user: "${UID:-1000}:${GID:-1000}"
+    ports:
+      - "3001:3001"
+    volumes:
+      - ./apps/wizard/src:/app/apps/wizard/src:z
+      - ./apps/wizard/public:/app/apps/wizard/public:z
+      - ./packages/ioc/src:/app/packages/ioc/src:z
+    environment:
+      - VITE_API_BASE_URL=http://wizard-api:8080
+
+  wizard-api:
+    build:
+      context: ..
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../../enclave:/enclave:z
+    command: ["./enclave-wizard", "--port", "8080", "--enclave-dir", "/enclave"]

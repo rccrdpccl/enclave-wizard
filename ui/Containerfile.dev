@@ -1,0 +1,22 @@
+FROM node:22-alpine
+
+RUN corepack enable
+
+WORKDIR /app
+
+COPY package.json yarn.lock .yarnrc.yml ./
+COPY .yarn/ .yarn/
+COPY packages/ioc/package.json packages/ioc/
+COPY packages/api-client/package.json packages/api-client/
+COPY apps/wizard/package.json apps/wizard/
+
+RUN yarn install
+
+COPY . .
+
+# Make everything writable so the container works with --userns=keep-id
+RUN chmod -R a+rw /app
+
+EXPOSE 3001
+
+CMD ["yarn", "workspace", "@enclave-wizard-ui/wizard", "start"]

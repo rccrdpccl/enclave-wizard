@@ -1,0 +1,19 @@
+node_modules/
+dist/
+.tmp/
+out/
+*.tgz
+.superpowers/
+
+# Yarn
+.yarn/*
+!.yarn/releases
+!.yarn/plugins
+
+# IDE
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store

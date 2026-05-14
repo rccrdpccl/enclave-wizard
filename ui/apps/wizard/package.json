@@ -1,0 +1,35 @@
+{
+  "name": "@enclave-wizard-ui/wizard",
+  "private": true,
+  "version": "1.0.0-alpha",
+  "type": "module",
+  "scripts": {
+    "start": "yarn run -T vite --host 0.0.0.0 --port 3001",
+    "build": "yarn run -T tsc -b && yarn run -T vite build",
+    "clean": "rm -rf node_modules dist .tmp",
+    "preview": "yarn run -T vite preview --host 0.0.0.0 --port 4001",
+    "check": "yarn run -T biome check .",
+    "check:fix": "yarn run -T biome check --write .",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@emotion/css": "^11.13.0",
+    "@enclave-wizard-ui/api-client": "workspace:*",
+    "@enclave-wizard-ui/ioc": "workspace:*",
+    "@patternfly/react-core": "^6.4.0",
+    "@patternfly/react-icons": "^6.4.0",
+    "@patternfly/react-table": "^6.4.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.0"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.0.0",
+    "@testing-library/jest-dom": "^6.6.0",
+    "@testing-library/react": "^16.0.0",
+    "@testing-library/user-event": "^14.0.0",
+    "jsdom": "^25.0.0",
+    "vitest": "^3.0.0"
+  }
+}

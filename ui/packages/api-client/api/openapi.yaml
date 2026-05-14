@@ -1,0 +1,1341 @@
+components:
+  schemas:
+    CertificatesConfig:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CertificatesConfig.json
+          format: uri
+          readOnly: true
+          type: string
+        ironicHTTPSCertificate:
+          description: PEM-encoded TLS cert for Ironic vmedia HTTPS
+          type: string
+        ironicHTTPSKey:
+          description: PEM-encoded private key for Ironic HTTPS cert
+          type: string
+        sslAPICertificateFullChain:
+          description: PEM-encoded full cert chain for API server
+          type: string
+        sslAPICertificateKey:
+          description: PEM-encoded private key for API server cert
+          type: string
+        sslCACertificate:
+          description: PEM-encoded root CA certificate
+          type: string
+        sslIngressCertificateFullChain:
+          description: PEM-encoded full cert chain for ingress wildcard
+          type: string
+        sslIngressCertificateKey:
+          description: PEM-encoded private key for ingress cert
+          type: string
+      type: object
+    CloudInfraConfig:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/CloudInfraConfig.json
+          format: uri
+          readOnly: true
+          type: string
+        discovery_hosts:
+          description: Worker nodes for hardware discovery
+          items:
+            $ref: "#/components/schemas/HostEntry"
+          type:
+            - array
+            - "null"
+      required:
+        - discovery_hosts
+      type: object
+    ClusterConfig:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ClusterConfig.json
+          format: uri
+          readOnly: true
+          type: string
+        agent_hosts:
+          description: Control plane nodes (exactly 3)
+          items:
+            $ref: "#/components/schemas/HostEntry"
+          maxItems: 3
+          minItems: 3
+          type:
+            - array
+            - "null"
+        apiVIP:
+          description: Virtual IP for Kubernetes API server
+          pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$
+          type: string
+        baseDomain:
+          description: Base DNS domain for the cluster
+          minLength: 1
+          type: string
+        clusterName:
+          description: OpenShift cluster name
+          minLength: 1
+          type: string
+        defaultNtpServers:
+          description: Additional NTP server addresses
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        diskEncryption:
+          description: Enable TPM v2 disk encryption
+          type: boolean
+        ingressVIP:
+          description: Virtual IP for ingress wildcard
+          pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$
+          type: string
+        machineNetwork:
+          description: Network CIDR for cluster nodes
+          pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/(3[0-2]|[12]?[0-9])$
+          type: string
+        masterMaxPods:
+          description: "Maximum pods per node (default: 500)"
+          format: int64
+          minimum: 1
+          type: integer
+        pullSecret:
+          description: OpenShift pull secret object
+        rendezvousIP:
+          description: IP of first control-plane node
+          pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$
+          type: string
+        sshPubPath:
+          description: Path to SSH public key file
+          minLength: 1
+          type: string
+      required:
+        - baseDomain
+        - clusterName
+        - machineNetwork
+        - apiVIP
+        - ingressVIP
+        - rendezvousIP
+        - pullSecret
+        - sshPubPath
+        - agent_hosts
+      type: object
+    Defaults:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Defaults.json
+          format: uri
+          readOnly: true
+          type: string
+        disconnected:
+          type: boolean
+        diskEncryption:
+          type: boolean
+        lvmsDefaults:
+          $ref: "#/components/schemas/LVMSConfig"
+        masterMaxPods:
+          format: int64
+          type: integer
+        ocMirrorLogLevel:
+          type: string
+        odfDefaults:
+          $ref: "#/components/schemas/ODFConfig"
+        storagePlugin:
+          type: string
+      required:
+        - disconnected
+        - masterMaxPods
+        - diskEncryption
+        - ocMirrorLogLevel
+        - storagePlugin
+      type: object
+    EnclaveConfig:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/EnclaveConfig.json
+          format: uri
+          readOnly: true
+          type: string
+        certificates:
+          $ref: "#/components/schemas/CertificatesConfig"
+          description: TLS certificates (certificates.yaml)
+        cloudInfra:
+          $ref: "#/components/schemas/CloudInfraConfig"
+          description: Cloud infrastructure / discovery hosts (cloud_infra.yaml)
+        global:
+          $ref: "#/components/schemas/GlobalConfig"
+          description: Primary cluster configuration (global.yaml)
+      required:
+        - global
+        - certificates
+        - cloudInfra
+      type: object
+    ErrorDetail:
+      additionalProperties: false
+      properties:
+        location:
+          description: Where the error occurred, e.g. 'body.items[3].tags' or 'path.thing-id'
+          type: string
+        message:
+          description: Error message text
+          type: string
+        value:
+          description: The value at the given location
+      type: object
+    ErrorModel:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ErrorModel.json
+          format: uri
+          readOnly: true
+          type: string
+        detail:
+          description: A human-readable explanation specific to this occurrence of the problem.
+          examples:
+            - Property foo is required but is missing.
+          type: string
+        errors:
+          description: Optional list of individual error details
+          items:
+            $ref: "#/components/schemas/ErrorDetail"
+          type:
+            - array
+            - "null"
+        instance:
+          description: A URI reference that identifies the specific occurrence of the problem.
+          examples:
+            - https://example.com/error-log/abc123
+          format: uri
+          type: string
+        status:
+          description: HTTP status code
+          examples:
+            - 400
+          format: int64
+          type: integer
+        title:
+          description: A short, human-readable summary of the problem type. This value should not change between occurrences of the error.
+          examples:
+            - Bad Request
+          type: string
+        type:
+          default: about:blank
+          description: A URI reference to human-readable documentation for the error.
+          examples:
+            - https://example.com/errors/example
+          format: uri
+          type: string
+      type: object
+    GlobalConfig:
+      additionalProperties: false
+      properties:
+        agent_hosts:
+          description: Control plane nodes (exactly 3)
+          items:
+            $ref: "#/components/schemas/HostEntry"
+          maxItems: 3
+          minItems: 3
+          type:
+            - array
+            - "null"
+        apiVIP:
+          description: Virtual IP for Kubernetes API server
+          pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$
+          type: string
+        baseDomain:
+          description: Base DNS domain for the cluster
+          minLength: 1
+          type: string
+        blockStorageBackend:
+          description: Block storage backend
+          enum:
+            - lvms
+            - odf
+          type: string
+        clusterName:
+          description: OpenShift cluster name
+          minLength: 1
+          type: string
+        defaultDNS:
+          description: DNS server IP for cluster nodes
+          pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$
+          type: string
+        defaultGateway:
+          description: Default gateway IP for cluster nodes
+          pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$
+          type: string
+        defaultNtpServers:
+          description: Additional NTP server addresses
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        defaultPrefix:
+          description: Subnet prefix length
+          format: int64
+          maximum: 32
+          minimum: 1
+          type: integer
+        disconnected:
+          description: "Air-gapped deployment mode (default: true)"
+          type: boolean
+        diskEncryption:
+          description: Enable TPM v2 disk encryption
+          type: boolean
+        enabled_plugins:
+          description: Plugins to deploy
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        ingressVIP:
+          description: Virtual IP for ingress wildcard
+          pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$
+          type: string
+        lvmsConfig:
+          $ref: "#/components/schemas/LVMSStorageConfig"
+          description: LVMS device selector configuration
+        lzBmcHostname:
+          description: DNS hostname for landing zone BMC interface
+          type: string
+        lzBmcIP:
+          description: Landing zone BMC IP for boot ISO serving
+          pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$
+          type: string
+        machineNetwork:
+          description: Network CIDR for cluster nodes
+          pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)/(3[0-2]|[12]?[0-9])$
+          type: string
+        masterMaxPods:
+          description: "Maximum pods per node (default: 500)"
+          format: int64
+          minimum: 1
+          type: integer
+        ocMirrorLogLevel:
+          description: oc-mirror log level
+          enum:
+            - trace
+            - debug
+            - info
+            - error
+          type: string
+        odfDefaults:
+          $ref: "#/components/schemas/ODFConfig"
+          description: ODF deployment configuration
+        odfExternalConfig:
+          description: ODF external Ceph cluster config JSON (required when blockStorageBackend is odf)
+          type: string
+        pullSecret:
+          description: OpenShift pull secret object
+        quayBackend:
+          description: Quay image storage backend
+          enum:
+            - RadosGWStorage
+            - LocalStorage
+          type: string
+        quayBackendRGWConfiguration:
+          $ref: "#/components/schemas/QuayBackendRGWConfiguration"
+          description: RadosGW/S3 backend config (required when quayBackend is RadosGWStorage)
+        quayPassword:
+          description: Admin password for Quay registry
+          minLength: 1
+          type: string
+        quayUser:
+          description: Admin username for Quay registry
+          minLength: 1
+          type: string
+        rendezvousIP:
+          description: IP of first control-plane node
+          pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$
+          type: string
+        sshPubPath:
+          description: Path to SSH public key file
+          minLength: 1
+          type: string
+        storage_plugin:
+          description: Modern replacement for blockStorageBackend
+          enum:
+            - lvms
+            - odf
+          type: string
+        workingDir:
+          description: Absolute path to root working directory
+          minLength: 1
+          type: string
+      required:
+        - lzBmcIP
+        - workingDir
+        - baseDomain
+        - clusterName
+        - machineNetwork
+        - apiVIP
+        - ingressVIP
+        - rendezvousIP
+        - pullSecret
+        - sshPubPath
+        - agent_hosts
+        - defaultDNS
+        - defaultGateway
+        - defaultPrefix
+        - quayUser
+        - quayPassword
+        - quayBackend
+        - blockStorageBackend
+      type: object
+    HostEntry:
+      additionalProperties: false
+      properties:
+        bmcSystemId:
+          description: "Redfish system ID path component (default: 1)"
+          type: string
+        ipAddress:
+          description: Node IPv4 address within machineNetwork
+          pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$
+          type: string
+        macAddress:
+          description: MAC address (xx:xx:xx:xx:xx:xx)
+          pattern: ^([0-9a-fA-F]{2}:){5}[0-9a-fA-F]{2}$
+          type: string
+        mapInterfaces:
+          description: Interface mapping for complex topologies
+        name:
+          description: Node name label
+          minLength: 1
+          type: string
+        networkConfig:
+          description: NMState network configuration for multi-NIC/VLAN
+        redfish:
+          description: Redfish/IPMI management IP
+          pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$
+          type: string
+        redfishPassword:
+          description: Redfish password
+          minLength: 1
+          type: string
+        redfishUser:
+          description: Redfish username
+          minLength: 1
+          type: string
+        rootDisk:
+          description: Root disk path for OS installation
+          minLength: 1
+          type: string
+      required:
+        - name
+        - redfish
+        - redfishUser
+        - redfishPassword
+        - rootDisk
+        - macAddress
+        - ipAddress
+      type: object
+    LVMSConfig:
+      additionalProperties: false
+      properties:
+        defaultStorageClass:
+          description: Set as default StorageClass
+          type: boolean
+        deviceClassName:
+          description: LVM volume group device class name
+          type: string
+        thinPoolConfig:
+          $ref: "#/components/schemas/LVMSThinPoolConfig"
+          description: Thin pool settings
+      required:
+        - deviceClassName
+        - defaultStorageClass
+        - thinPoolConfig
+      type: object
+    LVMSDeviceSelector:
+      additionalProperties: false
+      properties:
+        optionalPaths:
+          description: Disk device paths for LVM volume group
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+      type: object
+    LVMSStorageConfig:
+      additionalProperties: false
+      properties:
+        deviceSelector:
+          $ref: "#/components/schemas/LVMSDeviceSelector"
+          description: LVMS device selector
+      required:
+        - deviceSelector
+      type: object
+    LVMSThinPoolConfig:
+      additionalProperties: false
+      properties:
+        name:
+          description: Thin pool name
+          type: string
+        overprovisionRatio:
+          description: Thin pool overprovisioning ratio
+          format: int64
+          minimum: 1
+          type: integer
+        sizePercent:
+          description: Pool size as percentage of volume group
+          format: int64
+          maximum: 100
+          minimum: 1
+          type: integer
+      required:
+        - name
+        - sizePercent
+        - overprovisionRatio
+      type: object
+    LandingZoneConfig:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/LandingZoneConfig.json
+          format: uri
+          readOnly: true
+          type: string
+        disconnected:
+          description: "Air-gapped deployment mode (default: true)"
+          type: boolean
+        lzBmcHostname:
+          description: DNS hostname for landing zone BMC interface
+          type: string
+        lzBmcIP:
+          description: Landing zone BMC IP for boot ISO serving
+          pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$
+          type: string
+        workingDir:
+          description: Absolute path to root working directory
+          minLength: 1
+          type: string
+      required:
+        - lzBmcIP
+        - workingDir
+      type: object
+    NetworkConfig:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/NetworkConfig.json
+          format: uri
+          readOnly: true
+          type: string
+        defaultDNS:
+          description: DNS server IP for cluster nodes
+          pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$
+          type: string
+        defaultGateway:
+          description: Default gateway IP for cluster nodes
+          pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$
+          type: string
+        defaultPrefix:
+          description: Subnet prefix length
+          format: int64
+          maximum: 32
+          minimum: 1
+          type: integer
+      required:
+        - defaultDNS
+        - defaultGateway
+        - defaultPrefix
+      type: object
+    ODFConfig:
+      additionalProperties: false
+      properties:
+        defaultStorageClass:
+          description: Set as default StorageClass
+          type: boolean
+      required:
+        - defaultStorageClass
+      type: object
+    Plugin:
+      additionalProperties: false
+      properties:
+        description:
+          description: Human-readable description
+          type: string
+        name:
+          description: Plugin identifier
+          type: string
+        type:
+          description: Plugin type
+          enum:
+            - foundation
+            - addon
+          type: string
+      required:
+        - name
+        - type
+        - description
+      type: object
+    PluginValidateInputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PluginValidateInputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        plugins:
+          description: Plugin names to validate as a combination
+          items:
+            type: string
+          minItems: 1
+          type:
+            - array
+            - "null"
+      required:
+        - plugins
+      type: object
+    PluginValidateOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PluginValidateOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        errors:
+          description: Validation errors, if any
+          items:
+            $ref: "#/components/schemas/ValidationError"
+          type:
+            - array
+            - "null"
+        valid:
+          description: Whether the combination is valid
+          type: boolean
+      required:
+        - valid
+      type: object
+    PluginsConfig:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PluginsConfig.json
+          format: uri
+          readOnly: true
+          type: string
+        enabled_plugins:
+          description: Plugins to deploy
+          items:
+            type: string
+          type:
+            - array
+            - "null"
+        lvmsDefaults:
+          $ref: "#/components/schemas/LVMSConfig"
+          description: LVMS deployment configuration
+        odfDefaults:
+          $ref: "#/components/schemas/ODFConfig"
+          description: ODF deployment configuration
+      type: object
+    PluginsOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PluginsOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        plugins:
+          description: Available plugins
+          items:
+            $ref: "#/components/schemas/Plugin"
+          type:
+            - array
+            - "null"
+      required:
+        - plugins
+      type: object
+    PreviewConfigOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/PreviewConfigOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        certificatesYaml:
+          description: Rendered certificates.yaml content
+          type: string
+        cloudInfraYaml:
+          description: Rendered cloud_infra.yaml content
+          type: string
+        globalYaml:
+          description: Rendered global.yaml content
+          type: string
+      required:
+        - globalYaml
+        - certificatesYaml
+        - cloudInfraYaml
+      type: object
+    QuayBackendRGWConfiguration:
+      additionalProperties: false
+      properties:
+        access_key:
+          description: S3/RGW access key ID
+          minLength: 1
+          type: string
+        bucket_name:
+          description: S3 bucket name for Quay image storage
+          minLength: 1
+          type: string
+        hostname:
+          description: RadosGW/S3 endpoint hostname
+          minLength: 1
+          type: string
+        is_secure:
+          description: "Use HTTPS for backend storage (default: true)"
+          type: boolean
+        maximum_chunk_size_mb:
+          description: Maximum multipart upload chunk size in MB
+          format: int64
+          minimum: 1
+          type: integer
+        minimum_chunk_size_mb:
+          description: Minimum multipart upload chunk size in MB
+          format: int64
+          minimum: 1
+          type: integer
+        port:
+          description: "Backend storage endpoint port (default: 443)"
+          format: int64
+          maximum: 65535
+          minimum: 1
+          type: integer
+        secret_key:
+          description: S3/RGW secret access key
+          minLength: 1
+          type: string
+        server_side_assembly:
+          description: Enable server-side assembly for multipart uploads
+          type: boolean
+        storage_path:
+          description: Object storage path prefix (must start with /)
+          pattern: ^/
+          type: string
+      required:
+        - access_key
+        - secret_key
+        - bucket_name
+        - hostname
+      type: object
+    QuayConfig:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/QuayConfig.json
+          format: uri
+          readOnly: true
+          type: string
+        ocMirrorLogLevel:
+          description: oc-mirror log level
+          enum:
+            - trace
+            - debug
+            - info
+            - error
+          type: string
+        quayBackend:
+          description: Quay image storage backend
+          enum:
+            - RadosGWStorage
+            - LocalStorage
+          type: string
+        quayBackendRGWConfiguration:
+          $ref: "#/components/schemas/QuayBackendRGWConfiguration"
+          description: RadosGW/S3 backend config (required when quayBackend is RadosGWStorage)
+        quayPassword:
+          description: Admin password for Quay registry
+          minLength: 1
+          type: string
+        quayUser:
+          description: Admin username for Quay registry
+          minLength: 1
+          type: string
+      required:
+        - quayUser
+        - quayPassword
+        - quayBackend
+      type: object
+    StorageConfig:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/StorageConfig.json
+          format: uri
+          readOnly: true
+          type: string
+        blockStorageBackend:
+          description: Block storage backend
+          enum:
+            - lvms
+            - odf
+          type: string
+        lvmsConfig:
+          $ref: "#/components/schemas/LVMSStorageConfig"
+          description: LVMS device selector configuration
+        odfExternalConfig:
+          description: ODF external Ceph cluster config JSON (required when blockStorageBackend is odf)
+          type: string
+        storage_plugin:
+          description: Modern replacement for blockStorageBackend
+          enum:
+            - lvms
+            - odf
+          type: string
+      required:
+        - blockStorageBackend
+      type: object
+    ValidateConfigOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ValidateConfigOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        errors:
+          description: Validation errors, if any
+          items:
+            $ref: "#/components/schemas/ValidationError"
+          type:
+            - array
+            - "null"
+        valid:
+          description: Whether the config passes all validation checks
+          type: boolean
+      required:
+        - valid
+      type: object
+    ValidationError:
+      additionalProperties: false
+      properties:
+        field:
+          description: JSON path to the invalid field
+          type: string
+        message:
+          description: Human-readable error description
+          type: string
+      required:
+        - field
+        - message
+      type: object
+info:
+  description: API for managing Enclave deployment configuration files on the Landing Zone.
+  title: Enclave Configuration Wizard
+  version: 0.1.0
+openapi: 3.1.0
+paths:
+  /api/v1/config:
+    get:
+      description: Reads config/global.yaml, config/certificates.yaml, and config/cloud_infra.yaml from the Enclave directory and returns the merged configuration.
+      operationId: get-config
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/EnclaveConfig"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Load existing configuration
+      tags:
+        - Config
+    put:
+      description: Accepts wizard state, serializes to YAML, and writes to the Enclave config directory.
+      operationId: write-config
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnclaveConfig"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Write configuration to disk
+      tags:
+        - Config
+  /api/v1/config/certificates:
+    get:
+      operationId: get-config-certificates
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CertificatesConfig"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Load TLS certificates
+      tags:
+        - Certificates
+    put:
+      operationId: write-config-certificates
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CertificatesConfig"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Update TLS certificates
+      tags:
+        - Certificates
+  /api/v1/config/cluster:
+    get:
+      operationId: get-config-cluster
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ClusterConfig"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Load Management cluster install configuration
+      tags:
+        - Cluster
+    put:
+      operationId: write-config-cluster
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ClusterConfig"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Update Management cluster install configuration
+      tags:
+        - Cluster
+  /api/v1/config/hosts:
+    get:
+      operationId: get-config-hosts
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CloudInfraConfig"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Load Discovery hosts (cloud infrastructure)
+      tags:
+        - Hosts
+    put:
+      operationId: write-config-hosts
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CloudInfraConfig"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Update Discovery hosts (cloud infrastructure)
+      tags:
+        - Hosts
+  /api/v1/config/lz:
+    get:
+      operationId: get-config-lz
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LandingZoneConfig"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Load Landing zone configuration
+      tags:
+        - Landing Zone
+    put:
+      operationId: write-config-lz
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LandingZoneConfig"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Update Landing zone configuration
+      tags:
+        - Landing Zone
+  /api/v1/config/network:
+    get:
+      operationId: get-config-network
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NetworkConfig"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Load Host network configuration
+      tags:
+        - Network
+    put:
+      operationId: write-config-network
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NetworkConfig"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Update Host network configuration
+      tags:
+        - Network
+  /api/v1/config/plugins:
+    get:
+      operationId: get-config-plugins
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PluginsConfig"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Load Enabled plugins configuration
+      tags:
+        - Plugins
+    put:
+      operationId: write-config-plugins
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PluginsConfig"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Update Enabled plugins configuration
+      tags:
+        - Plugins
+  /api/v1/config/preview:
+    post:
+      description: Returns the rendered YAML content for each config file without writing to disk.
+      operationId: preview-config
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnclaveConfig"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PreviewConfigOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Preview rendered YAML
+      tags:
+        - Config
+  /api/v1/config/quay:
+    get:
+      operationId: get-config-quay
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/QuayConfig"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Load Quay registry configuration
+      tags:
+        - Quay
+    put:
+      operationId: write-config-quay
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/QuayConfig"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Update Quay registry configuration
+      tags:
+        - Quay
+  /api/v1/config/storage:
+    get:
+      operationId: get-config-storage
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StorageConfig"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Load Block storage configuration
+      tags:
+        - Storage
+    put:
+      operationId: write-config-storage
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StorageConfig"
+        required: true
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Update Block storage configuration
+      tags:
+        - Storage
+  /api/v1/config/validate:
+    post:
+      description: Validates the candidate configuration against Enclave JSON schemas and returns structured errors.
+      operationId: validate-config
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EnclaveConfig"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidateConfigOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Validate configuration
+      tags:
+        - Config
+  /api/v1/defaults:
+    get:
+      description: Returns default values read from defaults/deployment.yaml and plugin definitions.
+      operationId: get-defaults
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Defaults"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get default configuration values
+      tags:
+        - Defaults
+  /api/v1/plugins:
+    get:
+      description: Returns all known plugins and their types.
+      operationId: list-plugins
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PluginsOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List available plugins
+      tags:
+        - Plugins
+  /api/v1/plugins/validate:
+    post:
+      description: Checks whether the given set of plugins forms a valid deployment combination.
+      operationId: validate-plugin-combination
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PluginValidateInputBody"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PluginValidateOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Validate plugin combination
+      tags:
+        - Plugins
