@@ -44,16 +44,20 @@ make teardown TARGET=root@myserver.example.com
    - Extracts enclave to `/opt/enclave` and creates config files from examples
    - Loads the wizard-ui container image
    - Opens firewall ports and starts all services
-4. **Port forwarding** — iptables rules on the target host forward port 3001 from the target to the VM
-5. **Verification** — The script checks that the API, UI, and external access all work
+4. **Port forwarding** — iptables rules on the target host forward ports 3001 (HTTP) and 3443 (HTTPS) from the target to the VM
+5. **Verification** — The script checks that the API, HTTPS, HTTP→HTTPS redirect, and external access all work
 
 ## Accessing the Wizard
 
-After deployment, the wizard is available at:
+After deployment, the wizard is available over HTTPS:
 
 ```
-http://<target-host>:3001/wizard
+https://<target-host>:3443/wizard
 ```
+
+A self-signed TLS certificate is generated during installation. Accept the browser warning on first visit.
+
+HTTP on port 3001 automatically redirects to HTTPS on 3443.
 
 ## SSH into the VM
 
@@ -69,13 +73,18 @@ The VM IP is shown in the deploy output.
 Your laptop                    Target host                      VM (enclave-wizard-lz)
 ─────────────                  ──────────────                   ──────────────────────
                                iptables forwards
-browser ──── :3001 ──────────► :3001 ─────────────────────────► nginx (:3001)
-                                                                  │
+browser ──── :3443 ──────────► :3443 ─────────────────────────► nginx (HTTPS :3443)
+         (HTTPS)                                                  │
                                                                   ├─► /api/v1/* → wizard-api (:8080)
                                                                   └─► /*        → static UI files
+                               
+browser ──── :3001 ──────────► :3001 ─────────────────────────► nginx (:3001)
+         (HTTP)                                                   └─► 301 redirect → HTTPS :3443
                                                                 
                                                                 wizard-api (native systemd)
                                                                   └─► reads/writes /opt/enclave/config/
+
+TLS: self-signed cert generated at /etc/enclave-wizard/tls/
 ```
 
 ## Building the RPM
