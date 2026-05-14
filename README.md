@@ -68,8 +68,8 @@ Each section can be read or updated independently. A PUT to a section endpoint m
 
 | Method | Path | Description |
 |--------|------|-------------|
-| GET | `/api/v1/defaults` | Get default values from `defaults/*.yaml` |
-| GET | `/api/v1/plugins` | List available plugin descriptors |
+| GET | `/api/v1/defaults` | Get default values from `defaults/deployment.yaml` and plugin `defaults` blocks |
+| GET | `/api/v1/plugins` | List available plugins |
 | POST | `/api/v1/plugins/validate` | Check if a plugin combination is valid |
 
 ## Development
