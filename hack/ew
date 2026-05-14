@@ -1,0 +1,405 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Defaults
+TARGET=""
+NETWORK_NAME="enclave-bmc"
+NETWORK_SUBNET="192.168.223"
+SUSHY_IP="${NETWORK_SUBNET}.1"
+SUSHY_PORT="8100"
+SUSHY_CONTAINER="enclave-sushy-tools"
+SUSHY_IMAGE="quay.io/metal3-io/sushy-tools:latest"
+DNS_CONTAINER="enclave-dnsmasq"
+DNS_IP="${NETWORK_SUBNET}.1"
+DNS_PORT="5353"
+DNS_CONF_DIR="/etc/enclave-wizard/dnsmasq"
+OUTPUT_DIR="./out/hosts"
+
+usage() {
+    echo "ew — Enclave Wizard development utility"
+    echo ""
+    echo "Usage: ew <command> <subcommand> [options]"
+    echo ""
+    echo "Commands:"
+    echo "  vm create    Create BMC-emulated VMs for wizard testing"
+    echo "  vm destroy   Destroy BMC-emulated VMs"
+    echo "  vm list      List enclave VMs on the target"
+    echo "  dns create   Start a dnsmasq container for local DNS"
+    echo "  dns add      Add a DNS entry"
+    echo "  dns remove   Remove a DNS entry"
+    echo "  dns list     List DNS entries"
+    echo "  dns destroy  Stop and remove the dnsmasq container"
+    echo ""
+    echo "Global options:"
+    echo "  --host USER@HOST   Target host (required for all commands)"
+    echo ""
+    echo "Examples:"
+    echo "  ew vm create --host root@server -n hub-cp -c 3"
+    echo "  ew vm destroy --host root@server -n hub-cp -c 3"
+    echo "  ew dns create --host root@server"
+    echo "  ew dns add --host root@server --name api.mgmt.example.com --ip 192.168.223.100"
+    echo "  ew dns list --host root@server"
+    exit 1
+}
+
+ssh_target() {
+    ssh -o StrictHostKeyChecking=no "${TARGET}" "$@"
+}
+
+# ===========================================================================
+# VM commands
+# ===========================================================================
+
+ensure_infra() {
+    ssh_target "
+        set -e
+
+        # Create libvirt network if not present
+        if ! virsh net-info ${NETWORK_NAME} &>/dev/null; then
+            cat > /tmp/${NETWORK_NAME}-net.xml <<NETEOF
+<network>
+  <name>${NETWORK_NAME}</name>
+  <forward mode='nat'>
+    <nat>
+      <port start='1024' end='65535'/>
+    </nat>
+  </forward>
+  <bridge name='${NETWORK_NAME}' stp='on' delay='0'/>
+  <ip address='${SUSHY_IP}' netmask='255.255.255.0'>
+    <dhcp>
+      <range start='${NETWORK_SUBNET}.10' end='${NETWORK_SUBNET}.254'/>
+    </dhcp>
+  </ip>
+</network>
+NETEOF
+            virsh net-define /tmp/${NETWORK_NAME}-net.xml
+            virsh net-start ${NETWORK_NAME}
+            virsh net-autostart ${NETWORK_NAME}
+            rm /tmp/${NETWORK_NAME}-net.xml
+            echo 'Network created: ${NETWORK_NAME}'
+        else
+            virsh net-start ${NETWORK_NAME} 2>/dev/null || true
+        fi
+
+        # Create sushy-tools config
+        cat > /tmp/${SUSHY_CONTAINER}.conf <<SEOF
+SUSHY_EMULATOR_LISTEN_IP = u\"${SUSHY_IP}\"
+SUSHY_EMULATOR_LISTEN_PORT = ${SUSHY_PORT}
+SUSHY_EMULATOR_LIBVIRT_URI = u\"qemu:///system\"
+SEOF
+
+        # Start sushy-tools if not running
+        if ! podman ps --format '{{.Names}}' | grep -q '^${SUSHY_CONTAINER}\$'; then
+            podman rm -f ${SUSHY_CONTAINER} 2>/dev/null || true
+            podman run -d \
+                --name ${SUSHY_CONTAINER} \
+                --network host \
+                -v /tmp/${SUSHY_CONTAINER}.conf:/etc/sushy/sushy-emulator.conf:Z \
+                -v /var/run/libvirt:/var/run/libvirt:Z \
+                ${SUSHY_IMAGE} \
+                sushy-emulator --config /etc/sushy/sushy-emulator.conf
+            echo 'Sushy-tools started'
+        fi
+    "
+}
+
+cmd_vm_create() {
+    local name="enclave-node" count=3 memory=16384 vcpus=4 disk=100
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -n|--name)   name="$2"; shift 2;;
+            -c|--count)  count="$2"; shift 2;;
+            -m|--memory) memory="$2"; shift 2;;
+            -v|--vcpus)  vcpus="$2"; shift 2;;
+            -d|--disk)   disk="$2"; shift 2;;
+            -o|--output) OUTPUT_DIR="$2"; shift 2;;
+            *)           shift;;
+        esac
+    done
+
+    echo "=== Creating ${count} BMC VMs (${name}) ==="
+    echo "  Specs: ${vcpus} vCPUs, ${memory}MB RAM, ${disk}GB disk"
+    echo "  Sushy: ${SUSHY_IP}:${SUSHY_PORT}"
+    echo ""
+
+    ensure_infra
+    mkdir -p "${OUTPUT_DIR}"
+
+    for i in $(seq 1 "${count}"); do
+        local num=$(printf "%02d" "${i}")
+        local vm_name="${name}-${num}"
+        local mac=$(printf "00:60:2f:%02x:%02x:%02x" $((RANDOM%256)) $((RANDOM%256)) $((i)))
+
+        echo "[${i}/${count}] ${vm_name} (${mac})"
+
+        ssh_target "
+            set -e
+            virsh destroy ${vm_name} 2>/dev/null || true
+            virsh undefine ${vm_name} --remove-all-storage --nvram 2>/dev/null || true
+            qemu-img create -f qcow2 /var/lib/libvirt/images/${vm_name}.qcow2 ${disk}G 2>/dev/null
+            virt-install \
+                --name ${vm_name} \
+                --memory ${memory} \
+                --vcpus ${vcpus} \
+                --disk path=/var/lib/libvirt/images/${vm_name}.qcow2,format=qcow2 \
+                --os-variant fedora-unknown \
+                --network network=${NETWORK_NAME},mac=${mac} \
+                --boot uefi \
+                --graphics none \
+                --console pty,target_type=serial \
+                --noautoconsole \
+                --import \
+                --quiet
+            virsh destroy ${vm_name} 2>/dev/null || true
+        "
+
+        local uuid=$(ssh_target "virsh domuuid ${vm_name}")
+
+        cat > "${OUTPUT_DIR}/${vm_name}.yaml" <<EOF
+name: "${vm_name}"
+macAddress: "${mac}"
+ipAddress: ""
+redfish: "${SUSHY_IP}"
+redfishUser: "admin"
+redfishPassword: "password"
+rootDisk: "/dev/vda"
+bmcSystemId: "${uuid}"
+bmcAddress: "redfish-virtualmedia+http://${SUSHY_IP}:${SUSHY_PORT}/redfish/v1/Systems/${uuid}"
+EOF
+        echo "  UUID: ${uuid}"
+    done
+
+    # Combined summary
+    local summary="${OUTPUT_DIR}/${name}-all.yaml"
+    echo "# Hosts: ${name} | Target: ${TARGET} | Sushy: ${SUSHY_IP}:${SUSHY_PORT}" > "${summary}"
+    echo "hosts:" >> "${summary}"
+    for f in "${OUTPUT_DIR}/${name}"-[0-9]*.yaml; do
+        local n=$(grep "^name:" "$f" | awk '{print $2}' | tr -d '"')
+        local m=$(grep "^macAddress:" "$f" | awk '{print $2}' | tr -d '"')
+        local u=$(grep "^bmcSystemId:" "$f" | awk '{print $2}' | tr -d '"')
+        cat >> "${summary}" <<EOF
+  - name: "${n}"
+    macAddress: "${m}"
+    ipAddress: ""
+    redfish: "${SUSHY_IP}"
+    redfishUser: "admin"
+    redfishPassword: "password"
+    rootDisk: "/dev/vda"
+    bmcSystemId: "${u}"
+EOF
+    done
+
+    echo ""
+    echo "Specs: ${OUTPUT_DIR}/${name}-*.yaml"
+    echo "Summary: ${summary}"
+}
+
+cmd_vm_destroy() {
+    local name="enclave-node" count=3 all=false
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            -n|--name)   name="$2"; shift 2;;
+            -c|--count)  count="$2"; shift 2;;
+            --all)       all=true; shift;;
+            *)           shift;;
+        esac
+    done
+
+    echo "=== Destroying VMs: ${name}-01..${name}-$(printf '%02d' ${count}) ==="
+
+    for i in $(seq 1 "${count}"); do
+        local num=$(printf "%02d" "${i}")
+        local vm_name="${name}-${num}"
+        echo "  ${vm_name}"
+        ssh_target "
+            virsh destroy ${vm_name} 2>/dev/null || true
+            virsh undefine ${vm_name} --remove-all-storage --nvram 2>/dev/null || true
+        "
+    done
+
+    if $all; then
+        echo "  Removing sushy-tools and network..."
+        ssh_target "
+            podman rm -f ${SUSHY_CONTAINER} 2>/dev/null || true
+            virsh net-destroy ${NETWORK_NAME} 2>/dev/null || true
+            virsh net-undefine ${NETWORK_NAME} 2>/dev/null || true
+            rm -f /tmp/${SUSHY_CONTAINER}.conf
+        "
+    fi
+
+    rm -rf "${OUTPUT_DIR}/${name}"-*.yaml 2>/dev/null || true
+    echo "Done."
+}
+
+cmd_vm_list() {
+    echo "=== Enclave VMs on ${TARGET} ==="
+    ssh_target "virsh list --all | grep -E 'enclave-|hub-|worker-|caas-' || echo '  (none)'"
+}
+
+# ===========================================================================
+# DNS commands
+# ===========================================================================
+
+cmd_dns_create() {
+    echo "=== Starting dnsmasq on ${TARGET} ==="
+
+    ssh_target "
+        set -e
+        mkdir -p ${DNS_CONF_DIR}
+
+        # Base config (paths are relative to container mount at /etc/dnsmasq)
+        cat > ${DNS_CONF_DIR}/dnsmasq.conf <<DEOF
+no-resolv
+no-hosts
+strict-order
+bind-interfaces
+listen-address=${DNS_IP}
+port=${DNS_PORT}
+conf-dir=/etc/dnsmasq/hosts.d
+DEOF
+
+        mkdir -p ${DNS_CONF_DIR}/hosts.d
+
+        # Stop existing
+        podman rm -f ${DNS_CONTAINER} 2>/dev/null || true
+
+        podman run -d \
+            --name ${DNS_CONTAINER} \
+            --network host \
+            --cap-add NET_ADMIN \
+            --entrypoint dnsmasq \
+            -v ${DNS_CONF_DIR}:/etc/dnsmasq:Z \
+            docker.io/4km3/dnsmasq:2.85-r2 \
+            -k -C /etc/dnsmasq/dnsmasq.conf
+
+        echo 'dnsmasq started on ${DNS_IP}:${DNS_PORT}'
+    "
+}
+
+cmd_dns_add() {
+    local name="" ip=""
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --name)  name="$2"; shift 2;;
+            --ip)    ip="$2"; shift 2;;
+            *)       shift;;
+        esac
+    done
+
+    if [ -z "${name}" ] || [ -z "${ip}" ]; then
+        echo "Usage: ew dns add --host USER@HOST --name FQDN --ip IP"
+        exit 1
+    fi
+
+    # dnsmasq wildcard: *.foo.com → .foo.com
+    local dnsmasq_name="${name}"
+    if [[ "${dnsmasq_name}" == \** ]]; then
+        dnsmasq_name="${dnsmasq_name#\*}"
+    fi
+
+    echo "Adding DNS: ${name} → ${ip}"
+
+    local safename=$(echo "${name}" | tr '.*' '_-')
+    ssh_target "
+        echo 'address=/${dnsmasq_name}/${ip}' > ${DNS_CONF_DIR}/hosts.d/${safename}.conf
+        podman restart ${DNS_CONTAINER}
+    "
+    echo "Done. Verify: ssh ${TARGET} 'dig @${DNS_IP} -p ${DNS_PORT} ${name} +short'"
+}
+
+cmd_dns_remove() {
+    local name=""
+
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --name)  name="$2"; shift 2;;
+            *)       shift;;
+        esac
+    done
+
+    if [ -z "${name}" ]; then
+        echo "Usage: ew dns remove --host USER@HOST --name FQDN"
+        exit 1
+    fi
+
+    echo "Removing DNS: ${name}"
+    local safename=$(echo "${name}" | tr '.*' '_-')
+    ssh_target "
+        rm -f ${DNS_CONF_DIR}/hosts.d/${safename}.conf
+        podman restart ${DNS_CONTAINER}
+    "
+    echo "Done."
+}
+
+cmd_dns_list() {
+    echo "=== DNS entries on ${TARGET} ==="
+    ssh_target "cat ${DNS_CONF_DIR}/hosts.d/*.conf 2>/dev/null || echo '(none)'" \
+        | sed 's|address=/||; s|/| → |'
+}
+
+cmd_dns_destroy() {
+    echo "=== Removing dnsmasq on ${TARGET} ==="
+    ssh_target "
+        podman rm -f ${DNS_CONTAINER} 2>/dev/null || true
+        rm -rf ${DNS_CONF_DIR}
+    "
+    echo "Done."
+}
+
+# ===========================================================================
+# Main dispatcher
+# ===========================================================================
+
+if [ $# -lt 2 ]; then
+    usage
+fi
+
+CMD="$1"
+SUB="$2"
+shift 2
+
+# Parse --host from remaining args
+REMAINING=()
+while [ $# -gt 0 ]; do
+    case "$1" in
+        --host) TARGET="$2"; shift 2;;
+        *)      REMAINING+=("$1"); shift;;
+    esac
+done
+set -- "${REMAINING[@]+"${REMAINING[@]}"}"
+
+if [ -z "${TARGET}" ]; then
+    echo "ERROR: --host is required"
+    echo ""
+    usage
+fi
+
+case "${CMD}" in
+    vm)
+        case "${SUB}" in
+            create)  cmd_vm_create "$@";;
+            destroy) cmd_vm_destroy "$@";;
+            list)    cmd_vm_list "$@";;
+            *)       echo "Unknown: vm ${SUB}"; usage;;
+        esac
+        ;;
+    dns)
+        case "${SUB}" in
+            create)  cmd_dns_create "$@";;
+            add)     cmd_dns_add "$@";;
+            remove)  cmd_dns_remove "$@";;
+            list)    cmd_dns_list "$@";;
+            destroy) cmd_dns_destroy "$@";;
+            *)       echo "Unknown: dns ${SUB}"; usage;;
+        esac
+        ;;
+    *)
+        echo "Unknown command: ${CMD}"
+        usage
+        ;;
+esac
