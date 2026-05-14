@@ -18,7 +18,8 @@ VM_NAME="enclave-wizard-lz"
 VM_MEMORY=4096
 VM_CPUS=2
 VM_DISK_SIZE=20
-WIZARD_PORT=3001
+HTTP_PORT=3001
+HTTPS_PORT=3443
 API_PORT=8080
 FEDORA_IMAGE_URL="https://download.fedoraproject.org/pub/fedora/linux/releases/42/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-42-1.1.x86_64.qcow2"
 
@@ -153,39 +154,44 @@ echo "[6/6] Setting up port forwarding and verifying..."
 
 # Add iptables rules on target host to forward ports to VM
 ${SSH} "${TARGET}" "
-  # Forward wizard port
-  iptables -t nat -D PREROUTING -p tcp --dport ${WIZARD_PORT} -j DNAT --to-destination ${VM_IP}:${WIZARD_PORT} 2>/dev/null || true
-  iptables -t nat -A PREROUTING -p tcp --dport ${WIZARD_PORT} -j DNAT --to-destination ${VM_IP}:${WIZARD_PORT}
-  iptables -D FORWARD -p tcp -d ${VM_IP} --dport ${WIZARD_PORT} -j ACCEPT 2>/dev/null || true
-  iptables -I FORWARD -p tcp -d ${VM_IP} --dport ${WIZARD_PORT} -j ACCEPT
-
-  # Open port on target firewall
-  firewall-cmd --add-port=${WIZARD_PORT}/tcp --permanent 2>/dev/null || true
+  for PORT in ${HTTP_PORT} ${HTTPS_PORT}; do
+    iptables -t nat -D PREROUTING -p tcp --dport \${PORT} -j DNAT --to-destination ${VM_IP}:\${PORT} 2>/dev/null || true
+    iptables -t nat -A PREROUTING -p tcp --dport \${PORT} -j DNAT --to-destination ${VM_IP}:\${PORT}
+    iptables -D FORWARD -p tcp -d ${VM_IP} --dport \${PORT} -j ACCEPT 2>/dev/null || true
+    iptables -I FORWARD -p tcp -d ${VM_IP} --dport \${PORT} -j ACCEPT
+    firewall-cmd --add-port=\${PORT}/tcp --permanent 2>/dev/null || true
+  done
   firewall-cmd --reload 2>/dev/null || true
 "
 
 sleep 3
 
-# Verify from inside VM
-VM_UI_OK=false
-VM_API_OK=false
-${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -sf http://localhost:${WIZARD_PORT}" > /dev/null 2>&1 && VM_UI_OK=true
-${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -sf http://localhost:${API_PORT}/api/v1/defaults" > /dev/null 2>&1 && VM_API_OK=true
-
-# Verify from local machine
+# Verify
 TARGET_HOST=$(echo "${TARGET}" | cut -d@ -f2)
+
+API_OK=false
+HTTPS_OK=false
+REDIRECT_OK=false
 EXT_OK=false
-curl -sf --connect-timeout 5 "http://${TARGET_HOST}:${WIZARD_PORT}" > /dev/null 2>&1 && EXT_OK=true
+
+${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -sf http://localhost:${API_PORT}/api/v1/defaults" > /dev/null 2>&1 && API_OK=true
+${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -sfk https://localhost:${HTTPS_PORT}" > /dev/null 2>&1 && HTTPS_OK=true
+REDIRECT_CODE=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -so /dev/null -w '%{http_code}' http://localhost:${HTTP_PORT}" 2>/dev/null)
+[ "${REDIRECT_CODE}" = "301" ] && REDIRECT_OK=true
+curl -sfk --connect-timeout 5 "https://${TARGET_HOST}:${HTTPS_PORT}" > /dev/null 2>&1 && EXT_OK=true
 
 echo ""
-echo "  API (VM):        $( $VM_API_OK && echo 'OK' || echo 'FAIL' )"
-echo "  UI (VM):         $( $VM_UI_OK && echo 'OK' || echo 'FAIL' )"
-echo "  UI (external):   $( $EXT_OK && echo 'OK' || echo 'FAIL - check port forwarding' )"
+echo "  API (VM):            $( $API_OK && echo 'OK' || echo 'FAIL' )"
+echo "  HTTPS (VM):          $( $HTTPS_OK && echo 'OK' || echo 'FAIL' )"
+echo "  HTTP→HTTPS redirect: $( $REDIRECT_OK && echo 'OK (301)' || echo "FAIL (got ${REDIRECT_CODE})" )"
+echo "  HTTPS (external):   $( $EXT_OK && echo 'OK' || echo 'FAIL - check port forwarding' )"
 echo ""
 
-if $VM_UI_OK; then
-    echo "Wizard URL: http://${TARGET_HOST}:${WIZARD_PORT}/wizard"
+if $HTTPS_OK; then
+    echo "Wizard URL: https://${TARGET_HOST}:${HTTPS_PORT}/wizard"
     echo "VM SSH:     ssh -J ${TARGET} wizard@${VM_IP}"
+    echo ""
+    echo "  (Self-signed cert — accept the browser warning)"
     echo ""
     echo "To remove:  ./hack/teardown-wizard ${TARGET}"
 else

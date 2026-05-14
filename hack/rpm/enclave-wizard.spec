@@ -62,9 +62,24 @@ fi
 echo "Loading wizard-ui container image..."
 podman load -i /usr/share/enclave-wizard/wizard-ui.tar 2>/dev/null || true
 
+# Generate self-signed TLS certificate
+TLS_DIR="/etc/enclave-wizard/tls"
+if [ ! -f "${TLS_DIR}/server.crt" ]; then
+    echo "Generating self-signed TLS certificate..."
+    mkdir -p "${TLS_DIR}"
+    CERT_HOST=$(hostname -f)
+    openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
+        -keyout "${TLS_DIR}/server.key" \
+        -out "${TLS_DIR}/server.crt" \
+        -subj "/CN=${CERT_HOST}" \
+        -addext "subjectAltName=DNS:${CERT_HOST},DNS:localhost,IP:127.0.0.1" \
+        2>/dev/null
+    chmod 600 "${TLS_DIR}/server.key"
+fi
+
 # Open firewall ports
 firewall-cmd --add-port=3001/tcp --permanent 2>/dev/null || true
-firewall-cmd --add-port=8080/tcp --permanent 2>/dev/null || true
+firewall-cmd --add-port=3443/tcp --permanent 2>/dev/null || true
 firewall-cmd --reload 2>/dev/null || true
 
 # Start services
@@ -75,8 +90,9 @@ systemctl start enclave-wizard-ui
 
 echo ""
 echo "Enclave Wizard installed and running."
-echo "  UI:  http://$(hostname):3001/wizard"
+echo "  UI:  https://$(hostname -f):3443/wizard"
 echo "  API: http://localhost:8080/api/v1/defaults"
+echo "  (Self-signed cert — accept the browser warning)"
 
 %preun
 if [ $1 -eq 0 ]; then
@@ -91,7 +107,8 @@ if [ $1 -eq 0 ]; then
     podman rmi -f localhost/enclave-wizard-ui:dev 2>/dev/null || true
     rm -rf /opt/enclave
     firewall-cmd --remove-port=3001/tcp --permanent 2>/dev/null || true
-    firewall-cmd --remove-port=8080/tcp --permanent 2>/dev/null || true
+    firewall-cmd --remove-port=3443/tcp --permanent 2>/dev/null || true
+    rm -rf /etc/enclave-wizard/tls
     firewall-cmd --reload 2>/dev/null || true
 fi
 

@@ -9,7 +9,8 @@ fi
 
 TARGET="$1"
 VM_NAME="enclave-wizard-lz"
-WIZARD_PORT=3001
+HTTP_PORT=3001
+HTTPS_PORT=3443
 
 echo "=== Tearing down Enclave Wizard on ${TARGET} ==="
 
@@ -23,17 +24,19 @@ ssh -o StrictHostKeyChecking=no "${TARGET}" "
 
     # Clean up port forwarding
     if [ -n \"\${VM_IP:-}\" ]; then
-        iptables -t nat -D PREROUTING -p tcp --dport ${WIZARD_PORT} -j DNAT --to-destination \${VM_IP}:${WIZARD_PORT} 2>/dev/null || true
-        iptables -D FORWARD -p tcp -d \${VM_IP} --dport ${WIZARD_PORT} -j ACCEPT 2>/dev/null || true
+        for PORT in ${HTTP_PORT} ${HTTPS_PORT}; do
+            iptables -t nat -D PREROUTING -p tcp --dport \${PORT} -j DNAT --to-destination \${VM_IP}:\${PORT} 2>/dev/null || true
+            iptables -D FORWARD -p tcp -d \${VM_IP} --dport \${PORT} -j ACCEPT 2>/dev/null || true
+        done
     fi
 
     # Clean up firewall
-    firewall-cmd --remove-port=${WIZARD_PORT}/tcp --permanent 2>/dev/null || true
+    firewall-cmd --remove-port=${HTTP_PORT}/tcp --permanent 2>/dev/null || true
+    firewall-cmd --remove-port=${HTTPS_PORT}/tcp --permanent 2>/dev/null || true
     firewall-cmd --reload 2>/dev/null || true
 
     # Clean up temp files
-    rm -f /tmp/enclave-wizard /tmp/enclave-wizard-ui.tar /tmp/provision.sh /tmp/nginx-deploy.conf
-    rm -rf /tmp/quadlets
+    rm -f /tmp/enclave-wizard.rpm
 "
 
 echo "Done."
