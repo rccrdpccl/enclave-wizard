@@ -11,48 +11,191 @@ if [ $# -lt 1 ]; then
 fi
 
 TARGET="$1"
+SSH="ssh -o StrictHostKeyChecking=no"
+SCP="scp -o StrictHostKeyChecking=no -q"
+
+VM_NAME="enclave-wizard-lz"
+VM_MEMORY=4096
+VM_CPUS=2
+VM_DISK_SIZE=20
 WIZARD_PORT=3001
+API_PORT=8080
+FEDORA_IMAGE_URL="https://download.fedoraproject.org/pub/fedora/linux/releases/42/Cloud/x86_64/images/Fedora-Cloud-Base-Generic-42-1.1.x86_64.qcow2"
 
-echo "=== Deploying Enclave Wizard to ${TARGET} ==="
+echo "=== Deploying Enclave Wizard to ${TARGET} (in VM) ==="
 
+# --- Step 1: Transfer artifacts to target host ---
 echo ""
-echo "[1/4] Transferring..."
-scp -o StrictHostKeyChecking=no -q "${REPO_DIR}/enclave-wizard" "${TARGET}:/usr/local/bin/enclave-wizard"
-podman save enclave-wizard-ui:dev | ssh -o StrictHostKeyChecking=no "${TARGET}" "podman load" > /dev/null
+echo "[1/6] Transferring artifacts to target host..."
+${SCP} "${REPO_DIR}/enclave-wizard" "${TARGET}:/tmp/enclave-wizard"
+podman save enclave-wizard-ui:dev -o /tmp/enclave-wizard-ui.tar
+${SCP} /tmp/enclave-wizard-ui.tar "${TARGET}:/tmp/enclave-wizard-ui.tar"
+rm -f /tmp/enclave-wizard-ui.tar
+${SCP} "${SCRIPT_DIR}/provision.sh" "${TARGET}:/tmp/provision.sh"
+${SCP} "${SCRIPT_DIR}/nginx-deploy.conf" "${TARGET}:/tmp/nginx-deploy.conf"
+${SCP} -r "${SCRIPT_DIR}/quadlets" "${TARGET}:/tmp/quadlets"
 
-echo "[2/4] Copying files..."
-ssh -o StrictHostKeyChecking=no "${TARGET}" "rm -rf /tmp/quadlets /tmp/provision.sh /tmp/nginx-deploy.conf"
-scp -o StrictHostKeyChecking=no -q "${SCRIPT_DIR}/provision.sh" "${TARGET}:/tmp/provision.sh"
-scp -o StrictHostKeyChecking=no -q "${SCRIPT_DIR}/nginx-deploy.conf" "${TARGET}:/tmp/nginx-deploy.conf"
-scp -o StrictHostKeyChecking=no -qr "${SCRIPT_DIR}/quadlets" "${TARGET}:/tmp/quadlets"
+# --- Step 2: Download Fedora Cloud image on target ---
+echo "[2/6] Preparing VM image on target..."
+${SSH} "${TARGET}" "
+  set -e
+  IMG_DIR=/var/lib/libvirt/images
+  FEDORA_CACHE=\${IMG_DIR}/Fedora-Cloud-Base-42.qcow2
 
-echo "[3/4] Provisioning..."
-ssh -o StrictHostKeyChecking=no "${TARGET}" "bash /tmp/provision.sh" 2>&1 | grep -v "^$"
+  if [ ! -f \${FEDORA_CACHE} ]; then
+    echo '  Downloading Fedora Cloud image...'
+    curl -L -o \${FEDORA_CACHE} '${FEDORA_IMAGE_URL}'
+  else
+    echo '  Fedora image cached'
+  fi
 
-echo "[4/4] Verifying..."
+  # Destroy old VM if present
+  virsh destroy ${VM_NAME} 2>/dev/null || true
+  virsh undefine ${VM_NAME} --remove-all-storage 2>/dev/null || true
+  sleep 1
+
+  # Create VM disk
+  qemu-img create -f qcow2 -b \${FEDORA_CACHE} -F qcow2 \
+    \${IMG_DIR}/${VM_NAME}.qcow2 ${VM_DISK_SIZE}G
+"
+
+# --- Step 3: Create cloud-init and boot VM ---
+echo "[3/6] Booting VM..."
+LOCAL_SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
+${SSH} "${TARGET}" "
+  set -e
+  IMG_DIR=/var/lib/libvirt/images
+  CI_DIR=\$(mktemp -d)
+
+  cat > \${CI_DIR}/meta-data <<CIEOF
+instance-id: ${VM_NAME}
+local-hostname: ${VM_NAME}
+CIEOF
+
+  cat > \${CI_DIR}/user-data <<CIEOF
+#cloud-config
+users:
+  - name: wizard
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ${LOCAL_SSH_KEY}
+      - \$(cat ~/.ssh/id_rsa.pub 2>/dev/null || echo '')
+
+packages:
+  - podman
+  - curl
+
+runcmd:
+  - systemctl enable --now podman.socket
+CIEOF
+
+  mkisofs -output \${IMG_DIR}/${VM_NAME}-cidata.iso \
+    -volid cidata -joliet -rock \
+    \${CI_DIR}/meta-data \${CI_DIR}/user-data 2>/dev/null
+  rm -rf \${CI_DIR}
+
+  virt-install \
+    --name ${VM_NAME} \
+    --memory ${VM_MEMORY} \
+    --vcpus ${VM_CPUS} \
+    --disk path=\${IMG_DIR}/${VM_NAME}.qcow2,format=qcow2 \
+    --disk path=\${IMG_DIR}/${VM_NAME}-cidata.iso,device=cdrom \
+    --os-variant fedora-unknown \
+    --network default \
+    --graphics none \
+    --console pty,target_type=serial \
+    --noautoconsole \
+    --import \
+    --quiet
+"
+
+# --- Step 4: Wait for VM IP and SSH ---
+echo "[4/6] Waiting for VM..."
+VM_IP=""
+for i in $(seq 1 60); do
+    VM_IP=$(${SSH} "${TARGET}" "virsh domifaddr ${VM_NAME} 2>/dev/null | grep -oP '(\d+\.){3}\d+' | head -1" 2>/dev/null) || true
+    if [ -n "${VM_IP}" ]; then
+        break
+    fi
+    sleep 2
+done
+
+if [ -z "${VM_IP}" ]; then
+    echo "ERROR: VM did not get an IP after 120 seconds"
+    exit 1
+fi
+echo "  VM IP: ${VM_IP}"
+
+# Wait for SSH inside VM (via target as jump host)
+echo "  Waiting for SSH..."
+for i in $(seq 1 30); do
+    ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "echo ready" 2>/dev/null && break
+    sleep 2
+done
+
+# --- Step 5: Provision inside VM ---
+echo "[5/6] Provisioning VM..."
+
+# Transfer artifacts from target host into VM
+${SSH} "${TARGET}" "
+  scp -o StrictHostKeyChecking=no /tmp/enclave-wizard wizard@${VM_IP}:/tmp/enclave-wizard
+  scp -o StrictHostKeyChecking=no /tmp/enclave-wizard-ui.tar wizard@${VM_IP}:/tmp/enclave-wizard-ui.tar
+  scp -o StrictHostKeyChecking=no /tmp/provision.sh wizard@${VM_IP}:/tmp/provision.sh
+  scp -o StrictHostKeyChecking=no /tmp/nginx-deploy.conf wizard@${VM_IP}:/tmp/nginx-deploy.conf
+  scp -o StrictHostKeyChecking=no -r /tmp/quadlets wizard@${VM_IP}:/tmp/quadlets
+"
+
+# Run provision inside VM
+${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
+  sudo cp /tmp/enclave-wizard /usr/local/bin/enclave-wizard
+  sudo chmod +x /usr/local/bin/enclave-wizard
+  sudo podman load -i /tmp/enclave-wizard-ui.tar
+  sudo bash /tmp/provision.sh
+" 2>&1 | grep -v "^$"
+
+# --- Step 6: Set up port forwarding and verify ---
+echo "[6/6] Setting up port forwarding and verifying..."
+
+# Add iptables rules on target host to forward ports to VM
+${SSH} "${TARGET}" "
+  # Forward wizard port
+  iptables -t nat -D PREROUTING -p tcp --dport ${WIZARD_PORT} -j DNAT --to-destination ${VM_IP}:${WIZARD_PORT} 2>/dev/null || true
+  iptables -t nat -A PREROUTING -p tcp --dport ${WIZARD_PORT} -j DNAT --to-destination ${VM_IP}:${WIZARD_PORT}
+  iptables -D FORWARD -p tcp -d ${VM_IP} --dport ${WIZARD_PORT} -j ACCEPT 2>/dev/null || true
+  iptables -I FORWARD -p tcp -d ${VM_IP} --dport ${WIZARD_PORT} -j ACCEPT
+
+  # Open port on target firewall
+  firewall-cmd --add-port=${WIZARD_PORT}/tcp --permanent 2>/dev/null || true
+  firewall-cmd --reload 2>/dev/null || true
+"
+
 sleep 3
-HOST=$(echo "${TARGET}" | cut -d@ -f2)
 
-API_OK=false
-UI_OK=false
-PROXY_OK=false
+# Verify from inside VM
+VM_UI_OK=false
+VM_API_OK=false
+${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -sf http://localhost:${WIZARD_PORT}" > /dev/null 2>&1 && VM_UI_OK=true
+${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -sf http://localhost:${API_PORT}/api/v1/defaults" > /dev/null 2>&1 && VM_API_OK=true
 
-ssh -o StrictHostKeyChecking=no "${TARGET}" "curl -sf http://localhost:8080/api/v1/defaults" > /dev/null 2>&1 && API_OK=true
-ssh -o StrictHostKeyChecking=no "${TARGET}" "curl -sf http://localhost:${WIZARD_PORT}" > /dev/null 2>&1 && UI_OK=true
-curl -sf --connect-timeout 5 "http://${HOST}:${WIZARD_PORT}" > /dev/null 2>&1 && PROXY_OK=true
+# Verify from local machine
+TARGET_HOST=$(echo "${TARGET}" | cut -d@ -f2)
+EXT_OK=false
+curl -sf --connect-timeout 5 "http://${TARGET_HOST}:${WIZARD_PORT}" > /dev/null 2>&1 && EXT_OK=true
 
 echo ""
-echo "  API (local):    $( $API_OK && echo 'OK' || echo 'FAIL' )"
-echo "  UI (local):     $( $UI_OK && echo 'OK' || echo 'FAIL' )"
-echo "  UI (external):  $( $PROXY_OK && echo 'OK' || echo 'FAIL - check firewall or DNS' )"
+echo "  API (VM):        $( $VM_API_OK && echo 'OK' || echo 'FAIL' )"
+echo "  UI (VM):         $( $VM_UI_OK && echo 'OK' || echo 'FAIL' )"
+echo "  UI (external):   $( $EXT_OK && echo 'OK' || echo 'FAIL - check port forwarding' )"
 echo ""
 
-if $UI_OK; then
-    echo "Wizard URL: http://${HOST}:${WIZARD_PORT}/wizard"
+if $VM_UI_OK; then
+    echo "Wizard URL: http://${TARGET_HOST}:${WIZARD_PORT}/wizard"
+    echo "VM SSH:     ssh -J ${TARGET} wizard@${VM_IP}"
     echo ""
     echo "To remove:  ./hack/teardown-wizard ${TARGET}"
 else
     echo "Deployment failed. Check logs with:"
-    echo "  ssh ${TARGET} 'journalctl -u enclave-wizard-api -u enclave-wizard-ui --no-pager -n 20'"
+    echo "  ssh -J ${TARGET} wizard@${VM_IP} 'sudo journalctl -u enclave-wizard-api -u enclave-wizard-ui --no-pager -n 20'"
     exit 1
 fi
