@@ -30,6 +30,9 @@ clean:
 tidy:
 	$(GO) mod tidy
 
+rpm: build-linux build-ui
+	hack/rpm/build-rpm.sh
+
 deploy: build-linux build-ui
 	@test -n "$(TARGET)" || (echo "Usage: make deploy TARGET=root@host" && exit 1)
 	hack/deploy-wizard $(TARGET)

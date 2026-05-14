@@ -24,16 +24,18 @@ FEDORA_IMAGE_URL="https://download.fedoraproject.org/pub/fedora/linux/releases/4
 
 echo "=== Deploying Enclave Wizard to ${TARGET} (in VM) ==="
 
-# --- Step 1: Transfer artifacts to target host ---
+# --- Find RPM ---
+RPM_FILE=$(ls -t "${REPO_DIR}/out/"enclave-wizard-*.rpm 2>/dev/null | head -1)
+if [ -z "${RPM_FILE}" ]; then
+    echo "ERROR: No RPM found in out/. Run 'make rpm' first."
+    exit 1
+fi
+echo "  RPM: $(basename ${RPM_FILE})"
+
+# --- Step 1: Transfer RPM to target host ---
 echo ""
-echo "[1/6] Transferring artifacts to target host..."
-${SCP} "${REPO_DIR}/enclave-wizard" "${TARGET}:/tmp/enclave-wizard"
-podman save enclave-wizard-ui:dev -o /tmp/enclave-wizard-ui.tar
-${SCP} /tmp/enclave-wizard-ui.tar "${TARGET}:/tmp/enclave-wizard-ui.tar"
-rm -f /tmp/enclave-wizard-ui.tar
-${SCP} "${SCRIPT_DIR}/provision.sh" "${TARGET}:/tmp/provision.sh"
-${SCP} "${SCRIPT_DIR}/nginx-deploy.conf" "${TARGET}:/tmp/nginx-deploy.conf"
-${SCP} -r "${SCRIPT_DIR}/quadlets" "${TARGET}:/tmp/quadlets"
+echo "[1/6] Transferring RPM to target host..."
+${SCP} "${RPM_FILE}" "${TARGET}:/tmp/enclave-wizard.rpm"
 
 # --- Step 2: Download Fedora Cloud image on target ---
 echo "[2/6] Preparing VM image on target..."
@@ -137,21 +139,13 @@ done
 # --- Step 5: Provision inside VM ---
 echo "[5/6] Provisioning VM..."
 
-# Transfer artifacts from target host into VM
+# Transfer RPM from target host into VM and install
 ${SSH} "${TARGET}" "
-  scp -o StrictHostKeyChecking=no /tmp/enclave-wizard wizard@${VM_IP}:/tmp/enclave-wizard
-  scp -o StrictHostKeyChecking=no /tmp/enclave-wizard-ui.tar wizard@${VM_IP}:/tmp/enclave-wizard-ui.tar
-  scp -o StrictHostKeyChecking=no /tmp/provision.sh wizard@${VM_IP}:/tmp/provision.sh
-  scp -o StrictHostKeyChecking=no /tmp/nginx-deploy.conf wizard@${VM_IP}:/tmp/nginx-deploy.conf
-  scp -o StrictHostKeyChecking=no -r /tmp/quadlets wizard@${VM_IP}:/tmp/quadlets
+  scp -o StrictHostKeyChecking=no /tmp/enclave-wizard.rpm wizard@${VM_IP}:/tmp/enclave-wizard.rpm
 "
 
-# Run provision inside VM
 ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
-  sudo cp /tmp/enclave-wizard /usr/local/bin/enclave-wizard
-  sudo chmod +x /usr/local/bin/enclave-wizard
-  sudo podman load -i /tmp/enclave-wizard-ui.tar
-  sudo bash /tmp/provision.sh
+  sudo rpm -Uvh --force /tmp/enclave-wizard.rpm
 " 2>&1 | grep -v "^$"
 
 # --- Step 6: Set up port forwarding and verify ---
