@@ -10,7 +10,6 @@ import (
 
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/api"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/config"
-	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/validation"
 )
 
@@ -27,11 +26,10 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string) huma.API {
 	reader := config.NewReader(enclaveDir)
 	writer := config.NewWriter(enclaveDir)
 	validator := validation.NewValidator(enclaveDir)
-	loader := plugins.NewLoader(enclaveDir)
 
 	api.NewConfigHandler(reader, writer, validator).Register(humaAPI)
 	api.NewDefaultsHandler(enclaveDir).Register(humaAPI)
-	api.NewPluginsHandler(loader).Register(humaAPI)
+	api.NewPluginsHandler().Register(humaAPI)
 
 	return humaAPI
 }

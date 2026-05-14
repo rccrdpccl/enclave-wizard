@@ -41,16 +41,27 @@ type QuayConfig struct {
 }
 
 // Storage
+
+type LVMSDeviceSelector struct {
+	OptionalPaths []string `json:"optionalPaths,omitempty" yaml:"optionalPaths,omitempty" doc:"Disk device paths for LVM volume group"`
+}
+
+type LVMSStorageConfig struct {
+	DeviceSelector LVMSDeviceSelector `json:"deviceSelector" yaml:"deviceSelector" doc:"LVMS device selector"`
+}
+
 type StorageConfig struct {
-	BlockStorageBackend string  `json:"blockStorageBackend" yaml:"blockStorageBackend" doc:"Block storage backend" enum:"lvms,odf"`
-	StoragePlugin       *string `json:"storage_plugin,omitempty" yaml:"storage_plugin,omitempty" doc:"Modern replacement for blockStorageBackend" enum:"lvms,odf"`
-	ODFExternalConfig   *string `json:"odfExternalConfig,omitempty" yaml:"odfExternalConfig,omitempty" doc:"ODF external Ceph cluster config JSON (required when blockStorageBackend is odf)"`
-	LVMSConfig          any     `json:"lvmsConfig,omitempty" yaml:"lvmsConfig,omitempty" doc:"LVMS device selector configuration"`
+	BlockStorageBackend string             `json:"blockStorageBackend" yaml:"blockStorageBackend" doc:"Block storage backend" enum:"lvms,odf"`
+	StoragePlugin       *string            `json:"storage_plugin,omitempty" yaml:"storage_plugin,omitempty" doc:"Modern replacement for blockStorageBackend" enum:"lvms,odf"`
+	ODFExternalConfig   *string            `json:"odfExternalConfig,omitempty" yaml:"odfExternalConfig,omitempty" doc:"ODF external Ceph cluster config JSON (required when blockStorageBackend is odf)"`
+	LVMSConfig          *LVMSStorageConfig `json:"lvmsConfig,omitempty" yaml:"lvmsConfig,omitempty" doc:"LVMS device selector configuration"`
 }
 
 // Plugins
 type PluginsConfig struct {
-	EnabledPlugins []string `json:"enabled_plugins,omitempty" yaml:"enabled_plugins,omitempty" doc:"Plugins to deploy"`
+	EnabledPlugins []string   `json:"enabled_plugins,omitempty" yaml:"enabled_plugins,omitempty" doc:"Plugins to deploy"`
+	LVMSConfig     *LVMSConfig `json:"lvmsDefaults,omitempty" yaml:"lvmsDefaults,omitempty" doc:"LVMS deployment configuration"`
+	ODFConfig      *ODFConfig  `json:"odfDefaults,omitempty" yaml:"odfDefaults,omitempty" doc:"ODF deployment configuration"`
 }
 
 type GlobalConfig struct {

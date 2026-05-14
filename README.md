@@ -60,7 +60,7 @@ Each section can be read or updated independently. A PUT to a section endpoint m
 | GET/PUT | `/api/v1/config/network` | Host network (DNS, gateway, prefix) |
 | GET/PUT | `/api/v1/config/quay` | Quay registry (credentials, backend, RGW config) |
 | GET/PUT | `/api/v1/config/storage` | Block storage (LVMS/ODF backend, external config) |
-| GET/PUT | `/api/v1/config/plugins` | Enabled plugins |
+| GET/PUT | `/api/v1/config/plugins` | Enabled plugins and their configuration |
 | GET/PUT | `/api/v1/config/certificates` | TLS certificates (API server, ingress, CA, Ironic) |
 | GET/PUT | `/api/v1/config/hosts` | Discovery hosts (cloud infrastructure) |
 

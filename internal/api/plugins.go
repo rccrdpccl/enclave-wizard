@@ -9,17 +9,15 @@ import (
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
 )
 
-type PluginsHandler struct {
-	loader *plugins.Loader
-}
+type PluginsHandler struct{}
 
-func NewPluginsHandler(loader *plugins.Loader) *PluginsHandler {
-	return &PluginsHandler{loader: loader}
+func NewPluginsHandler() *PluginsHandler {
+	return &PluginsHandler{}
 }
 
 type PluginsOutput struct {
 	Body struct {
-		Plugins []models.PluginDescriptor `json:"plugins" doc:"Available plugin descriptors"`
+		Plugins []models.Plugin `json:"plugins" doc:"Available plugins"`
 	}
 }
 
@@ -42,7 +40,7 @@ func (h *PluginsHandler) Register(api huma.API) {
 		Method:      http.MethodGet,
 		Path:        "/api/v1/plugins",
 		Summary:     "List available plugins",
-		Description: "Returns all plugin descriptors discovered from plugins/*/plugin.yaml.",
+		Description: "Returns all known plugins and their types.",
 		Tags:        []string{"Plugins"},
 	}, h.listPlugins)
 
@@ -57,17 +55,13 @@ func (h *PluginsHandler) Register(api huma.API) {
 }
 
 func (h *PluginsHandler) listPlugins(_ context.Context, _ *struct{}) (*PluginsOutput, error) {
-	descriptors, err := h.loader.LoadAll()
-	if err != nil {
-		return nil, huma.Error500InternalServerError("failed to load plugins", err)
-	}
 	out := &PluginsOutput{}
-	out.Body.Plugins = descriptors
+	out.Body.Plugins = plugins.All
 	return out, nil
 }
 
 func (h *PluginsHandler) validateCombination(_ context.Context, input *PluginValidateInput) (*PluginValidateOutput, error) {
-	errs := h.loader.ValidateCombination(input.Body.Plugins)
+	errs := plugins.ValidateCombination(input.Body.Plugins)
 	out := &PluginValidateOutput{}
 	out.Body.Valid = len(errs) == 0
 	out.Body.Errors = errs
