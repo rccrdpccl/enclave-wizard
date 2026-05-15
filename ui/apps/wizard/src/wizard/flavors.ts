@@ -1,14 +1,11 @@
-import type { ReactNode } from "react";
-
-export type FlavorId = "cluster";
+export type FlavorId = "cluster" | "nvidia-gpu" | "openshift-ai";
 
 export interface FlavorDefinition {
   id: FlavorId;
   title: string;
   description: string;
-  hostStepPaths: string[];
-  defaultPlugins: string[];
-  icon?: ReactNode;
+  plugins: string[];
+  requires?: FlavorId[];
 }
 
 export const FLAVORS: FlavorDefinition[] = [
@@ -17,7 +14,21 @@ export const FLAVORS: FlavorDefinition[] = [
     title: "Cluster as a Service",
     description:
       "On-demand container clusters with built-in scalability, resilience, and lifecycle management.",
-    hostStepPaths: ["global.agent_hosts", "cloudInfra.discovery_hosts"],
-    defaultPlugins: ["lvms"],
+    plugins: [],
+  },
+  {
+    id: "nvidia-gpu",
+    title: "NVIDIA GPU Support",
+    description:
+      "GPU operator for accelerated computing workloads.",
+    plugins: ["nvidia-gpu"],
+  },
+  {
+    id: "openshift-ai",
+    title: "OpenShift AI",
+    description:
+      "AI/ML platform for model training and inference. Requires NVIDIA GPU support.",
+    plugins: ["openshift-ai", "nvidia-gpu"],
+    requires: ["nvidia-gpu"],
   },
 ];

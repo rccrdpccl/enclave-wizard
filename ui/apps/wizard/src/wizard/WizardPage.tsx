@@ -50,9 +50,9 @@ const TAIL_STEPS: StepDef[] = [
   { id: "generate", label: "Generate" },
 ];
 
-function buildSteps(selectedFlavor: string | null): StepDef[] {
+function buildSteps(selectedFlavors: Set<string>): StepDef[] {
   const steps = [...BASE_STEPS];
-  if (selectedFlavor === "cluster") {
+  if (selectedFlavors.has("cluster")) {
     steps.push(CAAS_STEP);
   }
   steps.push(...TAIL_STEPS);
@@ -88,8 +88,8 @@ function WizardContent(): React.ReactElement {
   const [stepErrors, setStepErrors] = useState<StepValidationError[]>([]);
 
   const steps = useMemo(
-    () => buildSteps(state.selectedFlavor),
-    [state.selectedFlavor],
+    () => buildSteps(state.selectedFlavors),
+    [state.selectedFlavors],
   );
 
   useEffect(() => {
