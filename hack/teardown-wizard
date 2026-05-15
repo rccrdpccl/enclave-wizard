@@ -15,20 +15,13 @@ HTTPS_PORT=3443
 echo "=== Tearing down Enclave Wizard on ${TARGET} ==="
 
 ssh -o StrictHostKeyChecking=no "${TARGET}" "
-    # Get VM IP before destroying for iptables cleanup
-    VM_IP=\$(virsh domifaddr ${VM_NAME} 2>/dev/null | grep -oP '(\d+\.){3}\d+' | head -1) || true
+    # Kill port forwarders
+    pkill -f 'socat.*TCP-LISTEN:3001' 2>/dev/null || true
+    pkill -f 'socat.*TCP-LISTEN:3443' 2>/dev/null || true
 
     # Destroy VM
     virsh destroy ${VM_NAME} 2>/dev/null || true
-    virsh undefine ${VM_NAME} --remove-all-storage 2>/dev/null || true
-
-    # Clean up port forwarding
-    if [ -n \"\${VM_IP:-}\" ]; then
-        for PORT in ${HTTP_PORT} ${HTTPS_PORT}; do
-            iptables -t nat -D PREROUTING -p tcp --dport \${PORT} -j DNAT --to-destination \${VM_IP}:\${PORT} 2>/dev/null || true
-            iptables -D FORWARD -p tcp -d \${VM_IP} --dport \${PORT} -j ACCEPT 2>/dev/null || true
-        done
-    fi
+    virsh undefine ${VM_NAME} --remove-all-storage --nvram 2>/dev/null || true
 
     # Clean up firewall
     firewall-cmd --remove-port=${HTTP_PORT}/tcp --permanent 2>/dev/null || true
@@ -36,7 +29,7 @@ ssh -o StrictHostKeyChecking=no "${TARGET}" "
     firewall-cmd --reload 2>/dev/null || true
 
     # Clean up temp files
-    rm -f /tmp/enclave-wizard.rpm
+    rm -f /tmp/enclave-wizard.rpm /tmp/enclave-wizard-tunnel
 "
 
 echo "Done."
