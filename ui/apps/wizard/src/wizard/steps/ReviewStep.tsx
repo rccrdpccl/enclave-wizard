@@ -21,6 +21,7 @@ import { useCallback, useMemo, useState } from "react";
 import type { EnclaveConfig } from "@enclave-wizard-ui/api-client";
 import { useEnclaveApi } from "../../api/useEnclaveApi.ts";
 import { useWizard } from "../WizardContext.tsx";
+import { buildFinalConfig } from "../buildFinalConfig.ts";
 import { YamlEditor } from "../components/YamlEditor.tsx";
 
 const styles = {
@@ -82,14 +83,16 @@ export const ReviewStep: React.FC = () => {
   const [copied, setCopied] = useState(false);
 
   const configData = state.configData as Record<string, unknown>;
+  const finalConfig = useMemo(() => buildFinalConfig(state) as unknown as Record<string, unknown>, [state]);
 
   const yamlContents = useMemo(() => {
     const result: Record<string, string> = {};
     for (const file of CONFIG_FILES) {
-      result[file.key] = configToYaml(configData[file.path]);
+      const data = file.key === "global" ? finalConfig[file.path] : configData[file.path];
+      result[file.key] = configToYaml(data);
     }
     return result;
-  }, [configData]);
+  }, [configData, finalConfig]);
 
   const handleYamlChange = useCallback(
     (fileKey: string, yamlStr: string) => {

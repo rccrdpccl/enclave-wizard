@@ -9,10 +9,9 @@ import {
 import { CheckCircleIcon } from "@patternfly/react-icons";
 import type React from "react";
 import { useCallback, useState } from "react";
-import type { EnclaveConfig } from "@enclave-wizard-ui/api-client";
 import { useEnclaveApi } from "../../api/useEnclaveApi.ts";
 import { useWizard } from "../WizardContext.tsx";
-import { FLAVORS } from "../flavors.ts";
+import { buildFinalConfig } from "../buildFinalConfig.ts";
 
 type GenerateStatus = "idle" | "writing" | "success" | "error";
 
@@ -26,26 +25,7 @@ export const GenerateStep: React.FC = () => {
     setStatus("writing");
     setErrorMessage("");
     try {
-      const globalData = (state.configData.global ?? {}) as Record<string, unknown>;
-      const configPlugins = Array.isArray(globalData.enabledPlugins)
-        ? globalData.enabledPlugins as string[]
-        : ["lvms"];
-      const flavorPlugins = FLAVORS
-        .filter((f) => state.selectedFlavors.has(f.id))
-        .flatMap((f) => f.plugins);
-      const enabledPlugins = [...new Set([...configPlugins, ...flavorPlugins])];
-      const configToWrite = {
-        ...state.configData,
-        global: {
-          ...globalData,
-          workingDir: "/home/enclave",
-          disconnected: true,
-          enabledPlugins: enabledPlugins,
-        },
-        certificates: state.configData.certificates ?? {},
-        cloudInfra: state.configData.cloudInfra ?? { discovery_hosts: [] },
-      };
-      await api.writeConfig(configToWrite as unknown as EnclaveConfig);
+      await api.writeConfig(buildFinalConfig(state));
       setStatus("success");
     } catch (err) {
       setStatus("error");
@@ -53,7 +33,7 @@ export const GenerateStep: React.FC = () => {
         err instanceof Error ? err.message : "Failed to write configuration",
       );
     }
-  }, [api, state.configData]);
+  }, [api, state]);
 
   if (status === "writing") {
     return (
