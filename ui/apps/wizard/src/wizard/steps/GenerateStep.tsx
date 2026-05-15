@@ -25,11 +25,14 @@ export const GenerateStep: React.FC = () => {
     setStatus("writing");
     setErrorMessage("");
     try {
-      const enabledPlugins = ["lvms"];
+      const globalData = (state.configData.global ?? {}) as Record<string, unknown>;
+      const enabledPlugins = Array.isArray(globalData.enabled_plugins)
+        ? globalData.enabled_plugins as string[]
+        : ["lvms"];
       const configToWrite = {
         ...state.configData,
         global: {
-          ...(state.configData.global as Record<string, unknown>),
+          ...globalData,
           workingDir: "/home/enclave",
           disconnected: true,
           enabled_plugins: enabledPlugins,

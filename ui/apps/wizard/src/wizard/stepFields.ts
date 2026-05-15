@@ -15,7 +15,6 @@ export const STEP_REQUIRED_FIELDS: Record<string, string[]> = {
     "global.defaultDNS",
     "global.defaultGateway",
     "global.defaultPrefix",
-    "global.blockStorageBackend",
     "global.pullSecret",
     "global.sshPubPath",
     "global.agent_hosts",
