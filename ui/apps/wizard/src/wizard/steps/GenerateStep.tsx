@@ -27,8 +27,8 @@ export const GenerateStep: React.FC = () => {
     setErrorMessage("");
     try {
       const globalData = (state.configData.global ?? {}) as Record<string, unknown>;
-      const configPlugins = Array.isArray(globalData.enabled_plugins)
-        ? globalData.enabled_plugins as string[]
+      const configPlugins = Array.isArray(globalData.enabledPlugins)
+        ? globalData.enabledPlugins as string[]
         : ["lvms"];
       const flavorPlugins = FLAVORS
         .filter((f) => state.selectedFlavors.has(f.id))
@@ -40,7 +40,7 @@ export const GenerateStep: React.FC = () => {
           ...globalData,
           workingDir: "/home/enclave",
           disconnected: true,
-          enabled_plugins: enabledPlugins,
+          enabledPlugins: enabledPlugins,
         },
         certificates: state.configData.certificates ?? {},
         cloudInfra: state.configData.cloudInfra ?? { discovery_hosts: [] },

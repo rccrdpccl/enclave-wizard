@@ -123,7 +123,7 @@ function WizardContent(): React.ReactElement {
           dispatch({ type: "SET_FIELD", path: "global.blockStorageBackend", value: d.storagePlugin });
           dispatch({ type: "SET_FIELD", path: "global.defaultPrefix", value: 24 });
           dispatch({ type: "SET_FIELD", path: "global.quayBackend", value: "LocalStorage" });
-          dispatch({ type: "SET_FIELD", path: "global.enabled_plugins", value: ["lvms"] });
+          dispatch({ type: "SET_FIELD", path: "global.enabledPlugins", value: ["lvms"] });
         }
 
         if (pluginsResult.status === "fulfilled") {

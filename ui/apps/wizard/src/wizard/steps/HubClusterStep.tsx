@@ -153,12 +153,12 @@ export const HubClusterStep: React.FC = () => {
   const configData = state.configData as Record<string, unknown>;
   const globalData = (configData.global ?? {}) as Record<string, unknown>;
 
-  const agentHosts: HostEntry[] = Array.isArray(globalData.agent_hosts)
-    ? (globalData.agent_hosts as HostEntry[])
+  const agentHosts: HostEntry[] = Array.isArray(globalData.agentHosts)
+    ? (globalData.agentHosts as HostEntry[])
     : [];
 
   const setAgentHosts = (hosts: HostEntry[]) =>
-    dispatch({ type: "SET_FIELD", path: "global.agent_hosts", value: hosts });
+    dispatch({ type: "SET_FIELD", path: "global.agentHosts", value: hosts });
 
   const hostCount = agentHosts.length;
   const canAddHost = hostCount < 3;
