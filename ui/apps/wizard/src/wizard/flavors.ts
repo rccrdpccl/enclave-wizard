@@ -17,9 +17,9 @@ export const FLAVORS: FlavorDefinition[] = [
   },
   {
     id: "gpu-ai",
-    title: "NVIDIA AI in a Box",
+    title: "GPU & AI Workloads",
     description:
-      "GPU-accelerated AI/ML platform with NVIDIA GPU Operator and OpenShift AI.",
+      "GPU-accelerated computing with NVIDIA GPU Operator and OpenShift AI platform.",
     plugins: ["nvidia-gpu", "openshift-ai"],
   },
 ];
