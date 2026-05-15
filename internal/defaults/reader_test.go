@@ -119,6 +119,61 @@ defaults:
 	}
 }
 
+func TestReadVastCSIPluginDefaults(t *testing.T) {
+	dir := t.TempDir()
+	writeFile(t, dir, "defaults/deployment.yaml", `---
+disconnected: true
+masterMaxPods: 500
+diskEncryption: false
+ocMirrorLogLevel: info
+storage_plugin: vast-csi
+`)
+
+	writeFile(t, dir, "plugins/vast-csi/plugin.yaml", `---
+name: vast-csi
+type: foundation
+defaults:
+  vastDefaults:
+    infraTenant: infra
+    storagePath: /osac
+    viewPolicyId: 1
+    quayPvcSize: 1000Gi
+    tiers:
+      - name: quay
+        protocol: nfs
+`)
+
+	d, err := NewReader(dir).ReadAll()
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if d.VASTDefaults == nil {
+		t.Fatal("VASTDefaults is nil")
+	}
+	if d.VASTDefaults.InfraTenant == nil || *d.VASTDefaults.InfraTenant != "infra" {
+		t.Errorf("vastDefaults.infraTenant: want infra, got %v", d.VASTDefaults.InfraTenant)
+	}
+	if d.VASTDefaults.StoragePath == nil || *d.VASTDefaults.StoragePath != "/osac" {
+		t.Errorf("vastDefaults.storagePath: want /osac, got %v", d.VASTDefaults.StoragePath)
+	}
+	if d.VASTDefaults.ViewPolicyID == nil || *d.VASTDefaults.ViewPolicyID != 1 {
+		t.Errorf("vastDefaults.viewPolicyId: want 1, got %v", d.VASTDefaults.ViewPolicyID)
+	}
+	if d.VASTDefaults.QuayPvcSize == nil || *d.VASTDefaults.QuayPvcSize != "1000Gi" {
+		t.Errorf("vastDefaults.quayPvcSize: want 1000Gi, got %v", d.VASTDefaults.QuayPvcSize)
+	}
+	if len(d.VASTDefaults.Tiers) != 1 {
+		t.Fatalf("vastDefaults.tiers: want 1 tier, got %d", len(d.VASTDefaults.Tiers))
+	}
+	if d.VASTDefaults.Tiers[0].Name != "quay" {
+		t.Errorf("vastDefaults.tiers[0].name: want quay, got %s", d.VASTDefaults.Tiers[0].Name)
+	}
+	if d.VASTDefaults.Tiers[0].Protocol != "nfs" {
+		t.Errorf("vastDefaults.tiers[0].protocol: want nfs, got %s", d.VASTDefaults.Tiers[0].Protocol)
+	}
+}
+
 func TestMissingFilesReturnZeros(t *testing.T) {
 	dir := t.TempDir()
 
@@ -138,6 +193,9 @@ func TestMissingFilesReturnZeros(t *testing.T) {
 	}
 	if d.ODFDefaults != nil {
 		t.Errorf("ODFDefaults: want nil, got %+v", d.ODFDefaults)
+	}
+	if d.VASTDefaults != nil {
+		t.Errorf("VASTDefaults: want nil, got %+v", d.VASTDefaults)
 	}
 }
 

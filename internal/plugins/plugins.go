@@ -5,6 +5,7 @@ import "github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
 var All = []models.Plugin{
 	{Name: "lvms", Type: models.PluginTypeFoundation, Description: "Logical Volume Manager Storage"},
 	{Name: "odf", Type: models.PluginTypeFoundation, Description: "OpenShift Data Foundation"},
+	{Name: "vast-csi", Type: models.PluginTypeFoundation, Description: "VAST CSI Storage"},
 	{Name: "nvidia-gpu", Type: models.PluginTypeAddon, Description: "NVIDIA GPU Operator"},
 	{Name: "openshift-ai", Type: models.PluginTypeAddon, Description: "Red Hat OpenShift AI"},
 }

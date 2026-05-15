@@ -19,6 +19,7 @@ type Defaults struct {
 
 	LVMSDefaults *models.LVMSConfig `json:"lvmsDefaults,omitempty"`
 	ODFDefaults  *models.ODFConfig  `json:"odfDefaults,omitempty"`
+	VASTDefaults *models.VASTConfig `json:"vastDefaults,omitempty"`
 }
 
 type Reader struct {
@@ -106,6 +107,10 @@ func (r *Reader) readPluginDefaults(d *Defaults) error {
 		case "odf":
 			if err := extractDefault(pf.Defaults, "odfDefaults", &d.ODFDefaults); err != nil {
 				return fmt.Errorf("odf defaults: %w", err)
+			}
+		case "vast-csi":
+			if err := extractDefault(pf.Defaults, "vastDefaults", &d.VASTDefaults); err != nil {
+				return fmt.Errorf("vast-csi defaults: %w", err)
 			}
 		}
 	}

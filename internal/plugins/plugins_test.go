@@ -7,7 +7,7 @@ import (
 )
 
 func TestAllPluginsPresent(t *testing.T) {
-	want := []string{"lvms", "odf", "nvidia-gpu", "openshift-ai"}
+	want := []string{"lvms", "odf", "vast-csi", "nvidia-gpu", "openshift-ai"}
 	if len(All) != len(want) {
 		t.Fatalf("expected %d plugins, got %d", len(want), len(All))
 	}
@@ -31,8 +31,8 @@ func TestAllPluginTypes(t *testing.T) {
 			t.Errorf("plugin %s has unknown type %s", p.Name, p.Type)
 		}
 	}
-	if foundations != 2 {
-		t.Errorf("expected 2 foundation plugins, got %d", foundations)
+	if foundations != 3 {
+		t.Errorf("expected 3 foundation plugins, got %d", foundations)
 	}
 	if addons != 2 {
 		t.Errorf("expected 2 addon plugins, got %d", addons)
