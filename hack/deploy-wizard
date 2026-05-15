@@ -146,32 +146,55 @@ ${SSH} "${TARGET}" "
 "
 
 ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
+  sudo cloud-init status --wait 2>/dev/null || sleep 10
   sudo dnf install -y podman curl openssl 2>&1 | tail -3
   sudo rpm -Uvh --force /tmp/enclave-wizard.rpm
 " 2>&1 | grep -v "^$"
 
-# --- Step 6: Set up SSH tunnel and verify ---
+# --- Step 6: Set up port forwarding and verify ---
 echo "[6/6] Setting up port forwarding and verifying..."
 
-# Set up port forwarding using socat (reliable, no iptables mess)
+# Set up port forwarding using iptables NAT (works with external access,
+# PREROUTING DNAT bypasses firewalld zone rules)
 ${SSH} "${TARGET}" "
-  # Install socat if needed
-  which socat &>/dev/null || dnf install -y socat 2>&1 | tail -1
+  sysctl -w net.ipv4.ip_forward=1 >/dev/null
 
-  # Kill any existing forwarders on our ports
-  for PID in \$(ss -tlnp | grep -E ':3001|:3443' | grep socat | grep -oP 'pid=\K[0-9]+' | sort -u); do
-    kill \${PID} 2>/dev/null || true
+  # Clean up ALL existing rules for our ports (from any previous VM)
+  cleanup_rules() {
+    local table=\$1 chain=\$2 port=\$3
+    while true; do
+      LINE=\$(iptables -t \$table -L \$chain -n --line-numbers 2>/dev/null | grep \"dpt:\$port\" | head -1 | awk '{print \$1}')
+      [ -z \"\$LINE\" ] && break
+      iptables -t \$table -D \$chain \$LINE
+    done
+  }
+  cleanup_rules nat PREROUTING ${HTTPS_PORT}
+  cleanup_rules nat PREROUTING ${HTTP_PORT}
+  cleanup_rules nat OUTPUT ${HTTPS_PORT}
+  cleanup_rules nat OUTPUT ${HTTP_PORT}
+
+  # Clean up old FORWARD and MASQUERADE rules for wizard VMs
+  while true; do
+    LINE=\$(iptables -L FORWARD -n --line-numbers 2>/dev/null | grep -E '${HTTP_PORT}|${HTTPS_PORT}' | head -1 | awk '{print \$1}')
+    [ -z \"\$LINE\" ] && break
+    iptables -D FORWARD \$LINE
   done
-  sleep 1
+  while true; do
+    LINE=\$(iptables -t nat -L POSTROUTING -n --line-numbers 2>/dev/null | grep '192.168.122' | grep MASQUERADE | head -1 | awk '{print \$1}')
+    [ -z \"\$LINE\" ] && break
+    iptables -t nat -D POSTROUTING \$LINE
+  done
 
-  # Forward HTTP and HTTPS ports from target to VM
-  setsid socat TCP-LISTEN:${HTTP_PORT},fork,reuseaddr TCP:${VM_IP}:${HTTP_PORT} </dev/null &>/dev/null &
-  setsid socat TCP-LISTEN:${HTTPS_PORT},fork,reuseaddr TCP:${VM_IP}:${HTTPS_PORT} </dev/null &>/dev/null &
-  disown -a
+  # DNAT external + local traffic to the VM
+  iptables -t nat -A PREROUTING -p tcp --dport ${HTTPS_PORT} -j DNAT --to-destination ${VM_IP}:${HTTPS_PORT}
+  iptables -t nat -A PREROUTING -p tcp --dport ${HTTP_PORT} -j DNAT --to-destination ${VM_IP}:${HTTP_PORT}
+  iptables -t nat -A OUTPUT -p tcp --dport ${HTTPS_PORT} -j DNAT --to-destination ${VM_IP}:${HTTPS_PORT}
+  iptables -t nat -A OUTPUT -p tcp --dport ${HTTP_PORT} -j DNAT --to-destination ${VM_IP}:${HTTP_PORT}
+  iptables -t nat -A POSTROUTING -d ${VM_IP} -j MASQUERADE
+  iptables -I FORWARD 1 -d ${VM_IP} -p tcp -m multiport --dports ${HTTP_PORT},${HTTPS_PORT} -j ACCEPT
 
-  # Open firewall
-  firewall-cmd --add-port=${HTTP_PORT}/tcp --add-port=${HTTPS_PORT}/tcp --permanent 2>/dev/null || true
-  firewall-cmd --reload 2>/dev/null || true
+  # Save VM IP for teardown
+  echo '${VM_IP}' > /tmp/enclave-wizard-vm-ip
 "
 
 sleep 3

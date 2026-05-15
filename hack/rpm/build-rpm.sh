@@ -14,6 +14,7 @@ make -C "${REPO_DIR}" build-ui
 
 # Save UI container image as tarball
 echo "  Saving UI container image..."
+rm -f "${REPO_DIR}/wizard-ui.tar"
 podman save enclave-wizard-ui:dev -o "${REPO_DIR}/wizard-ui.tar"
 
 # --- Build RPM in container ---
