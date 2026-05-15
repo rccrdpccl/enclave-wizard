@@ -25,10 +25,7 @@ export const GenerateStep: React.FC = () => {
     setStatus("writing");
     setErrorMessage("");
     try {
-      const enabledPlugins =
-        state.selectedFlavor === "cluster"
-          ? ["lvms"]
-          : ["lvms"];
+      const enabledPlugins = ["lvms"];
       const configToWrite = {
         ...state.configData,
         global: {
