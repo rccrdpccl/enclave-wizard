@@ -7,11 +7,11 @@ export default defineConfig((_env) => {
     server: {
       proxy: {
         "/api/v1": {
-          target: process.env.VITE_API_BASE_URL || "http://localhost:8080",
+          target: process.env.API_PROXY_TARGET || "http://localhost:8080",
           changeOrigin: true,
         },
         "/openapi.json": {
-          target: process.env.VITE_API_BASE_URL || "http://localhost:8080",
+          target: process.env.API_PROXY_TARGET || "http://localhost:8080",
           changeOrigin: true,
         },
       },

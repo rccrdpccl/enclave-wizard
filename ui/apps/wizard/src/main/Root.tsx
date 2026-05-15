@@ -18,7 +18,7 @@ import { router } from "./Router.tsx";
 import { Symbols } from "./Symbols.ts";
 
 function getApiBasePath(): string {
-  return import.meta.env.VITE_API_BASE_URL || window.location.origin;
+  return window.location.origin;
 }
 
 function getConfiguredContainer(): Container {
