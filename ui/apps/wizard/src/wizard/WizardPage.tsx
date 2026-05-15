@@ -157,6 +157,24 @@ function WizardContent(): React.ReactElement {
         errors = validateFields(state.schema, nonHostFields, state.configData as Record<string, unknown>);
       }
 
+      if (currentStepId === "landing-zone") {
+        const globalData = ((state.configData as Record<string, unknown>).global ?? {}) as Record<string, unknown>;
+        const disconnected = globalData.disconnected !== false;
+        if (disconnected) {
+          const quayFields = ["global.quayUser", "global.quayPassword", "global.quayBackend"];
+          errors.push(...validateFields(state.schema, quayFields, state.configData as Record<string, unknown>));
+          const quayBackend = globalData.quayBackend as string;
+          if (quayBackend === "RadosGWStorage") {
+            const rgw = (globalData.quayBackendRGWConfiguration ?? {}) as Record<string, unknown>;
+            for (const key of ["access_key", "secret_key", "bucket_name", "hostname"]) {
+              if (!rgw[key] || (typeof rgw[key] === "string" && (rgw[key] as string).trim() === "")) {
+                errors.push({ path: `global.quayBackendRGWConfiguration.${key}`, label: key, message: `${key} is required for RadosGW backend` });
+              }
+            }
+          }
+        }
+      }
+
       if (currentStepId === "hub-cluster") {
         const globalData = ((state.configData as Record<string, unknown>).global ?? {}) as Record<string, unknown>;
         const agentHosts = Array.isArray(globalData.agent_hosts) ? (globalData.agent_hosts as Record<string, unknown>[]) : [];

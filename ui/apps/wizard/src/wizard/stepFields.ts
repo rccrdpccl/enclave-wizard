@@ -1,9 +1,6 @@
 export const STEP_REQUIRED_FIELDS: Record<string, string[]> = {
   "landing-zone": [
     "global.lzBmcIP",
-    "global.quayUser",
-    "global.quayPassword",
-    "global.quayBackend",
   ],
   "hub-cluster": [
     "global.baseDomain",
