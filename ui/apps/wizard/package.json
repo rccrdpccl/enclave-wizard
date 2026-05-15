@@ -14,12 +14,17 @@
     "test:watch": "vitest"
   },
   "dependencies": {
+    "@codemirror/lang-yaml": "^6.1.0",
+    "@codemirror/state": "^6.5.0",
+    "@codemirror/view": "^6.36.0",
     "@emotion/css": "^11.13.0",
     "@enclave-wizard-ui/api-client": "workspace:*",
     "@enclave-wizard-ui/ioc": "workspace:*",
     "@patternfly/react-core": "^6.4.0",
     "@patternfly/react-icons": "^6.4.0",
     "@patternfly/react-table": "^6.4.0",
+    "codemirror": "^6.0.0",
+    "js-yaml": "^4.1.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.26.0"
@@ -29,6 +34,7 @@
     "@testing-library/jest-dom": "^6.6.0",
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^14.0.0",
+    "@types/js-yaml": "^4.0.9",
     "jsdom": "^25.0.0",
     "vitest": "^3.0.0"
   }
