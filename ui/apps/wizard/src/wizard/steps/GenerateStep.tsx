@@ -12,6 +12,7 @@ import { useCallback, useState } from "react";
 import type { EnclaveConfig } from "@enclave-wizard-ui/api-client";
 import { useEnclaveApi } from "../../api/useEnclaveApi.ts";
 import { useWizard } from "../WizardContext.tsx";
+import { FLAVORS } from "../flavors.ts";
 
 type GenerateStatus = "idle" | "writing" | "success" | "error";
 
@@ -25,14 +26,18 @@ export const GenerateStep: React.FC = () => {
     setStatus("writing");
     setErrorMessage("");
     try {
-      const enabledPlugins =
-        state.selectedFlavor === "cluster"
-          ? ["lvms"]
-          : ["lvms"];
+      const globalData = (state.configData.global ?? {}) as Record<string, unknown>;
+      const configPlugins = Array.isArray(globalData.enabled_plugins)
+        ? globalData.enabled_plugins as string[]
+        : ["lvms"];
+      const flavorPlugins = FLAVORS
+        .filter((f) => state.selectedFlavors.has(f.id))
+        .flatMap((f) => f.plugins);
+      const enabledPlugins = [...new Set([...configPlugins, ...flavorPlugins])];
       const configToWrite = {
         ...state.configData,
         global: {
-          ...(state.configData.global as Record<string, unknown>),
+          ...globalData,
           workingDir: "/home/enclave",
           disconnected: true,
           enabled_plugins: enabledPlugins,

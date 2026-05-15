@@ -1,5 +1,5 @@
 import { Content, Flex, FlexItem, Title } from "@patternfly/react-core";
-import { ClusterIcon } from "@patternfly/react-icons";
+import { ClusterIcon, CpuIcon } from "@patternfly/react-icons";
 import type React from "react";
 import type { ReactNode } from "react";
 import { FlavorCard } from "../components/FlavorCard.tsx";
@@ -9,18 +9,11 @@ import { stepStyles } from "./stepStyles.ts";
 
 const FLAVOR_ICONS: Record<FlavorId, ReactNode> = {
   cluster: <ClusterIcon />,
+  "gpu-ai": <CpuIcon />,
 };
 
 export const SelectFlavorStep: React.FC = () => {
   const { state, dispatch } = useWizard();
-
-  const toggleFlavor = (id: FlavorId) => {
-    if (state.selectedFlavor === id) {
-      dispatch({ type: "SET_FLAVOR", flavor: null });
-    } else {
-      dispatch({ type: "SET_FLAVOR", flavor: id });
-    }
-  };
 
   return (
     <Flex direction={{ default: "column" }} gap={{ default: "gapLg" }}>
@@ -41,8 +34,10 @@ export const SelectFlavorStep: React.FC = () => {
                 title={flavor.title}
                 description={flavor.description}
                 icon={FLAVOR_ICONS[flavor.id]}
-                isSelected={state.selectedFlavor === flavor.id}
-                onSelect={() => toggleFlavor(flavor.id)}
+                isSelected={state.selectedFlavors.has(flavor.id)}
+                onSelect={() =>
+                  dispatch({ type: "TOGGLE_FLAVOR", flavor: flavor.id })
+                }
               />
             </FlexItem>
           ))}

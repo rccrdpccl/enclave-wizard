@@ -10,12 +10,37 @@ describe("wizardReducer", () => {
     expect(state.currentStep).toBe(3);
   });
 
-  it("sets the selected flavor", () => {
+  it("toggles a flavor on", () => {
     const state = wizardReducer(initialWizardState, {
-      type: "SET_FLAVOR",
+      type: "TOGGLE_FLAVOR",
       flavor: "cluster",
     });
-    expect(state.selectedFlavor).toBe("cluster");
+    expect(state.selectedFlavors.has("cluster")).toBe(true);
+  });
+
+  it("toggles a flavor off", () => {
+    let state = wizardReducer(initialWizardState, {
+      type: "TOGGLE_FLAVOR",
+      flavor: "cluster",
+    });
+    state = wizardReducer(state, {
+      type: "TOGGLE_FLAVOR",
+      flavor: "cluster",
+    });
+    expect(state.selectedFlavors.has("cluster")).toBe(false);
+  });
+
+  it("supports multiple flavors selected", () => {
+    let state = wizardReducer(initialWizardState, {
+      type: "TOGGLE_FLAVOR",
+      flavor: "cluster",
+    });
+    state = wizardReducer(state, {
+      type: "TOGGLE_FLAVOR",
+      flavor: "gpu-ai",
+    });
+    expect(state.selectedFlavors.has("cluster")).toBe(true);
+    expect(state.selectedFlavors.has("gpu-ai")).toBe(true);
   });
 
   it("sets a top-level config field via dot path", () => {

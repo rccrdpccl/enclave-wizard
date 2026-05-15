@@ -15,7 +15,7 @@ interface ConfigData {
 
 export interface WizardState {
   currentStep: number;
-  selectedFlavor: FlavorId | null;
+  selectedFlavors: Set<FlavorId>;
   configData: ConfigData;
   validationErrors: ValidationError[];
   showValidation: boolean;
@@ -25,7 +25,7 @@ export interface WizardState {
 
 export type WizardAction =
   | { type: "SET_STEP"; step: number }
-  | { type: "SET_FLAVOR"; flavor: FlavorId | null }
+  | { type: "TOGGLE_FLAVOR"; flavor: FlavorId }
   | { type: "SET_FIELD"; path: string; value: unknown }
   | { type: "SET_SCHEMA"; schema: unknown }
   | { type: "SET_PLUGINS"; plugins: unknown[] }
@@ -35,7 +35,7 @@ export type WizardAction =
 
 export const initialWizardState: WizardState = {
   currentStep: 0,
-  selectedFlavor: null,
+  selectedFlavors: new Set(),
   configData: {},
   validationErrors: [],
   showValidation: false,
@@ -57,6 +57,16 @@ function setNestedField(
   return { ...obj, [head]: setNestedField({ ...child }, rest, value) };
 }
 
+function toggleFlavor(flavors: Set<FlavorId>, id: FlavorId): Set<FlavorId> {
+  const next = new Set(flavors);
+  if (next.has(id)) {
+    next.delete(id);
+  } else {
+    next.add(id);
+  }
+  return next;
+}
+
 export function wizardReducer(
   state: WizardState,
   action: WizardAction,
@@ -64,8 +74,8 @@ export function wizardReducer(
   switch (action.type) {
     case "SET_STEP":
       return { ...state, currentStep: action.step };
-    case "SET_FLAVOR":
-      return { ...state, selectedFlavor: action.flavor };
+    case "TOGGLE_FLAVOR":
+      return { ...state, selectedFlavors: toggleFlavor(state.selectedFlavors, action.flavor) };
     case "SET_FIELD": {
       const keys = action.path.split(".");
       const configData = setNestedField(

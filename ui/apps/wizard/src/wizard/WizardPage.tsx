@@ -23,6 +23,7 @@ import { useOpenApiSchema } from "../schema/useOpenApiSchema.ts";
 import { STEP_REQUIRED_FIELDS } from "./stepFields.ts";
 import { CaasStep } from "./steps/CaasStep.tsx";
 import { GenerateStep } from "./steps/GenerateStep.tsx";
+import { GpuAiStep } from "./steps/GpuAiStep.tsx";
 import { HubClusterStep } from "./steps/HubClusterStep.tsx";
 import { LandingZoneStep } from "./steps/LandingZoneStep.tsx";
 import { ReviewStep } from "./steps/ReviewStep.tsx";
@@ -44,16 +45,20 @@ const BASE_STEPS: StepDef[] = [
 ];
 
 const CAAS_STEP: StepDef = { id: "caas", label: "Cluster as a Service" };
+const GPU_AI_STEP: StepDef = { id: "gpu-ai", label: "GPU & AI" };
 
 const TAIL_STEPS: StepDef[] = [
   { id: "review", label: "Review" },
   { id: "generate", label: "Generate" },
 ];
 
-function buildSteps(selectedFlavor: string | null): StepDef[] {
+function buildSteps(selectedFlavors: Set<string>): StepDef[] {
   const steps = [...BASE_STEPS];
-  if (selectedFlavor === "cluster") {
+  if (selectedFlavors.has("cluster")) {
     steps.push(CAAS_STEP);
+  }
+  if (selectedFlavors.has("gpu-ai")) {
+    steps.push(GPU_AI_STEP);
   }
   steps.push(...TAIL_STEPS);
   return steps;
@@ -71,6 +76,8 @@ function StepContent({ stepId }: { stepId: string }): React.ReactElement {
       return <HubClusterStep />;
     case "caas":
       return <CaasStep />;
+    case "gpu-ai":
+      return <GpuAiStep />;
     case "review":
       return <ReviewStep />;
     case "generate":
@@ -88,8 +95,8 @@ function WizardContent(): React.ReactElement {
   const [stepErrors, setStepErrors] = useState<StepValidationError[]>([]);
 
   const steps = useMemo(
-    () => buildSteps(state.selectedFlavor),
-    [state.selectedFlavor],
+    () => buildSteps(state.selectedFlavors),
+    [state.selectedFlavors],
   );
 
   useEffect(() => {
@@ -116,6 +123,7 @@ function WizardContent(): React.ReactElement {
           dispatch({ type: "SET_FIELD", path: "global.blockStorageBackend", value: d.storagePlugin });
           dispatch({ type: "SET_FIELD", path: "global.defaultPrefix", value: 24 });
           dispatch({ type: "SET_FIELD", path: "global.quayBackend", value: "LocalStorage" });
+          dispatch({ type: "SET_FIELD", path: "global.enabled_plugins", value: ["lvms"] });
         }
 
         if (pluginsResult.status === "fulfilled") {
@@ -154,6 +162,24 @@ function WizardContent(): React.ReactElement {
       if (fieldsToValidate) {
         const nonHostFields = fieldsToValidate.filter((f) => f !== "global.agent_hosts");
         errors = validateFields(state.schema, nonHostFields, state.configData as Record<string, unknown>);
+      }
+
+      if (currentStepId === "landing-zone") {
+        const globalData = ((state.configData as Record<string, unknown>).global ?? {}) as Record<string, unknown>;
+        const disconnected = globalData.disconnected !== false;
+        if (disconnected) {
+          const quayFields = ["global.quayUser", "global.quayPassword", "global.quayBackend"];
+          errors.push(...validateFields(state.schema, quayFields, state.configData as Record<string, unknown>));
+          const quayBackend = globalData.quayBackend as string;
+          if (quayBackend === "RadosGWStorage") {
+            const rgw = (globalData.quayBackendRGWConfiguration ?? {}) as Record<string, unknown>;
+            for (const key of ["access_key", "secret_key", "bucket_name", "hostname"]) {
+              if (!rgw[key] || (typeof rgw[key] === "string" && (rgw[key] as string).trim() === "")) {
+                errors.push({ path: `global.quayBackendRGWConfiguration.${key}`, label: key, message: `${key} is required for RadosGW backend` });
+              }
+            }
+          }
+        }
       }
 
       if (currentStepId === "hub-cluster") {

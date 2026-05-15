@@ -1,0 +1,211 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "${SCRIPT_DIR}/.." && pwd)"
+
+if [ $# -lt 1 ]; then
+    echo "Usage: $0 <user@host>"
+    echo "Example: $0 root@myserver.example.com"
+    exit 1
+fi
+
+TARGET="$1"
+SSH="ssh -o StrictHostKeyChecking=no"
+SCP="scp -o StrictHostKeyChecking=no -q"
+
+VM_NAME="enclave-wizard-lz"
+VM_MEMORY=4096
+VM_CPUS=2
+VM_DISK_SIZE=20
+HTTP_PORT=3001
+HTTPS_PORT=3443
+API_PORT=8080
+CLOUD_IMAGE_URL="https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-9-latest.x86_64.qcow2"
+
+echo "=== Deploying Enclave Wizard to ${TARGET} (in VM) ==="
+
+# --- Find RPM ---
+RPM_FILE=$(ls -t "${REPO_DIR}/out/"enclave-wizard-*.rpm 2>/dev/null | head -1)
+if [ -z "${RPM_FILE}" ]; then
+    echo "ERROR: No RPM found in out/. Run 'make rpm' first."
+    exit 1
+fi
+echo "  RPM: $(basename ${RPM_FILE})"
+
+# --- Step 1: Transfer RPM to target host ---
+echo ""
+echo "[1/6] Transferring RPM to target host..."
+${SCP} "${RPM_FILE}" "${TARGET}:/tmp/enclave-wizard.rpm"
+
+# --- Step 2: Download Fedora Cloud image on target ---
+echo "[2/6] Preparing VM image on target..."
+${SSH} "${TARGET}" "
+  set -e
+  IMG_DIR=/var/lib/libvirt/images
+  IMAGE_CACHE=\${IMG_DIR}/CentOS-Stream-9-GenericCloud.qcow2
+
+  if [ ! -f \${IMAGE_CACHE} ]; then
+    echo '  Downloading CentOS Stream 9 Cloud image...'
+    curl -L -o \${IMAGE_CACHE} '${CLOUD_IMAGE_URL}'
+  else
+    echo '  CentOS image cached'
+  fi
+
+  # Destroy old VM if present
+  virsh destroy ${VM_NAME} 2>/dev/null || true
+  virsh undefine ${VM_NAME} --remove-all-storage --nvram 2>/dev/null || true
+  sleep 1
+
+  # Create VM disk
+  qemu-img create -f qcow2 -b \${IMAGE_CACHE} -F qcow2 \
+    \${IMG_DIR}/${VM_NAME}.qcow2 ${VM_DISK_SIZE}G
+"
+
+# --- Step 3: Create cloud-init and boot VM ---
+echo "[3/6] Booting VM..."
+LOCAL_SSH_KEY=$(cat ~/.ssh/id_rsa.pub)
+${SSH} "${TARGET}" "
+  set -e
+  IMG_DIR=/var/lib/libvirt/images
+  CI_DIR=\$(mktemp -d)
+
+  cat > \${CI_DIR}/meta-data <<CIEOF
+instance-id: ${VM_NAME}
+local-hostname: ${VM_NAME}
+CIEOF
+
+  cat > \${CI_DIR}/user-data <<CIEOF
+#cloud-config
+users:
+  - name: wizard
+    sudo: ALL=(ALL) NOPASSWD:ALL
+    shell: /bin/bash
+    ssh_authorized_keys:
+      - ${LOCAL_SSH_KEY}
+      - \$(cat ~/.ssh/id_rsa.pub 2>/dev/null || echo '')
+
+packages:
+  - podman
+  - curl
+
+runcmd:
+  - systemctl enable --now podman.socket
+CIEOF
+
+  mkisofs -output \${IMG_DIR}/${VM_NAME}-cidata.iso \
+    -volid cidata -joliet -rock \
+    \${CI_DIR}/meta-data \${CI_DIR}/user-data 2>/dev/null
+  rm -rf \${CI_DIR}
+
+  virt-install \
+    --name ${VM_NAME} \
+    --memory ${VM_MEMORY} \
+    --vcpus ${VM_CPUS} \
+    --disk path=\${IMG_DIR}/${VM_NAME}.qcow2,format=qcow2 \
+    --disk path=\${IMG_DIR}/${VM_NAME}-cidata.iso,device=cdrom \
+    --os-variant centos-stream9 \
+    --network default \
+    --graphics none \
+    --console pty,target_type=serial \
+    --noautoconsole \
+    --import \
+    --quiet
+"
+
+# --- Step 4: Wait for VM IP and SSH ---
+echo "[4/6] Waiting for VM..."
+VM_IP=""
+for i in $(seq 1 60); do
+    VM_IP=$(${SSH} "${TARGET}" "virsh domifaddr ${VM_NAME} 2>/dev/null | grep -oP '(\d+\.){3}\d+' | head -1" 2>/dev/null) || true
+    if [ -n "${VM_IP}" ]; then
+        break
+    fi
+    sleep 2
+done
+
+if [ -z "${VM_IP}" ]; then
+    echo "ERROR: VM did not get an IP after 120 seconds"
+    exit 1
+fi
+echo "  VM IP: ${VM_IP}"
+
+# Wait for SSH inside VM (via target as jump host)
+echo "  Waiting for SSH..."
+for i in $(seq 1 30); do
+    ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "echo ready" 2>/dev/null && break
+    sleep 2
+done
+
+# --- Step 5: Provision inside VM ---
+echo "[5/6] Provisioning VM..."
+
+# Transfer RPM from target host into VM and install
+${SSH} "${TARGET}" "
+  scp -o StrictHostKeyChecking=no /tmp/enclave-wizard.rpm wizard@${VM_IP}:/tmp/enclave-wizard.rpm
+"
+
+${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
+  sudo dnf install -y podman curl openssl 2>&1 | tail -3
+  sudo rpm -Uvh --force /tmp/enclave-wizard.rpm
+" 2>&1 | grep -v "^$"
+
+# --- Step 6: Set up SSH tunnel and verify ---
+echo "[6/6] Setting up port forwarding and verifying..."
+
+# Set up port forwarding using socat (reliable, no iptables mess)
+${SSH} "${TARGET}" "
+  # Install socat if needed
+  which socat &>/dev/null || dnf install -y socat 2>&1 | tail -1
+
+  # Kill any existing forwarders on our ports
+  for PID in \$(ss -tlnp | grep -E ':3001|:3443' | grep socat | grep -oP 'pid=\K[0-9]+' | sort -u); do
+    kill \${PID} 2>/dev/null || true
+  done
+  sleep 1
+
+  # Forward HTTP and HTTPS ports from target to VM
+  setsid socat TCP-LISTEN:${HTTP_PORT},fork,reuseaddr TCP:${VM_IP}:${HTTP_PORT} </dev/null &>/dev/null &
+  setsid socat TCP-LISTEN:${HTTPS_PORT},fork,reuseaddr TCP:${VM_IP}:${HTTPS_PORT} </dev/null &>/dev/null &
+  disown -a
+
+  # Open firewall
+  firewall-cmd --add-port=${HTTP_PORT}/tcp --add-port=${HTTPS_PORT}/tcp --permanent 2>/dev/null || true
+  firewall-cmd --reload 2>/dev/null || true
+"
+
+sleep 3
+
+# Verify
+TARGET_HOST=$(echo "${TARGET}" | cut -d@ -f2)
+
+API_OK=false
+HTTPS_OK=false
+REDIRECT_OK=false
+EXT_OK=false
+
+${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -sf http://localhost:${API_PORT}/api/v1/defaults" > /dev/null 2>&1 && API_OK=true
+${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -sfk https://localhost:${HTTPS_PORT}" > /dev/null 2>&1 && HTTPS_OK=true
+REDIRECT_CODE=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -so /dev/null -w '%{http_code}' http://localhost:${HTTP_PORT}" 2>/dev/null)
+[ "${REDIRECT_CODE}" = "301" ] && REDIRECT_OK=true
+curl -sfk --connect-timeout 5 "https://${TARGET_HOST}:${HTTPS_PORT}" > /dev/null 2>&1 && EXT_OK=true
+
+echo ""
+echo "  API (VM):            $( $API_OK && echo 'OK' || echo 'FAIL' )"
+echo "  HTTPS (VM):          $( $HTTPS_OK && echo 'OK' || echo 'FAIL' )"
+echo "  HTTP→HTTPS redirect: $( $REDIRECT_OK && echo 'OK (301)' || echo "FAIL (got ${REDIRECT_CODE})" )"
+echo "  HTTPS (external):   $( $EXT_OK && echo 'OK' || echo 'FAIL - check port forwarding' )"
+echo ""
+
+if $HTTPS_OK; then
+    echo "Wizard URL: https://${TARGET_HOST}:${HTTPS_PORT}/wizard"
+    echo "VM SSH:     ssh -J ${TARGET} wizard@${VM_IP}"
+    echo ""
+    echo "  (Self-signed cert — accept the browser warning)"
+    echo ""
+    echo "To remove:  ./hack/teardown-wizard ${TARGET}"
+else
+    echo "Deployment failed. Check logs with:"
+    echo "  ssh -J ${TARGET} wizard@${VM_IP} 'sudo journalctl -u enclave-wizard-api -u enclave-wizard-ui --no-pager -n 20'"
+    exit 1
+fi
