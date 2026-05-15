@@ -30,26 +30,17 @@ describe("wizardReducer", () => {
     expect(state.selectedFlavors.has("cluster")).toBe(false);
   });
 
-  it("auto-selects nvidia-gpu when openshift-ai is selected", () => {
-    const state = wizardReducer(initialWizardState, {
-      type: "TOGGLE_FLAVOR",
-      flavor: "openshift-ai",
-    });
-    expect(state.selectedFlavors.has("openshift-ai")).toBe(true);
-    expect(state.selectedFlavors.has("nvidia-gpu")).toBe(true);
-  });
-
-  it("deselects openshift-ai when nvidia-gpu is deselected", () => {
+  it("supports multiple flavors selected", () => {
     let state = wizardReducer(initialWizardState, {
       type: "TOGGLE_FLAVOR",
-      flavor: "openshift-ai",
+      flavor: "cluster",
     });
     state = wizardReducer(state, {
       type: "TOGGLE_FLAVOR",
-      flavor: "nvidia-gpu",
+      flavor: "gpu-ai",
     });
-    expect(state.selectedFlavors.has("nvidia-gpu")).toBe(false);
-    expect(state.selectedFlavors.has("openshift-ai")).toBe(false);
+    expect(state.selectedFlavors.has("cluster")).toBe(true);
+    expect(state.selectedFlavors.has("gpu-ai")).toBe(true);
   });
 
   it("sets a top-level config field via dot path", () => {

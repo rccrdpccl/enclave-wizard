@@ -61,14 +61,8 @@ function toggleFlavor(flavors: Set<FlavorId>, id: FlavorId): Set<FlavorId> {
   const next = new Set(flavors);
   if (next.has(id)) {
     next.delete(id);
-    if (id === "nvidia-gpu") {
-      next.delete("openshift-ai");
-    }
   } else {
     next.add(id);
-    if (id === "openshift-ai") {
-      next.add("nvidia-gpu");
-    }
   }
   return next;
 }
