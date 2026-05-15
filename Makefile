@@ -40,3 +40,11 @@ deploy: build-linux build-ui
 teardown:
 	@test -n "$(TARGET)" || (echo "Usage: make teardown TARGET=root@host" && exit 1)
 	hack/teardown-wizard $(TARGET)
+
+e2e: rpm
+	@test -n "$(TARGET)" || (echo "Usage: make e2e TARGET=root@host" && exit 1)
+	hack/e2e/run-e2e.sh --host $(TARGET)
+
+e2e-rerun:
+	@test -n "$(TARGET)" || (echo "Usage: make e2e-rerun TARGET=root@host" && exit 1)
+	hack/e2e/run-e2e.sh --host $(TARGET) --skip-deploy --skip-teardown
