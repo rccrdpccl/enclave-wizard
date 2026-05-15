@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate, useRouteError } from "react-router-dom";
+import { createBrowserRouter, Link, Navigate, useRouteError } from "react-router-dom";
 
 function ErrorPage() {
   const error = useRouteError() as Error;
@@ -28,5 +28,14 @@ export const router = createBrowserRouter([
       const { WizardPage } = await import("../wizard/WizardPage.tsx");
       return { Component: WizardPage };
     },
+  },
+  {
+    path: "*",
+    element: (
+      <div style={{ padding: "2rem", textAlign: "center" }}>
+        <h1>404 — Page not found</h1>
+        <p><Link to="/wizard">Go to wizard</Link></p>
+      </div>
+    ),
   },
 ]);
