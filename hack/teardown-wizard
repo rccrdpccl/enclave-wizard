@@ -15,9 +15,10 @@ HTTPS_PORT=3443
 echo "=== Tearing down Enclave Wizard on ${TARGET} ==="
 
 ssh -o StrictHostKeyChecking=no "${TARGET}" "
-    # Kill port forwarders
-    pkill -f 'socat.*TCP-LISTEN:3001' 2>/dev/null || true
-    pkill -f 'socat.*TCP-LISTEN:3443' 2>/dev/null || true
+    # Kill port forwarders (by listening port, not pattern that matches SSH)
+    for PID in \$(ss -tlnp | grep -E ':3001|:3443' | grep -oP 'pid=\K[0-9]+' | sort -u); do
+        kill \${PID} 2>/dev/null || true
+    done
 
     # Destroy VM
     virsh destroy ${VM_NAME} 2>/dev/null || true

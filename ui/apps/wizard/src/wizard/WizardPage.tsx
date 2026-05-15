@@ -23,6 +23,7 @@ import { useOpenApiSchema } from "../schema/useOpenApiSchema.ts";
 import { STEP_REQUIRED_FIELDS } from "./stepFields.ts";
 import { CaasStep } from "./steps/CaasStep.tsx";
 import { GenerateStep } from "./steps/GenerateStep.tsx";
+import { GpuAiStep } from "./steps/GpuAiStep.tsx";
 import { HubClusterStep } from "./steps/HubClusterStep.tsx";
 import { LandingZoneStep } from "./steps/LandingZoneStep.tsx";
 import { ReviewStep } from "./steps/ReviewStep.tsx";
@@ -44,6 +45,7 @@ const BASE_STEPS: StepDef[] = [
 ];
 
 const CAAS_STEP: StepDef = { id: "caas", label: "Cluster as a Service" };
+const GPU_AI_STEP: StepDef = { id: "gpu-ai", label: "GPU & AI" };
 
 const TAIL_STEPS: StepDef[] = [
   { id: "review", label: "Review" },
@@ -54,6 +56,9 @@ function buildSteps(selectedFlavors: Set<string>): StepDef[] {
   const steps = [...BASE_STEPS];
   if (selectedFlavors.has("cluster")) {
     steps.push(CAAS_STEP);
+  }
+  if (selectedFlavors.has("gpu-ai")) {
+    steps.push(GPU_AI_STEP);
   }
   steps.push(...TAIL_STEPS);
   return steps;
@@ -71,6 +76,8 @@ function StepContent({ stepId }: { stepId: string }): React.ReactElement {
       return <HubClusterStep />;
     case "caas":
       return <CaasStep />;
+    case "gpu-ai":
+      return <GpuAiStep />;
     case "review":
       return <ReviewStep />;
     case "generate":
