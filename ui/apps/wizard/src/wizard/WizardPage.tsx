@@ -160,7 +160,7 @@ function WizardContent(): React.ReactElement {
       let errors: StepValidationError[] = [];
 
       if (fieldsToValidate) {
-        const nonHostFields = fieldsToValidate.filter((f) => f !== "global.agent_hosts");
+        const nonHostFields = fieldsToValidate.filter((f) => f !== "global.agentHosts");
         errors = validateFields(state.schema, nonHostFields, state.configData as Record<string, unknown>);
       }
 
@@ -184,9 +184,9 @@ function WizardContent(): React.ReactElement {
 
       if (currentStepId === "hub-cluster") {
         const globalData = ((state.configData as Record<string, unknown>).global ?? {}) as Record<string, unknown>;
-        const agentHosts = Array.isArray(globalData.agent_hosts) ? (globalData.agent_hosts as Record<string, unknown>[]) : [];
+        const agentHosts = Array.isArray(globalData.agentHosts) ? (globalData.agentHosts as Record<string, unknown>[]) : [];
         if (agentHosts.length !== 3) {
-          errors.push({ path: "global.agent_hosts", label: "Control Plane Nodes", message: `Exactly 3 control plane nodes are required (currently ${agentHosts.length})` });
+          errors.push({ path: "global.agentHosts", label: "Control Plane Nodes", message: `Exactly 3 control plane nodes are required (currently ${agentHosts.length})` });
         } else {
           errors.push(...validateHostEntries(state.schema, agentHosts, "Node"));
         }
