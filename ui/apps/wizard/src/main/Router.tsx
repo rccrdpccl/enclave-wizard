@@ -1,19 +1,5 @@
-import { createBrowserRouter, Link, Navigate, useRouteError } from "react-router-dom";
-
-function ErrorPage() {
-  const error = useRouteError() as Error;
-  return (
-    <div style={{ padding: "2rem", fontFamily: "monospace" }}>
-      <h1>Application Error</h1>
-      <pre style={{ color: "red", whiteSpace: "pre-wrap" }}>
-        {error?.message ?? String(error)}
-      </pre>
-      <pre style={{ color: "#666", whiteSpace: "pre-wrap", marginTop: "1rem" }}>
-        {error?.stack}
-      </pre>
-    </div>
-  );
-}
+import { createBrowserRouter, Link, Navigate } from "react-router-dom";
+import { ErrorPage } from "../pages/ErrorPage.tsx";
 
 export const router = createBrowserRouter([
   {
