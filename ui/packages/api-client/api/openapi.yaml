@@ -424,7 +424,7 @@ components:
           description: NMState network configuration for multi-NIC/VLAN
         redfish:
           description: Redfish/IPMI management IP
-          pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$
+          pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(:\d+)?$
           type: string
         redfishPassword:
           description: Redfish password

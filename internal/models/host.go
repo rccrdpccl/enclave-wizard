@@ -2,7 +2,7 @@ package models
 
 type HostEntry struct {
 	Name            string  `json:"name" yaml:"name" doc:"Node name label" minLength:"1"`
-	Redfish         string  `json:"redfish" yaml:"redfish" doc:"Redfish/IPMI management IP" pattern:"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"`
+	Redfish         string  `json:"redfish" yaml:"redfish" doc:"Redfish/IPMI management IP" pattern:"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)(:\\d+)?$"`
 	RedfishUser     string  `json:"redfishUser" yaml:"redfishUser" doc:"Redfish username" minLength:"1"`
 	RedfishPassword string  `json:"redfishPassword" yaml:"redfishPassword" doc:"Redfish password" minLength:"1"`
 	RootDisk        string  `json:"rootDisk" yaml:"rootDisk" doc:"Root disk path for OS installation" minLength:"1"`
