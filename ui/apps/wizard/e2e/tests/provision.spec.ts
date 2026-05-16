@@ -116,12 +116,25 @@ test.describe("Provision flow", () => {
     await wizard.fillHubCluster(minimalHubConfig);
     await wizard.clickNext();
 
-    // Now on the Review step — click Download files
-    await wizard.clickDownloadFiles();
+    // Download config files and verify content
+    const files = await wizard.downloadConfigFiles();
 
-    // Read the YAML content from the global.yaml tab
-    const yamlContent = await wizard.getYamlContent("global.yaml");
-    expect(yamlContent).toContain("provision-test.local");
+    expect(files.size).toBeGreaterThanOrEqual(1);
+
+    const globalYaml = files.get("global.yaml");
+    expect(globalYaml).toBeDefined();
+    expect(globalYaml!.content).toContain("provision-test.local");
+    expect(globalYaml!.content).toContain("prov-cl");
+
+    const cloudInfraYaml = files.get("cloud_infra.yaml");
+    expect(cloudInfraYaml).toBeDefined();
+
+    const certsYaml = files.get("certificates.yaml");
+    expect(certsYaml).toBeDefined();
+
+    // Also verify the YAML tab content matches
+    const tabContent = await wizard.getYamlContent("global.yaml");
+    expect(tabContent).toContain("provision-test.local");
   });
 
   test("provision status polling", async () => {

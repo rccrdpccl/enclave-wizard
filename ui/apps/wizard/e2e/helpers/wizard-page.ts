@@ -1,4 +1,5 @@
-import type { Page } from "@playwright/test";
+import type { Download, Page } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 export interface LandingZoneConfig {
   disconnected: boolean;
@@ -176,6 +177,33 @@ export class WizardPage {
 
   async clickDownloadFiles() {
     await this.page.getByRole("button", { name: "Download files" }).click();
+  }
+
+  async downloadConfigFiles(): Promise<
+    Map<string, { download: Download; content: string }>
+  > {
+    const results = new Map<
+      string,
+      { download: Download; content: string }
+    >();
+    const downloads: Download[] = [];
+
+    const collectDownloads = (d: Download) => downloads.push(d);
+    this.page.on("download", collectDownloads);
+
+    await this.page.getByRole("button", { name: "Download files" }).click();
+    await this.page.waitForTimeout(1_000);
+
+    this.page.removeListener("download", collectDownloads);
+
+    for (const download of downloads) {
+      const path = await download.path();
+      if (path) {
+        const content = await readFile(path, "utf-8");
+        results.set(download.suggestedFilename(), { download, content });
+      }
+    }
+    return results;
   }
 
   async isValidationSuccess(): Promise<boolean> {
