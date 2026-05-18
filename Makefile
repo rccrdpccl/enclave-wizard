@@ -3,7 +3,7 @@ GO := go
 CONTAINER_RUNTIME := $(shell command -v podman 2> /dev/null || echo docker)
 UI_IMAGE := enclave-wizard-ui:dev
 
-.PHONY: build build-linux build-ui run test lint clean tidy deploy teardown
+.PHONY: build build-linux build-ui run test lint clean tidy deploy teardown generate
 
 build:
 	$(GO) build -o $(BINARY) .
@@ -29,6 +29,9 @@ clean:
 
 tidy:
 	$(GO) mod tidy
+
+generate:
+	$(GO) generate ./...
 
 rpm: build-linux build-ui
 	hack/rpm/build-rpm.sh

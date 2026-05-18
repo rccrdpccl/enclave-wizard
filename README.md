@@ -72,6 +72,36 @@ Each section can be read or updated independently. A PUT to a section endpoint m
 | GET | `/api/v1/plugins` | List available plugins |
 | POST | `/api/v1/plugins/validate` | Check if a plugin combination is valid |
 
+### Tasks
+
+Task endpoints start and monitor long-running Ansible playbook executions. Only one task may run at a time — starting a second while one is active returns `409 Conflict`.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/api/v1/tasks/deploy` | Run the full deployment (`playbooks/main.yaml`, all 7 phases) |
+| POST | `/api/v1/tasks/deploy/{phase}` | Run a single deployment phase (1–7) |
+| POST | `/api/v1/tasks/plugins/{name}` | Deploy a specific plugin (`playbooks/deploy-plugin.yaml`) |
+| GET | `/api/v1/tasks` | List all task runs, most recent first |
+| GET | `/api/v1/tasks/{id}` | Get status and metadata for a specific run |
+| GET | `/api/v1/tasks/{id}/logs` | Get ansible-runner stdout as `text/plain` |
+| GET | `/api/v1/tasks/{id}/events` | Get ansible-runner job events as a JSON array |
+
+Each run is represented by a `TaskRun` object:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `id` | string | Unique run identifier |
+| `type` | string | `deploy`, `deploy-phase`, or `deploy-plugin` |
+| `status` | string | `running`, `successful`, `failed`, or `canceled` |
+| `playbook` | string | Playbook path relative to the enclave directory |
+| `extraVars` | object | Extra variables passed to ansible-runner (e.g. `plugin_name`) |
+| `pid` | int | OS process ID of the ansible-runner process |
+| `exitCode` | int | Process exit code (present when the run has ended) |
+| `createdAt` | timestamp | When the run was created |
+| `startedAt` | timestamp | When ansible-runner started |
+| `endedAt` | timestamp | When the run completed |
+| `error` | string | Error message if the run failed |
+
 ## Development
 
 ```bash
