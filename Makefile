@@ -48,3 +48,12 @@ e2e: rpm
 e2e-rerun:
 	@test -n "$(TARGET)" || (echo "Usage: make e2e-rerun TARGET=root@host" && exit 1)
 	hack/e2e/run-e2e.sh --host $(TARGET) --skip-deploy --skip-teardown
+
+e2e-browser:
+	@test -n "$(WIZARD_URL)" || (echo "Usage: make e2e-browser WIZARD_URL=https://localhost:3443" && exit 1)
+	cd ui/apps/wizard && WIZARD_URL=$(WIZARD_URL) yarn e2e
+
+e2e-full: rpm
+	@test -n "$(TARGET)" || (echo "Usage: make e2e-full TARGET=root@host" && exit 1)
+	hack/e2e/run-e2e.sh --host $(TARGET)
+	$(MAKE) e2e-browser WIZARD_URL=https://$(shell echo $(TARGET) | cut -d@ -f2):3443

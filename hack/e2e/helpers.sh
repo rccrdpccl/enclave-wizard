@@ -81,6 +81,58 @@ assert_http_status() {
     fi
 }
 
+# Assert a command output does NOT contain a string
+assert_not_contains() {
+    local desc="$1"
+    local unexpected="$2"
+    shift 2
+    local output
+    output=$("$@" 2>&1)
+    if echo "${output}" | grep -q "${unexpected}"; then
+        echo "    ✗ ${desc} (found unexpected '${unexpected}' in output)"
+        return 1
+    else
+        echo "    ✓ ${desc}"
+    fi
+}
+
+# Assert a JSON field has an exact value (requires jq on the VM)
+assert_field() {
+    local desc="$1"
+    local jq_expr="$2"
+    local expected="$3"
+    local json="$4"
+    local actual
+    actual=$(echo "${json}" | jq -r "${jq_expr}")
+    if [ "${actual}" = "${expected}" ]; then
+        echo "    ✓ ${desc}"
+    else
+        echo "    ✗ ${desc} (expected '${expected}', got '${actual}')"
+        return 1
+    fi
+}
+
+# Assert HTTP status code (without -f, so we can inspect 4xx/5xx)
+assert_http_code() {
+    local desc="$1"
+    local expected="$2"
+    local method="$3"
+    local path="$4"
+    local body="${5:-}"
+    local status
+    if [ -n "${body}" ]; then
+        status=$(vm_exec "curl -sk -o /dev/null -w '%{http_code}' -X ${method} https://localhost:3443${path} -H 'Content-Type: application/json' -d '${body}'")
+    else
+        status=$(vm_exec "curl -sk -o /dev/null -w '%{http_code}' -X ${method} https://localhost:3443${path}")
+    fi
+    if [ "${status}" = "${expected}" ]; then
+        echo "    ✓ ${desc} (${status})"
+    else
+        echo "    ✗ ${desc} (expected ${expected}, got ${status})"
+        return 1
+    fi
+}
+
 # Run enclave's validate-schema against the config written by the wizard
 validate_enclave_schema() {
     vm_exec "
