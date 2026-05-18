@@ -23,21 +23,72 @@ export interface ConfigPreview {
   certificates: string;
 }
 
+export interface LoginResponse {
+  token: string;
+  mustChangePassword: boolean;
+}
+
+export interface ChangePasswordResponse {
+  token: string;
+}
+
 export class WizardApi {
+  private token = "";
+
   constructor(
     private request: APIRequestContext,
     private baseUrl: string,
   ) {}
 
+  setToken(token: string) {
+    this.token = token;
+  }
+
+  private authHeaders(): Record<string, string> {
+    if (!this.token) return {};
+    return { Authorization: `Bearer ${this.token}` };
+  }
+
+  async login(password: string): Promise<LoginResponse> {
+    const res = await this.request.post(
+      `${this.baseUrl}/api/v1/auth/login`,
+      { data: { username: "admin", password } },
+    );
+    if (!res.ok()) throw new Error(`login failed: ${res.status()}`);
+    const body: LoginResponse = await res.json();
+    this.token = body.token;
+    return body;
+  }
+
+  async changePassword(
+    currentPassword: string,
+    newPassword: string,
+  ): Promise<ChangePasswordResponse> {
+    const res = await this.request.post(
+      `${this.baseUrl}/api/v1/auth/password`,
+      {
+        data: { currentPassword, newPassword },
+        headers: this.authHeaders(),
+      },
+    );
+    if (!res.ok()) throw new Error(`changePassword failed: ${res.status()}`);
+    const body: ChangePasswordResponse = await res.json();
+    this.token = body.token;
+    return body;
+  }
+
   async writeConfig(config: Record<string, unknown>): Promise<void> {
     const res = await this.request.put(`${this.baseUrl}/api/v1/config`, {
       data: config,
+      headers: this.authHeaders(),
     });
     if (!res.ok()) throw new Error(`writeConfig failed: ${res.status()}`);
   }
 
   async getConfig(): Promise<Record<string, unknown>> {
-    const res = await this.request.get(`${this.baseUrl}/api/v1/config`);
+    const res = await this.request.get(`${this.baseUrl}/api/v1/config`, {
+      headers: this.authHeaders(),
+    });
     if (!res.ok()) throw new Error(`getConfig failed: ${res.status()}`);
     return res.json();
   }
@@ -47,14 +98,16 @@ export class WizardApi {
   ): Promise<ValidationResult> {
     const res = await this.request.post(
       `${this.baseUrl}/api/v1/config/validate`,
-      { data: config },
+      { data: config, headers: this.authHeaders() },
     );
     if (!res.ok()) throw new Error(`validateConfig failed: ${res.status()}`);
     return res.json();
   }
 
   async getDefaults(): Promise<Record<string, unknown>> {
-    const res = await this.request.get(`${this.baseUrl}/api/v1/defaults`);
+    const res = await this.request.get(`${this.baseUrl}/api/v1/defaults`, {
+      headers: this.authHeaders(),
+    });
     if (!res.ok()) throw new Error(`getDefaults failed: ${res.status()}`);
     return res.json();
   }

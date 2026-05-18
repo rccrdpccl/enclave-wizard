@@ -3,7 +3,7 @@ Description=Enclave Wizard API
 After=network-online.target
 
 [Service]
-ExecStart=/usr/local/bin/enclave-wizard --port 8080 --enclave-dir /opt/enclave
+ExecStart=/usr/local/bin/enclave-wizard --port 8080 --enclave-dir /opt/enclave --password-file /etc/enclave-wizard/password
 Restart=on-failure
 RestartSec=5
 WorkingDirectory=/opt/enclave

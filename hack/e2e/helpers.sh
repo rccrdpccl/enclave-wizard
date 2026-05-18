@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # Shared helpers for e2e tests
 
-SSH_VM="ssh -o StrictHostKeyChecking=no -J ${TARGET} wizard@${VM_IP}"
+SSH_VM="ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null -J ${TARGET} wizard@${VM_IP}"
 API="https://localhost:3443"
+TOKEN=""
+E2E_PASSWORD="e2e-test-password-$(date +%s)"
 
 # Run a command inside the VM
 vm_exec() {
@@ -14,12 +16,48 @@ host_exec() {
     ssh -o StrictHostKeyChecking=no "${TARGET}" "$@"
 }
 
+# Authenticate with the wizard API.
+# Tries /tmp/enclave-wizard-current-pass first (set by a previous test run
+# that changed the password), then falls back to the RPM-installed initial
+# password in /tmp/enclave-wizard-init-pass.
+# Sets TOKEN and changes the password if mustChangePassword is true,
+# persisting the new password for subsequent tests.
+api_login() {
+    local password=""
+    password=$(vm_exec "cat /tmp/enclave-wizard-current-pass 2>/dev/null | tr -d '[:space:]'" || true)
+    if [ -z "${password}" ]; then
+        password=$(vm_exec "cat /tmp/enclave-wizard-init-pass 2>/dev/null | tr -d '[:space:]'" || true)
+    fi
+    if [ -z "${password}" ]; then
+        echo "ERROR: Could not read any password from the VM"
+        return 1
+    fi
+    local result
+    result=$(vm_exec "curl -sk -X POST https://localhost:3443/api/v1/auth/login -H 'Content-Type: application/json' -d '{\"username\":\"admin\",\"password\":\"${password}\"}'" || true)
+    TOKEN=$(echo "${result}" | jq -r '.token // empty')
+    if [ -z "${TOKEN}" ]; then
+        echo "ERROR: Login failed. Response: ${result}"
+        return 1
+    fi
+    local must_change
+    must_change=$(echo "${result}" | jq -r '.mustChangePassword')
+    if [ "${must_change}" = "true" ]; then
+        result=$(vm_exec "curl -sk -X POST https://localhost:3443/api/v1/auth/password -H 'Content-Type: application/json' -H 'Authorization: Bearer ${TOKEN}' -d '{\"currentPassword\":\"${password}\",\"newPassword\":\"${E2E_PASSWORD}\"}'" || true)
+        TOKEN=$(echo "${result}" | jq -r '.token // empty')
+        if [ -z "${TOKEN}" ]; then
+            echo "ERROR: Password change failed. Response: ${result}"
+            return 1
+        fi
+        vm_exec "echo -n '${E2E_PASSWORD}' > /tmp/enclave-wizard-current-pass"
+    fi
+}
+
 # Call the wizard API (via SSH tunnel through target → VM)
 api_call() {
     local method="$1"
     local path="$2"
     shift 2
-    vm_exec "curl -sfk -X ${method} https://localhost:3443${path} -H 'Content-Type: application/json' $*"
+    vm_exec "curl -sfk -X ${method} https://localhost:3443${path} -H 'Content-Type: application/json' -H 'Authorization: Bearer ${TOKEN}' $*"
 }
 
 api_get() {
@@ -29,13 +67,13 @@ api_get() {
 api_put() {
     local path="$1"
     local data="$2"
-    vm_exec "curl -sfk -X PUT https://localhost:3443${path} -H 'Content-Type: application/json' -d '${data}'"
+    vm_exec "curl -sfk -X PUT https://localhost:3443${path} -H 'Content-Type: application/json' -H 'Authorization: Bearer ${TOKEN}' -d '${data}'"
 }
 
 api_post() {
     local path="$1"
     local data="$2"
-    vm_exec "curl -sfk -X POST https://localhost:3443${path} -H 'Content-Type: application/json' -d '${data}'"
+    vm_exec "curl -sfk -X POST https://localhost:3443${path} -H 'Content-Type: application/json' -H 'Authorization: Bearer ${TOKEN}' -d '${data}'"
 }
 
 # Assert a command succeeds
@@ -72,7 +110,7 @@ assert_http_status() {
     local expected="$2"
     local url="$3"
     local status
-    status=$(vm_exec "curl -sfk -o /dev/null -w '%{http_code}' '${url}'" 2>/dev/null)
+    status=$(vm_exec "curl -sk -o /dev/null -w '%{http_code}' '${url}'" 2>/dev/null || true)
     if [ "${status}" = "${expected}" ]; then
         echo "    ✓ ${desc} (${status})"
     else
@@ -112,8 +150,34 @@ assert_field() {
     fi
 }
 
-# Assert HTTP status code (without -f, so we can inspect 4xx/5xx)
+# Assert HTTP status code (without -f, so we can inspect 4xx/5xx).
+# Includes Authorization header when TOKEN is set.
 assert_http_code() {
+    local desc="$1"
+    local expected="$2"
+    local method="$3"
+    local path="$4"
+    local body="${5:-}"
+    local auth_header=""
+    if [ -n "${TOKEN}" ]; then
+        auth_header="-H 'Authorization: Bearer ${TOKEN}'"
+    fi
+    local status
+    if [ -n "${body}" ]; then
+        status=$(vm_exec "curl -sk -o /dev/null -w '%{http_code}' -X ${method} https://localhost:3443${path} -H 'Content-Type: application/json' ${auth_header} -d '${body}'")
+    else
+        status=$(vm_exec "curl -sk -o /dev/null -w '%{http_code}' -X ${method} https://localhost:3443${path} ${auth_header}")
+    fi
+    if [ "${status}" = "${expected}" ]; then
+        echo "    ✓ ${desc} (${status})"
+    else
+        echo "    ✗ ${desc} (expected ${expected}, got ${status})"
+        return 1
+    fi
+}
+
+# Assert HTTP status code WITHOUT any auth header (for testing unauthenticated access)
+assert_http_code_no_auth() {
     local desc="$1"
     local expected="$2"
     local method="$3"
@@ -124,6 +188,32 @@ assert_http_code() {
         status=$(vm_exec "curl -sk -o /dev/null -w '%{http_code}' -X ${method} https://localhost:3443${path} -H 'Content-Type: application/json' -d '${body}'")
     else
         status=$(vm_exec "curl -sk -o /dev/null -w '%{http_code}' -X ${method} https://localhost:3443${path}")
+    fi
+    if [ "${status}" = "${expected}" ]; then
+        echo "    ✓ ${desc} (${status})"
+    else
+        echo "    ✗ ${desc} (expected ${expected}, got ${status})"
+        return 1
+    fi
+}
+
+# Assert HTTP status code with a specific Authorization header (or none)
+assert_http_code_with_token() {
+    local desc="$1"
+    local expected="$2"
+    local method="$3"
+    local path="$4"
+    local token="${5:-}"
+    local body="${6:-}"
+    local auth_header=""
+    if [ -n "${token}" ]; then
+        auth_header="-H 'Authorization: Bearer ${token}'"
+    fi
+    local status
+    if [ -n "${body}" ]; then
+        status=$(vm_exec "curl -sk -o /dev/null -w '%{http_code}' -X ${method} https://localhost:3443${path} -H 'Content-Type: application/json' ${auth_header} -d '${body}'")
+    else
+        status=$(vm_exec "curl -sk -o /dev/null -w '%{http_code}' -X ${method} https://localhost:3443${path} ${auth_header}")
     fi
     if [ "${status}" = "${expected}" ]; then
         echo "    ✓ ${desc} (${status})"
@@ -174,3 +264,8 @@ except Exception as e:
 validate_enclave_config() {
     vm_exec "cd /opt/enclave && bash validations.sh 2>&1"
 }
+
+# Auto-login when sourced (unless SKIP_AUTH is set, e.g. for auth tests)
+if [ "${SKIP_AUTH:-}" != "true" ]; then
+    api_login
+fi

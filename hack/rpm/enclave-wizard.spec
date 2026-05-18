@@ -82,7 +82,7 @@ firewall-cmd --add-port=3001/tcp --permanent 2>/dev/null || true
 firewall-cmd --add-port=3443/tcp --permanent 2>/dev/null || true
 firewall-cmd --reload 2>/dev/null || true
 
-# Start services
+# Start services (API generates initial password on first boot)
 systemctl daemon-reload
 systemctl enable --now enclave-wizard-api
 sleep 2
@@ -93,6 +93,12 @@ echo "Enclave Wizard installed and running."
 echo "  UI:  https://$(hostname -f):3443/wizard"
 echo "  API: http://localhost:8080/api/v1/defaults"
 echo "  (Self-signed cert — accept the browser warning)"
+if [ -f /tmp/enclave-wizard-init-pass ]; then
+    echo ""
+    echo "  Admin password: $(cat /tmp/enclave-wizard-init-pass)"
+    echo "  (You must change it on first login)"
+    echo "  Check logs: journalctl -u enclave-wizard-api"
+fi
 
 %preun
 if [ $1 -eq 0 ]; then
