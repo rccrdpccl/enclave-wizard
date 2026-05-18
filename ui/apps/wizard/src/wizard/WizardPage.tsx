@@ -12,6 +12,7 @@ import {
 } from "@patternfly/react-core";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { EnclaveConfigToJSON } from "@enclave-wizard-ui/api-client";
 import { useEnclaveApi } from "../api/useEnclaveApi.ts";
 import { RedHatLogo } from "../common/components/RedHatLogo.tsx";
 import {
@@ -123,7 +124,7 @@ function WizardContent(): React.ReactElement {
           dispatch({ type: "SET_FIELD", path: "global.blockStorageBackend", value: d.storagePlugin });
           dispatch({ type: "SET_FIELD", path: "global.defaultPrefix", value: 24 });
           dispatch({ type: "SET_FIELD", path: "global.quayBackend", value: "LocalStorage" });
-          dispatch({ type: "SET_FIELD", path: "global.enabledPlugins", value: ["lvms"] });
+          dispatch({ type: "SET_FIELD", path: "global.enabled_plugins", value: ["lvms"] });
         }
 
         if (pluginsResult.status === "fulfilled") {
@@ -131,7 +132,7 @@ function WizardContent(): React.ReactElement {
         }
 
         if (existingConfig.status === "fulfilled") {
-          dispatch({ type: "LOAD_CONFIG", config: existingConfig.value as Record<string, unknown> });
+          dispatch({ type: "LOAD_CONFIG", config: EnclaveConfigToJSON(existingConfig.value) });
         }
       } catch (err) {
         console.warn("Failed to load initial data:", err);
@@ -184,7 +185,7 @@ function WizardContent(): React.ReactElement {
 
       if (currentStepId === "hub-cluster") {
         const globalData = ((state.configData as Record<string, unknown>).global ?? {}) as Record<string, unknown>;
-        const agentHosts = Array.isArray(globalData.agentHosts) ? (globalData.agentHosts as Record<string, unknown>[]) : [];
+        const agentHosts = Array.isArray(globalData.agent_hosts) ? (globalData.agent_hosts as Record<string, unknown>[]) : [];
         if (agentHosts.length !== 3) {
           errors.push({ path: "global.agentHosts", label: "Control Plane Nodes", message: `Exactly 3 control plane nodes are required (currently ${agentHosts.length})` });
         } else {

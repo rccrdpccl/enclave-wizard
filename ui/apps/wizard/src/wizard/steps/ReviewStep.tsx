@@ -19,6 +19,7 @@ import jsYaml from "js-yaml";
 import type React from "react";
 import { useCallback, useMemo, useState } from "react";
 import type { EnclaveConfig } from "@enclave-wizard-ui/api-client";
+import { EnclaveConfigToJSON } from "@enclave-wizard-ui/api-client";
 import { useEnclaveApi } from "../../api/useEnclaveApi.ts";
 import { useWizard } from "../WizardContext.tsx";
 import { buildFinalConfig } from "../buildFinalConfig.ts";
@@ -82,17 +83,16 @@ export const ReviewStep: React.FC = () => {
   const [parseErrors, setParseErrors] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState(false);
 
-  const configData = state.configData as Record<string, unknown>;
-  const finalConfig = useMemo(() => buildFinalConfig(state) as unknown as Record<string, unknown>, [state]);
+  const finalConfig = useMemo(() => buildFinalConfig(state), [state]);
+  const wireConfig = useMemo(() => EnclaveConfigToJSON(finalConfig) as Record<string, unknown>, [finalConfig]);
 
   const yamlContents = useMemo(() => {
     const result: Record<string, string> = {};
     for (const file of CONFIG_FILES) {
-      const data = file.key === "global" ? finalConfig[file.path] : configData[file.path];
-      result[file.key] = configToYaml(data);
+      result[file.key] = configToYaml(wireConfig[file.path]);
     }
     return result;
-  }, [configData, finalConfig]);
+  }, [wireConfig]);
 
   const handleYamlChange = useCallback(
     (fileKey: string, yamlStr: string) => {
@@ -115,9 +115,7 @@ export const ReviewStep: React.FC = () => {
     setValidating(true);
     setValidationDone(false);
     try {
-      const result = await api.validateConfig(
-        configData as unknown as EnclaveConfig,
-      );
+      const result = await api.validateConfig(finalConfig);
       dispatch({
         type: "SET_VALIDATION_ERRORS",
         errors: result.errors ?? [],
@@ -138,7 +136,7 @@ export const ReviewStep: React.FC = () => {
     } finally {
       setValidating(false);
     }
-  }, [api, configData, dispatch]);
+  }, [api, finalConfig, dispatch]);
 
   const handleCopyAll = useCallback(() => {
     const allYaml = CONFIG_FILES.map(
