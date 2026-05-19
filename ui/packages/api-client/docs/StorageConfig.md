@@ -11,6 +11,10 @@ Name | Type
 `lvmsConfig` | [LVMSStorageConfig](LVMSStorageConfig.md)
 `odfExternalConfig` | string
 `storagePlugin` | string
+`vastAdminPassword` | string
+`vastAdminUsername` | string
+`vastEndpoint` | string
+`vastVipPool` | [VASTVipPool](VASTVipPool.md)
 
 ## Example
 
@@ -24,6 +28,10 @@ const example = {
   "lvmsConfig": null,
   "odfExternalConfig": null,
   "storagePlugin": null,
+  "vastAdminPassword": null,
+  "vastAdminUsername": null,
+  "vastEndpoint": null,
+  "vastVipPool": null,
 } satisfies StorageConfig
 
 console.log(example)

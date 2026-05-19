@@ -1,12 +1,15 @@
 /* tslint:disable */
 /* eslint-disable */
 export * from './CertificatesConfig.js';
+export * from './ChangePasswordInputBody.js';
+export * from './ChangePasswordOutputBody.js';
 export * from './CloudInfraConfig.js';
 export * from './ClusterConfig.js';
 export * from './Defaults.js';
 export * from './EnclaveConfig.js';
 export * from './ErrorDetail.js';
 export * from './ErrorModel.js';
+export * from './GetTaskEventsOutputBody.js';
 export * from './GlobalConfig.js';
 export * from './HostEntry.js';
 export * from './LVMSConfig.js';
@@ -15,6 +18,8 @@ export * from './LVMSStorageConfig.js';
 export * from './LVMSThinPoolConfig.js';
 export * from './LandingZoneConfig.js';
 export * from './ListTasksOutputBody.js';
+export * from './LoginInputBody.js';
+export * from './LoginOutputBody.js';
 export * from './NetworkConfig.js';
 export * from './ODFConfig.js';
 export * from './Plugin.js';
@@ -26,9 +31,10 @@ export * from './PreviewConfigOutputBody.js';
 export * from './QuayBackendRGWConfiguration.js';
 export * from './QuayConfig.js';
 export * from './StorageConfig.js';
-export * from './TaskEventsOutputBody.js';
 export * from './TaskRun.js';
-export * from './TaskStatus.js';
-export * from './TaskType.js';
+export * from './VASTConfig.js';
+export * from './VASTIPRange.js';
+export * from './VASTTier.js';
+export * from './VASTVipPool.js';
 export * from './ValidateConfigOutputBody.js';
 export * from './ValidationError.js';

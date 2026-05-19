@@ -77,7 +77,6 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** | OK |  -  |
-| **404** | Run not found |  -  |
 | **0** | Error |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
@@ -85,7 +84,7 @@ No authorization required
 
 ## getTaskEvents
 
-> TaskEventsOutputBody getTaskEvents(id)
+> GetTaskEventsOutputBody getTaskEvents(id)
 
 Get task job events
 
@@ -130,7 +129,7 @@ example().catch(console.error);
 
 ### Return type
 
-[**TaskEventsOutputBody**](TaskEventsOutputBody.md)
+[**GetTaskEventsOutputBody**](GetTaskEventsOutputBody.md)
 
 ### Authorization
 
@@ -146,7 +145,6 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** | OK |  -  |
-| **404** | Run not found |  -  |
 | **0** | Error |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
@@ -158,7 +156,7 @@ No authorization required
 
 Get task output logs
 
-Returns ansible-runner stdout as plain text.
+Returns ansible-runner stdout as text/plain. Use the offset query parameter for incremental reads.
 
 ### Example
 
@@ -208,14 +206,13 @@ No authorization required
 ### HTTP request headers
 
 - **Content-Type**: Not defined
-- **Accept**: `text/plain`, `application/problem+json`
+- **Accept**: `application/json`, `application/problem+json`
 
 
 ### HTTP response details
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** | OK |  -  |
-| **404** | Run not found |  -  |
 | **0** | Error |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
@@ -336,7 +333,6 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** | OK |  -  |
-| **409** | A task is already running |  -  |
 | **0** | Error |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
@@ -365,7 +361,7 @@ async function example() {
 
   const body = {
     // number | Deployment phase number (1-7)
-    phase: 56,
+    phase: 789,
   } satisfies StartDeployPhaseRequest;
 
   try {
@@ -405,7 +401,6 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** | OK |  -  |
-| **409** | A task is already running |  -  |
 | **0** | Error |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
@@ -474,8 +469,6 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **200** | OK |  -  |
-| **404** | Unknown plugin |  -  |
-| **409** | A task is already running |  -  |
 | **0** | Error |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)

@@ -6,17 +6,18 @@
 
 Name | Type
 ------------ | -------------
-`id` | string
-`type` | [TaskType](TaskType.md)
-`status` | [TaskStatus](TaskStatus.md)
-`playbook` | string
-`extraVars` | { [key: string]: string; }
-`pid` | number
-`exitCode` | number
+`$schema` | string
 `createdAt` | Date
-`startedAt` | Date
 `endedAt` | Date
 `error` | string
+`exitCode` | number
+`extraVars` | { [key: string]: string; }
+`id` | string
+`pid` | number
+`playbook` | string
+`startedAt` | Date
+`status` | string
+`type` | string
 
 ## Example
 
@@ -25,17 +26,18 @@ import type { TaskRun } from '@enclave-wizard-ui/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "id": null,
-  "type": null,
-  "status": null,
-  "playbook": null,
-  "extraVars": null,
-  "pid": null,
-  "exitCode": null,
+  "$schema": null,
   "createdAt": null,
-  "startedAt": null,
   "endedAt": null,
   "error": null,
+  "exitCode": null,
+  "extraVars": null,
+  "id": null,
+  "pid": null,
+  "playbook": null,
+  "startedAt": null,
+  "status": null,
+  "type": null,
 } satisfies TaskRun
 
 console.log(example)

@@ -14,6 +14,7 @@ Name | Type
 `ocMirrorLogLevel` | string
 `odfDefaults` | [ODFConfig](ODFConfig.md)
 `storagePlugin` | string
+`vastDefaults` | [VASTConfig](VASTConfig.md)
 
 ## Example
 
@@ -30,6 +31,7 @@ const example = {
   "ocMirrorLogLevel": null,
   "odfDefaults": null,
   "storagePlugin": null,
+  "vastDefaults": null,
 } satisfies Defaults
 
 console.log(example)

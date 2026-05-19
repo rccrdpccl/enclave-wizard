@@ -16,16 +16,25 @@ Next, try it out.
 ```ts
 import {
   Configuration,
-  CertificatesApi,
+  AuthApi,
 } from '@enclave-wizard-ui/api-client';
-import type { GetConfigCertificatesRequest } from '@enclave-wizard-ui/api-client';
+import type { ChangePasswordRequest } from '@enclave-wizard-ui/api-client';
 
 async function example() {
   console.log("🚀 Testing @enclave-wizard-ui/api-client SDK...");
-  const api = new CertificatesApi();
+  const config = new Configuration({ 
+    // Configure HTTP bearer authorization: bearer
+    accessToken: "YOUR BEARER TOKEN",
+  });
+  const api = new AuthApi(config);
+
+  const body = {
+    // ChangePasswordInputBody
+    changePasswordInputBody: ...,
+  } satisfies ChangePasswordRequest;
 
   try {
-    const data = await api.getConfigCertificates();
+    const data = await api.changePassword(body);
     console.log(data);
   } catch (error) {
     console.error(error);
@@ -45,6 +54,8 @@ All URIs are relative to *http://localhost*
 
 | Class | Method | HTTP request | Description
 | ----- | ------ | ------------ | -------------
+*AuthApi* | [**changePassword**](docs/AuthApi.md#changepassword) | **POST** /api/v1/auth/password | Change admin password
+*AuthApi* | [**login**](docs/AuthApi.md#login) | **POST** /api/v1/auth/login | Authenticate and get a bearer token
 *CertificatesApi* | [**getConfigCertificates**](docs/CertificatesApi.md#getconfigcertificates) | **GET** /api/v1/config/certificates | Load TLS certificates
 *CertificatesApi* | [**writeConfigCertificates**](docs/CertificatesApi.md#writeconfigcertificates) | **PUT** /api/v1/config/certificates | Update TLS certificates
 *ClusterApi* | [**getConfigCluster**](docs/ClusterApi.md#getconfigcluster) | **GET** /api/v1/config/cluster | Load Management cluster install configuration
@@ -80,12 +91,15 @@ All URIs are relative to *http://localhost*
 ### Models
 
 - [CertificatesConfig](docs/CertificatesConfig.md)
+- [ChangePasswordInputBody](docs/ChangePasswordInputBody.md)
+- [ChangePasswordOutputBody](docs/ChangePasswordOutputBody.md)
 - [CloudInfraConfig](docs/CloudInfraConfig.md)
 - [ClusterConfig](docs/ClusterConfig.md)
 - [Defaults](docs/Defaults.md)
 - [EnclaveConfig](docs/EnclaveConfig.md)
 - [ErrorDetail](docs/ErrorDetail.md)
 - [ErrorModel](docs/ErrorModel.md)
+- [GetTaskEventsOutputBody](docs/GetTaskEventsOutputBody.md)
 - [GlobalConfig](docs/GlobalConfig.md)
 - [HostEntry](docs/HostEntry.md)
 - [LVMSConfig](docs/LVMSConfig.md)
@@ -94,6 +108,8 @@ All URIs are relative to *http://localhost*
 - [LVMSThinPoolConfig](docs/LVMSThinPoolConfig.md)
 - [LandingZoneConfig](docs/LandingZoneConfig.md)
 - [ListTasksOutputBody](docs/ListTasksOutputBody.md)
+- [LoginInputBody](docs/LoginInputBody.md)
+- [LoginOutputBody](docs/LoginOutputBody.md)
 - [NetworkConfig](docs/NetworkConfig.md)
 - [ODFConfig](docs/ODFConfig.md)
 - [Plugin](docs/Plugin.md)
@@ -105,17 +121,23 @@ All URIs are relative to *http://localhost*
 - [QuayBackendRGWConfiguration](docs/QuayBackendRGWConfiguration.md)
 - [QuayConfig](docs/QuayConfig.md)
 - [StorageConfig](docs/StorageConfig.md)
-- [TaskEventsOutputBody](docs/TaskEventsOutputBody.md)
 - [TaskRun](docs/TaskRun.md)
-- [TaskStatus](docs/TaskStatus.md)
-- [TaskType](docs/TaskType.md)
+- [VASTConfig](docs/VASTConfig.md)
+- [VASTIPRange](docs/VASTIPRange.md)
+- [VASTTier](docs/VASTTier.md)
+- [VASTVipPool](docs/VASTVipPool.md)
 - [ValidateConfigOutputBody](docs/ValidateConfigOutputBody.md)
 - [ValidationError](docs/ValidationError.md)
 
 ### Authorization
 
-Endpoints do not require authorization.
 
+Authentication schemes defined for the API:
+<a id="bearer"></a>
+#### bearer
+
+
+- **Type**: HTTP Bearer Token authentication (opaque)
 
 ## About
 

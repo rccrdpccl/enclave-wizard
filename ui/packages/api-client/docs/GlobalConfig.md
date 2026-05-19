@@ -35,6 +35,11 @@ Name | Type
 `rendezvousIP` | string
 `sshPubPath` | string
 `storagePlugin` | string
+`vastAdminPassword` | string
+`vastAdminUsername` | string
+`vastDefaults` | [VASTConfig](VASTConfig.md)
+`vastEndpoint` | string
+`vastVipPool` | [VASTVipPool](VASTVipPool.md)
 `workingDir` | string
 
 ## Example
@@ -73,6 +78,11 @@ const example = {
   "rendezvousIP": null,
   "sshPubPath": null,
   "storagePlugin": null,
+  "vastAdminPassword": null,
+  "vastAdminUsername": null,
+  "vastDefaults": null,
+  "vastEndpoint": null,
+  "vastVipPool": null,
   "workingDir": null,
 } satisfies GlobalConfig
 

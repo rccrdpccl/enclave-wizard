@@ -20,6 +20,13 @@ import {
     LVMSStorageConfigToJSON,
     LVMSStorageConfigToJSONTyped,
 } from './LVMSStorageConfig.js';
+import type { VASTConfig } from './VASTConfig.js';
+import {
+    VASTConfigFromJSON,
+    VASTConfigFromJSONTyped,
+    VASTConfigToJSON,
+    VASTConfigToJSONTyped,
+} from './VASTConfig.js';
 import type { ODFConfig } from './ODFConfig.js';
 import {
     ODFConfigFromJSON,
@@ -41,6 +48,13 @@ import {
     HostEntryToJSON,
     HostEntryToJSONTyped,
 } from './HostEntry.js';
+import type { VASTVipPool } from './VASTVipPool.js';
+import {
+    VASTVipPoolFromJSON,
+    VASTVipPoolFromJSONTyped,
+    VASTVipPoolToJSON,
+    VASTVipPoolToJSONTyped,
+} from './VASTVipPool.js';
 
 /**
  * 
@@ -223,6 +237,36 @@ export interface GlobalConfig {
      */
     storagePlugin?: GlobalConfigStoragePluginEnum;
     /**
+     * VAST management API password
+     * @type {string}
+     * @memberof GlobalConfig
+     */
+    vastAdminPassword?: string;
+    /**
+     * VAST management API username
+     * @type {string}
+     * @memberof GlobalConfig
+     */
+    vastAdminUsername?: string;
+    /**
+     * VAST CSI deployment defaults
+     * @type {VASTConfig}
+     * @memberof GlobalConfig
+     */
+    vastDefaults?: VASTConfig;
+    /**
+     * VAST management endpoint URL (required when storage_plugin is vast-csi)
+     * @type {string}
+     * @memberof GlobalConfig
+     */
+    vastEndpoint?: string;
+    /**
+     * VIP pool configuration for CSI traffic (required when storage_plugin is vast-csi)
+     * @type {VASTVipPool}
+     * @memberof GlobalConfig
+     */
+    vastVipPool?: VASTVipPool;
+    /**
      * Absolute path to root working directory
      * @type {string}
      * @memberof GlobalConfig
@@ -236,7 +280,8 @@ export interface GlobalConfig {
  */
 export const GlobalConfigBlockStorageBackendEnum = {
     Lvms: 'lvms',
-    Odf: 'odf'
+    Odf: 'odf',
+    VastCsi: 'vast-csi'
 } as const;
 export type GlobalConfigBlockStorageBackendEnum = typeof GlobalConfigBlockStorageBackendEnum[keyof typeof GlobalConfigBlockStorageBackendEnum];
 
@@ -265,7 +310,8 @@ export type GlobalConfigQuayBackendEnum = typeof GlobalConfigQuayBackendEnum[key
  */
 export const GlobalConfigStoragePluginEnum = {
     Lvms: 'lvms',
-    Odf: 'odf'
+    Odf: 'odf',
+    VastCsi: 'vast-csi'
 } as const;
 export type GlobalConfigStoragePluginEnum = typeof GlobalConfigStoragePluginEnum[keyof typeof GlobalConfigStoragePluginEnum];
 
@@ -334,6 +380,11 @@ export function GlobalConfigFromJSONTyped(json: any, ignoreDiscriminator: boolea
         'rendezvousIP': json['rendezvousIP'],
         'sshPubPath': json['sshPubPath'],
         'storagePlugin': json['storage_plugin'] == null ? undefined : json['storage_plugin'],
+        'vastAdminPassword': json['vastAdminPassword'] == null ? undefined : json['vastAdminPassword'],
+        'vastAdminUsername': json['vastAdminUsername'] == null ? undefined : json['vastAdminUsername'],
+        'vastDefaults': json['vastDefaults'] == null ? undefined : VASTConfigFromJSON(json['vastDefaults']),
+        'vastEndpoint': json['vastEndpoint'] == null ? undefined : json['vastEndpoint'],
+        'vastVipPool': json['vastVipPool'] == null ? undefined : VASTVipPoolFromJSON(json['vastVipPool']),
         'workingDir': json['workingDir'],
     };
 }
@@ -378,6 +429,11 @@ export function GlobalConfigToJSONTyped(value?: GlobalConfig | null, ignoreDiscr
         'rendezvousIP': value['rendezvousIP'],
         'sshPubPath': value['sshPubPath'],
         'storage_plugin': value['storagePlugin'],
+        'vastAdminPassword': value['vastAdminPassword'],
+        'vastAdminUsername': value['vastAdminUsername'],
+        'vastDefaults': VASTConfigToJSON(value['vastDefaults']),
+        'vastEndpoint': value['vastEndpoint'],
+        'vastVipPool': VASTVipPoolToJSON(value['vastVipPool']),
         'workingDir': value['workingDir'],
     };
 }

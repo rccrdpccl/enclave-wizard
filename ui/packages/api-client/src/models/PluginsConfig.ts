@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime.js';
+import type { VASTConfig } from './VASTConfig.js';
+import {
+    VASTConfigFromJSON,
+    VASTConfigFromJSONTyped,
+    VASTConfigToJSON,
+    VASTConfigToJSONTyped,
+} from './VASTConfig.js';
 import type { ODFConfig } from './ODFConfig.js';
 import {
     ODFConfigFromJSON,
@@ -58,6 +65,12 @@ export interface PluginsConfig {
      * @memberof PluginsConfig
      */
     odfDefaults?: ODFConfig;
+    /**
+     * VAST CSI deployment defaults
+     * @type {VASTConfig}
+     * @memberof PluginsConfig
+     */
+    vastDefaults?: VASTConfig;
 }
 
 /**
@@ -81,6 +94,7 @@ export function PluginsConfigFromJSONTyped(json: any, ignoreDiscriminator: boole
         'enabledPlugins': json['enabled_plugins'] == null ? undefined : json['enabled_plugins'],
         'lvmsDefaults': json['lvmsDefaults'] == null ? undefined : LVMSConfigFromJSON(json['lvmsDefaults']),
         'odfDefaults': json['odfDefaults'] == null ? undefined : ODFConfigFromJSON(json['odfDefaults']),
+        'vastDefaults': json['vastDefaults'] == null ? undefined : VASTConfigFromJSON(json['vastDefaults']),
     };
 }
 
@@ -98,6 +112,7 @@ export function PluginsConfigToJSONTyped(value?: Omit<PluginsConfig, '$schema'> 
         'enabled_plugins': value['enabledPlugins'],
         'lvmsDefaults': LVMSConfigToJSON(value['lvmsDefaults']),
         'odfDefaults': ODFConfigToJSON(value['odfDefaults']),
+        'vastDefaults': VASTConfigToJSON(value['vastDefaults']),
     };
 }
 

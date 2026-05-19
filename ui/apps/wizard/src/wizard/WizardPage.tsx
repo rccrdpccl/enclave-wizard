@@ -33,6 +33,7 @@ import { HubClusterStep } from "./steps/HubClusterStep.tsx";
 import { LandingZoneStep } from "./steps/LandingZoneStep.tsx";
 import { ReviewStep } from "./steps/ReviewStep.tsx";
 import { SelectFlavorStep } from "./steps/SelectFlavorStep.tsx";
+import { StorageStep } from "./steps/StorageStep.tsx";
 import { WelcomeStep } from "./steps/WelcomeStep.tsx";
 import { useWizard, WizardProvider } from "./WizardContext.tsx";
 import { wizardStyles as styles } from "./wizardStyles.ts";
@@ -62,6 +63,7 @@ const BASE_STEPS: StepDef[] = [
   { id: "welcome", label: "Welcome" },
   { id: "flavor", label: "Select" },
   { id: "landing-zone", label: "Landing Zone" },
+  { id: "storage", label: "Storage" },
   { id: "hub-cluster", label: "Hub Cluster" },
 ];
 
@@ -93,6 +95,8 @@ function StepContent({ stepId }: { stepId: string }): React.ReactElement {
       return <SelectFlavorStep />;
     case "landing-zone":
       return <LandingZoneStep />;
+    case "storage":
+      return <StorageStep />;
     case "hub-cluster":
       return <HubClusterStep />;
     case "caas":
@@ -185,12 +189,30 @@ function WizardContent(): React.ReactElement {
         errors = validateFields(state.schema, nonHostFields, state.configData as Record<string, unknown>);
       }
 
-      if (currentStepId === "landing-zone") {
+      if (currentStepId === "storage") {
         const globalData = ((state.configData as Record<string, unknown>).global ?? {}) as Record<string, unknown>;
         const disconnected = globalData.disconnected !== false;
+        const backend = globalData.blockStorageBackend as string;
+        if (backend === "odf" && !((globalData.odfExternalConfig as string) ?? "").trim()) {
+          errors.push({ path: "global.odfExternalConfig", label: "ODF connection details", message: "ODF external Ceph connection details are required" });
+        }
+        if (backend === "vast-csi") {
+          for (const [field, label] of [["vastEndpoint", "Management endpoint"], ["vastAdminUsername", "Admin username"], ["vastAdminPassword", "Admin password"]] as const) {
+            if (!((globalData[field] as string) ?? "").trim()) {
+              errors.push({ path: `global.${field}`, label, message: `${label} is required for VAST CSI` });
+            }
+          }
+          const pool = globalData.vastVipPool as { subnet_cidr?: number; ip_ranges?: { start: string; end: string }[] } | undefined;
+          if (!pool || !pool.ip_ranges?.length || pool.ip_ranges.some((r) => !r.start.trim() || !r.end.trim())) {
+            errors.push({ path: "global.vastVipPool", label: "VIP pool", message: "VIP pool with at least one complete IP range is required for VAST CSI" });
+          }
+        }
         if (disconnected) {
-          const quayFields = ["global.quayUser", "global.quayPassword", "global.quayBackend"];
-          errors.push(...validateFields(state.schema, quayFields, state.configData as Record<string, unknown>));
+          for (const [field, label] of [["quayUser", "Admin username"], ["quayPassword", "Admin password"]] as const) {
+            if (!((globalData[field] as string) ?? "").trim()) {
+              errors.push({ path: `global.${field}`, label, message: `Quay ${label} is required` });
+            }
+          }
           const quayBackend = globalData.quayBackend as string;
           if (quayBackend === "RadosGWStorage") {
             const rgw = (globalData.quayBackendRGWConfiguration ?? {}) as Record<string, unknown>;

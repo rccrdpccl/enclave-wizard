@@ -16,17 +16,17 @@
 import * as runtime from '../runtime.js';
 import type {
   ErrorModel,
+  GetTaskEventsOutputBody,
   ListTasksOutputBody,
-  TaskEventsOutputBody,
   TaskRun,
 } from '../models/index.js';
 import {
     ErrorModelFromJSON,
     ErrorModelToJSON,
+    GetTaskEventsOutputBodyFromJSON,
+    GetTaskEventsOutputBodyToJSON,
     ListTasksOutputBodyFromJSON,
     ListTasksOutputBodyToJSON,
-    TaskEventsOutputBodyFromJSON,
-    TaskEventsOutputBodyToJSON,
     TaskRunFromJSON,
     TaskRunToJSON,
 } from '../models/index.js';
@@ -82,16 +82,16 @@ export interface TasksApiInterface {
      * @throws {RequiredError}
      * @memberof TasksApiInterface
      */
-    getTaskEventsRaw(requestParameters: GetTaskEventsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TaskEventsOutputBody>>;
+    getTaskEventsRaw(requestParameters: GetTaskEventsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GetTaskEventsOutputBody>>;
 
     /**
      * Returns ansible-runner job events as a JSON array.
      * Get task job events
      */
-    getTaskEvents(requestParameters: GetTaskEventsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TaskEventsOutputBody>;
+    getTaskEvents(requestParameters: GetTaskEventsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GetTaskEventsOutputBody>;
 
     /**
-     * Returns ansible-runner stdout as plain text.
+     * Returns ansible-runner stdout as text/plain. Use the offset query parameter for incremental reads.
      * @summary Get task output logs
      * @param {string} id Run identifier
      * @param {*} [options] Override http request option.
@@ -101,7 +101,7 @@ export interface TasksApiInterface {
     getTaskLogsRaw(requestParameters: GetTaskLogsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<string>>;
 
     /**
-     * Returns ansible-runner stdout as plain text.
+     * Returns ansible-runner stdout as text/plain. Use the offset query parameter for incremental reads.
      * Get task output logs
      */
     getTaskLogs(requestParameters: GetTaskLogsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<string>;
@@ -218,7 +218,7 @@ export class TasksApi extends runtime.BaseAPI implements TasksApiInterface {
      * Returns ansible-runner job events as a JSON array.
      * Get task job events
      */
-    async getTaskEventsRaw(requestParameters: GetTaskEventsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TaskEventsOutputBody>> {
+    async getTaskEventsRaw(requestParameters: GetTaskEventsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<GetTaskEventsOutputBody>> {
         if (requestParameters['id'] == null) {
             throw new runtime.RequiredError(
                 'id',
@@ -241,20 +241,20 @@ export class TasksApi extends runtime.BaseAPI implements TasksApiInterface {
             query: queryParameters,
         }, initOverrides);
 
-        return new runtime.JSONApiResponse(response, (jsonValue) => TaskEventsOutputBodyFromJSON(jsonValue));
+        return new runtime.JSONApiResponse(response, (jsonValue) => GetTaskEventsOutputBodyFromJSON(jsonValue));
     }
 
     /**
      * Returns ansible-runner job events as a JSON array.
      * Get task job events
      */
-    async getTaskEvents(requestParameters: GetTaskEventsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TaskEventsOutputBody> {
+    async getTaskEvents(requestParameters: GetTaskEventsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<GetTaskEventsOutputBody> {
         const response = await this.getTaskEventsRaw(requestParameters, initOverrides);
         return await response.value();
     }
 
     /**
-     * Returns ansible-runner stdout as plain text.
+     * Returns ansible-runner stdout as text/plain. Use the offset query parameter for incremental reads.
      * Get task output logs
      */
     async getTaskLogsRaw(requestParameters: GetTaskLogsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<string>> {
@@ -288,7 +288,7 @@ export class TasksApi extends runtime.BaseAPI implements TasksApiInterface {
     }
 
     /**
-     * Returns ansible-runner stdout as plain text.
+     * Returns ansible-runner stdout as text/plain. Use the offset query parameter for incremental reads.
      * Get task output logs
      */
     async getTaskLogs(requestParameters: GetTaskLogsRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<string> {

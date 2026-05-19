@@ -20,6 +20,13 @@ import {
     LVMSStorageConfigToJSON,
     LVMSStorageConfigToJSONTyped,
 } from './LVMSStorageConfig.js';
+import type { VASTVipPool } from './VASTVipPool.js';
+import {
+    VASTVipPoolFromJSON,
+    VASTVipPoolFromJSONTyped,
+    VASTVipPoolToJSON,
+    VASTVipPoolToJSONTyped,
+} from './VASTVipPool.js';
 
 /**
  * 
@@ -57,6 +64,30 @@ export interface StorageConfig {
      * @memberof StorageConfig
      */
     storagePlugin?: StorageConfigStoragePluginEnum;
+    /**
+     * VAST management API password
+     * @type {string}
+     * @memberof StorageConfig
+     */
+    vastAdminPassword?: string;
+    /**
+     * VAST management API username
+     * @type {string}
+     * @memberof StorageConfig
+     */
+    vastAdminUsername?: string;
+    /**
+     * VAST management endpoint URL (required when storage_plugin is vast-csi)
+     * @type {string}
+     * @memberof StorageConfig
+     */
+    vastEndpoint?: string;
+    /**
+     * VIP pool configuration for CSI traffic (required when storage_plugin is vast-csi)
+     * @type {VASTVipPool}
+     * @memberof StorageConfig
+     */
+    vastVipPool?: VASTVipPool;
 }
 
 
@@ -65,7 +96,8 @@ export interface StorageConfig {
  */
 export const StorageConfigBlockStorageBackendEnum = {
     Lvms: 'lvms',
-    Odf: 'odf'
+    Odf: 'odf',
+    VastCsi: 'vast-csi'
 } as const;
 export type StorageConfigBlockStorageBackendEnum = typeof StorageConfigBlockStorageBackendEnum[keyof typeof StorageConfigBlockStorageBackendEnum];
 
@@ -74,7 +106,8 @@ export type StorageConfigBlockStorageBackendEnum = typeof StorageConfigBlockStor
  */
 export const StorageConfigStoragePluginEnum = {
     Lvms: 'lvms',
-    Odf: 'odf'
+    Odf: 'odf',
+    VastCsi: 'vast-csi'
 } as const;
 export type StorageConfigStoragePluginEnum = typeof StorageConfigStoragePluginEnum[keyof typeof StorageConfigStoragePluginEnum];
 
@@ -102,6 +135,10 @@ export function StorageConfigFromJSONTyped(json: any, ignoreDiscriminator: boole
         'lvmsConfig': json['lvmsConfig'] == null ? undefined : LVMSStorageConfigFromJSON(json['lvmsConfig']),
         'odfExternalConfig': json['odfExternalConfig'] == null ? undefined : json['odfExternalConfig'],
         'storagePlugin': json['storage_plugin'] == null ? undefined : json['storage_plugin'],
+        'vastAdminPassword': json['vastAdminPassword'] == null ? undefined : json['vastAdminPassword'],
+        'vastAdminUsername': json['vastAdminUsername'] == null ? undefined : json['vastAdminUsername'],
+        'vastEndpoint': json['vastEndpoint'] == null ? undefined : json['vastEndpoint'],
+        'vastVipPool': json['vastVipPool'] == null ? undefined : VASTVipPoolFromJSON(json['vastVipPool']),
     };
 }
 
@@ -120,6 +157,10 @@ export function StorageConfigToJSONTyped(value?: Omit<StorageConfig, '$schema'> 
         'lvmsConfig': LVMSStorageConfigToJSON(value['lvmsConfig']),
         'odfExternalConfig': value['odfExternalConfig'],
         'storage_plugin': value['storagePlugin'],
+        'vastAdminPassword': value['vastAdminPassword'],
+        'vastAdminUsername': value['vastAdminUsername'],
+        'vastEndpoint': value['vastEndpoint'],
+        'vastVipPool': VASTVipPoolToJSON(value['vastVipPool']),
     };
 }
 

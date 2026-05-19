@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime.js';
+import type { VASTConfig } from './VASTConfig.js';
+import {
+    VASTConfigFromJSON,
+    VASTConfigFromJSONTyped,
+    VASTConfigToJSON,
+    VASTConfigToJSONTyped,
+} from './VASTConfig.js';
 import type { ODFConfig } from './ODFConfig.js';
 import {
     ODFConfigFromJSON,
@@ -82,6 +89,12 @@ export interface Defaults {
      * @memberof Defaults
      */
     storagePlugin: string;
+    /**
+     * 
+     * @type {VASTConfig}
+     * @memberof Defaults
+     */
+    vastDefaults?: VASTConfig;
 }
 
 /**
@@ -114,6 +127,7 @@ export function DefaultsFromJSONTyped(json: any, ignoreDiscriminator: boolean): 
         'ocMirrorLogLevel': json['ocMirrorLogLevel'],
         'odfDefaults': json['odfDefaults'] == null ? undefined : ODFConfigFromJSON(json['odfDefaults']),
         'storagePlugin': json['storagePlugin'],
+        'vastDefaults': json['vastDefaults'] == null ? undefined : VASTConfigFromJSON(json['vastDefaults']),
     };
 }
 
@@ -135,6 +149,7 @@ export function DefaultsToJSONTyped(value?: Omit<Defaults, '$schema'> | null, ig
         'ocMirrorLogLevel': value['ocMirrorLogLevel'],
         'odfDefaults': ODFConfigToJSON(value['odfDefaults']),
         'storagePlugin': value['storagePlugin'],
+        'vastDefaults': VASTConfigToJSON(value['vastDefaults']),
     };
 }
 

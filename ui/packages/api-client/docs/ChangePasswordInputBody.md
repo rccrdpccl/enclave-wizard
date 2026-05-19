@@ -1,5 +1,5 @@
 
-# PluginsConfig
+# ChangePasswordInputBody
 
 
 ## Properties
@@ -7,24 +7,20 @@
 Name | Type
 ------------ | -------------
 `$schema` | string
-`enabledPlugins` | Array&lt;string&gt;
-`lvmsDefaults` | [LVMSConfig](LVMSConfig.md)
-`odfDefaults` | [ODFConfig](ODFConfig.md)
-`vastDefaults` | [VASTConfig](VASTConfig.md)
+`currentPassword` | string
+`newPassword` | string
 
 ## Example
 
 ```typescript
-import type { PluginsConfig } from '@enclave-wizard-ui/api-client'
+import type { ChangePasswordInputBody } from '@enclave-wizard-ui/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
   "$schema": null,
-  "enabledPlugins": null,
-  "lvmsDefaults": null,
-  "odfDefaults": null,
-  "vastDefaults": null,
-} satisfies PluginsConfig
+  "currentPassword": null,
+  "newPassword": null,
+} satisfies ChangePasswordInputBody
 
 console.log(example)
 
@@ -33,7 +29,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as PluginsConfig
+const exampleParsed = JSON.parse(exampleJSON) as ChangePasswordInputBody
 console.log(exampleParsed)
 ```
 

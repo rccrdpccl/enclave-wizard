@@ -38,7 +38,7 @@ export interface ListTasksOutputBody {
      * @type {Array<TaskRun>}
      * @memberof ListTasksOutputBody
      */
-    runs: Array<TaskRun>;
+    runs: Array<TaskRun> | null;
 }
 
 /**
@@ -60,7 +60,7 @@ export function ListTasksOutputBodyFromJSONTyped(json: any, ignoreDiscriminator:
     return {
         
         '$schema': json['$schema'] == null ? undefined : json['$schema'],
-        'runs': ((json['runs'] as Array<any>).map(TaskRunFromJSON)),
+        'runs': (json['runs'] == null ? null : (json['runs'] as Array<any>).map(TaskRunFromJSON)),
     };
 }
 
@@ -75,7 +75,7 @@ export function ListTasksOutputBodyToJSONTyped(value?: Omit<ListTasksOutputBody,
 
     return {
         
-        'runs': ((value['runs'] as Array<any>).map(TaskRunToJSON)),
+        'runs': (value['runs'] == null ? null : (value['runs'] as Array<any>).map(TaskRunToJSON)),
     };
 }
 

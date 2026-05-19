@@ -13,21 +13,6 @@
  */
 
 import { mapValues } from '../runtime.js';
-import type { TaskType } from './TaskType.js';
-import {
-    TaskTypeFromJSON,
-    TaskTypeFromJSONTyped,
-    TaskTypeToJSON,
-    TaskTypeToJSONTyped,
-} from './TaskType.js';
-import type { TaskStatus } from './TaskStatus.js';
-import {
-    TaskStatusFromJSON,
-    TaskStatusFromJSONTyped,
-    TaskStatusToJSON,
-    TaskStatusToJSONTyped,
-} from './TaskStatus.js';
-
 /**
  * 
  * @export
@@ -35,47 +20,11 @@ import {
  */
 export interface TaskRun {
     /**
-     * Unique run identifier
+     * A URL to the JSON Schema for this object.
      * @type {string}
      * @memberof TaskRun
      */
-    id: string;
-    /**
-     * 
-     * @type {TaskType}
-     * @memberof TaskRun
-     */
-    type: TaskType;
-    /**
-     * 
-     * @type {TaskStatus}
-     * @memberof TaskRun
-     */
-    status: TaskStatus;
-    /**
-     * Playbook path relative to enclave directory
-     * @type {string}
-     * @memberof TaskRun
-     */
-    playbook: string;
-    /**
-     * Extra variables passed to ansible-runner
-     * @type {{ [key: string]: string; }}
-     * @memberof TaskRun
-     */
-    extraVars?: { [key: string]: string; };
-    /**
-     * OS process ID of ansible-runner
-     * @type {number}
-     * @memberof TaskRun
-     */
-    pid?: number;
-    /**
-     * Process exit code
-     * @type {number}
-     * @memberof TaskRun
-     */
-    exitCode?: number | null;
+    readonly $schema?: string;
     /**
      * When the run was created
      * @type {Date}
@@ -83,36 +32,99 @@ export interface TaskRun {
      */
     createdAt: Date;
     /**
-     * When ansible-runner started
-     * @type {Date}
-     * @memberof TaskRun
-     */
-    startedAt?: Date | null;
-    /**
      * When the run completed
      * @type {Date}
      * @memberof TaskRun
      */
-    endedAt?: Date | null;
+    endedAt?: Date;
     /**
      * Error message if failed
      * @type {string}
      * @memberof TaskRun
      */
     error?: string;
+    /**
+     * Process exit code
+     * @type {number}
+     * @memberof TaskRun
+     */
+    exitCode?: number;
+    /**
+     * Extra variables passed to ansible-runner
+     * @type {{ [key: string]: string; }}
+     * @memberof TaskRun
+     */
+    extraVars?: { [key: string]: string; };
+    /**
+     * Unique run identifier
+     * @type {string}
+     * @memberof TaskRun
+     */
+    id: string;
+    /**
+     * OS process ID of ansible-runner
+     * @type {number}
+     * @memberof TaskRun
+     */
+    pid?: number;
+    /**
+     * Playbook path relative to enclave directory
+     * @type {string}
+     * @memberof TaskRun
+     */
+    playbook: string;
+    /**
+     * When ansible-runner started
+     * @type {Date}
+     * @memberof TaskRun
+     */
+    startedAt?: Date;
+    /**
+     * Current execution status
+     * @type {string}
+     * @memberof TaskRun
+     */
+    status: TaskRunStatusEnum;
+    /**
+     * Type of task
+     * @type {string}
+     * @memberof TaskRun
+     */
+    type: TaskRunTypeEnum;
 }
 
+
+/**
+ * @export
+ */
+export const TaskRunStatusEnum = {
+    Running: 'running',
+    Successful: 'successful',
+    Failed: 'failed',
+    Canceled: 'canceled'
+} as const;
+export type TaskRunStatusEnum = typeof TaskRunStatusEnum[keyof typeof TaskRunStatusEnum];
+
+/**
+ * @export
+ */
+export const TaskRunTypeEnum = {
+    Deploy: 'deploy',
+    DeployPhase: 'deploy-phase',
+    DeployPlugin: 'deploy-plugin'
+} as const;
+export type TaskRunTypeEnum = typeof TaskRunTypeEnum[keyof typeof TaskRunTypeEnum];
 
 
 /**
  * Check if a given object implements the TaskRun interface.
  */
 export function instanceOfTaskRun(value: object): value is TaskRun {
-    if (!('id' in value) || value['id'] === undefined) return false;
-    if (!('type' in value) || value['type'] === undefined) return false;
-    if (!('status' in value) || value['status'] === undefined) return false;
-    if (!('playbook' in value) || value['playbook'] === undefined) return false;
     if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
+    if (!('id' in value) || value['id'] === undefined) return false;
+    if (!('playbook' in value) || value['playbook'] === undefined) return false;
+    if (!('status' in value) || value['status'] === undefined) return false;
+    if (!('type' in value) || value['type'] === undefined) return false;
     return true;
 }
 
@@ -126,17 +138,18 @@ export function TaskRunFromJSONTyped(json: any, ignoreDiscriminator: boolean): T
     }
     return {
         
-        'id': json['id'],
-        'type': TaskTypeFromJSON(json['type']),
-        'status': TaskStatusFromJSON(json['status']),
-        'playbook': json['playbook'],
-        'extraVars': json['extraVars'] == null ? undefined : json['extraVars'],
-        'pid': json['pid'] == null ? undefined : json['pid'],
-        'exitCode': json['exitCode'] == null ? undefined : json['exitCode'],
+        '$schema': json['$schema'] == null ? undefined : json['$schema'],
         'createdAt': (new Date(json['createdAt'])),
-        'startedAt': json['startedAt'] == null ? undefined : (new Date(json['startedAt'])),
         'endedAt': json['endedAt'] == null ? undefined : (new Date(json['endedAt'])),
         'error': json['error'] == null ? undefined : json['error'],
+        'exitCode': json['exitCode'] == null ? undefined : json['exitCode'],
+        'extraVars': json['extraVars'] == null ? undefined : json['extraVars'],
+        'id': json['id'],
+        'pid': json['pid'] == null ? undefined : json['pid'],
+        'playbook': json['playbook'],
+        'startedAt': json['startedAt'] == null ? undefined : (new Date(json['startedAt'])),
+        'status': json['status'],
+        'type': json['type'],
     };
 }
 
@@ -144,24 +157,24 @@ export function TaskRunToJSON(json: any): TaskRun {
     return TaskRunToJSONTyped(json, false);
 }
 
-export function TaskRunToJSONTyped(value?: TaskRun | null, ignoreDiscriminator: boolean = false): any {
+export function TaskRunToJSONTyped(value?: Omit<TaskRun, '$schema'> | null, ignoreDiscriminator: boolean = false): any {
     if (value == null) {
         return value;
     }
 
     return {
         
-        'id': value['id'],
-        'type': TaskTypeToJSON(value['type']),
-        'status': TaskStatusToJSON(value['status']),
-        'playbook': value['playbook'],
-        'extraVars': value['extraVars'],
-        'pid': value['pid'],
-        'exitCode': value['exitCode'],
         'createdAt': value['createdAt'].toISOString(),
-        'startedAt': value['startedAt'] == null ? value['startedAt'] : value['startedAt'].toISOString(),
         'endedAt': value['endedAt'] == null ? value['endedAt'] : value['endedAt'].toISOString(),
         'error': value['error'],
+        'exitCode': value['exitCode'],
+        'extraVars': value['extraVars'],
+        'id': value['id'],
+        'pid': value['pid'],
+        'playbook': value['playbook'],
+        'startedAt': value['startedAt'] == null ? value['startedAt'] : value['startedAt'].toISOString(),
+        'status': value['status'],
+        'type': value['type'],
     };
 }
 

@@ -1,5 +1,6 @@
 /* tslint:disable */
 /* eslint-disable */
+export * from './AuthApi.js';
 export * from './CertificatesApi.js';
 export * from './ClusterApi.js';
 export * from './ConfigApi.js';

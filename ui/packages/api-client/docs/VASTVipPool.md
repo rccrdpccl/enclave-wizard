@@ -1,30 +1,24 @@
 
-# PluginsConfig
+# VASTVipPool
 
 
 ## Properties
 
 Name | Type
 ------------ | -------------
-`$schema` | string
-`enabledPlugins` | Array&lt;string&gt;
-`lvmsDefaults` | [LVMSConfig](LVMSConfig.md)
-`odfDefaults` | [ODFConfig](ODFConfig.md)
-`vastDefaults` | [VASTConfig](VASTConfig.md)
+`ipRanges` | [Array&lt;VASTIPRange&gt;](VASTIPRange.md)
+`subnetCidr` | number
 
 ## Example
 
 ```typescript
-import type { PluginsConfig } from '@enclave-wizard-ui/api-client'
+import type { VASTVipPool } from '@enclave-wizard-ui/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "$schema": null,
-  "enabledPlugins": null,
-  "lvmsDefaults": null,
-  "odfDefaults": null,
-  "vastDefaults": null,
-} satisfies PluginsConfig
+  "ipRanges": null,
+  "subnetCidr": null,
+} satisfies VASTVipPool
 
 console.log(example)
 
@@ -33,7 +27,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as PluginsConfig
+const exampleParsed = JSON.parse(exampleJSON) as VASTVipPool
 console.log(exampleParsed)
 ```
 
