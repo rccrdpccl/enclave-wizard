@@ -20,7 +20,6 @@ VM_CPUS=2
 VM_DISK_SIZE=20
 HTTP_PORT=3001
 HTTPS_PORT=3443
-API_PORT=8080
 CLOUD_IMAGE_URL="https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-9-latest.x86_64.qcow2"
 
 echo "=== Deploying Enclave Wizard to ${TARGET} (in VM) ==="
@@ -86,11 +85,8 @@ users:
       - \$(cat ~/.ssh/id_rsa.pub 2>/dev/null || echo '')
 
 packages:
-  - podman
   - curl
-
-runcmd:
-  - systemctl enable --now podman.socket
+  - openssl
 CIEOF
 
   mkisofs -output \${IMG_DIR}/${VM_NAME}-cidata.iso \
@@ -147,7 +143,7 @@ ${SSH} "${TARGET}" "
 
 ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
   sudo cloud-init status --wait 2>/dev/null || sleep 10
-  sudo dnf install -y podman curl openssl 2>&1 | tail -3
+  sudo dnf install -y curl openssl 2>&1 | tail -3
   sudo rpm -Uvh --force /tmp/enclave-wizard.rpm
 " 2>&1 | grep -v "^$"
 
@@ -202,20 +198,16 @@ sleep 3
 # Verify
 TARGET_HOST=$(echo "${TARGET}" | cut -d@ -f2)
 
-API_OK=false
 HTTPS_OK=false
 REDIRECT_OK=false
 EXT_OK=false
 
-API_STATUS=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -sk -o /dev/null -w '%{http_code}' http://localhost:${API_PORT}/api/v1/defaults" 2>/dev/null)
-[ "${API_STATUS}" = "200" ] || [ "${API_STATUS}" = "401" ] && API_OK=true
-${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -sfk https://localhost:${HTTPS_PORT}" > /dev/null 2>&1 && HTTPS_OK=true
-REDIRECT_CODE=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -so /dev/null -w '%{http_code}' http://localhost:${HTTP_PORT}" 2>/dev/null)
+${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -sfk https://localhost:${HTTPS_PORT}/wizard" > /dev/null 2>&1 && HTTPS_OK=true
+REDIRECT_CODE=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -so /dev/null -w '%{http_code}' http://localhost:${HTTP_PORT}" 2>/dev/null || true)
 [ "${REDIRECT_CODE}" = "301" ] && REDIRECT_OK=true
-curl -sfk --connect-timeout 5 "https://${TARGET_HOST}:${HTTPS_PORT}" > /dev/null 2>&1 && EXT_OK=true
+curl -sfk --connect-timeout 5 "https://${TARGET_HOST}:${HTTPS_PORT}/wizard" > /dev/null 2>&1 && EXT_OK=true
 
 echo ""
-echo "  API (VM):            $( $API_OK && echo 'OK' || echo 'FAIL' )"
 echo "  HTTPS (VM):          $( $HTTPS_OK && echo 'OK' || echo 'FAIL' )"
 echo "  HTTP→HTTPS redirect: $( $REDIRECT_OK && echo 'OK (301)' || echo "FAIL (got ${REDIRECT_CODE})" )"
 echo "  HTTPS (external):   $( $EXT_OK && echo 'OK' || echo 'FAIL - check port forwarding' )"

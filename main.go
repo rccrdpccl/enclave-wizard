@@ -2,11 +2,14 @@ package main
 
 import (
 	"context"
+	"embed"
 	"fmt"
+	"io/fs"
 	"net/http"
 	"os"
 	"os/signal"
 	"path/filepath"
+	"strings"
 	"syscall"
 	"time"
 
@@ -21,8 +24,14 @@ import (
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/validation"
 )
 
+//go:embed all:ui/apps/wizard/dist
+var uiFiles embed.FS
+
 type Options struct {
-	Port         int    `help:"Port to listen on" short:"p" default:"8080"`
+	HTTPPort     int    `help:"HTTP port (redirects to HTTPS)" default:"3001"`
+	HTTPSPort    int    `help:"HTTPS port" default:"3443"`
+	TLSCert      string `help:"Path to TLS certificate" default:"/etc/enclave-wizard/tls/server.crt"`
+	TLSKey       string `help:"Path to TLS key" default:"/etc/enclave-wizard/tls/server.key"`
 	EnclaveDir   string `help:"Path to the Enclave repository root" default:"../enclave"`
 	PasswordFile string `help:"Path to the password file" default:"/etc/enclave-wizard/password"`
 }
@@ -63,6 +72,34 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store) (hum
 	return humaAPI, runner
 }
 
+func setupUIHandler(mux *http.ServeMux) {
+	uiFS, err := fs.Sub(uiFiles, "ui/apps/wizard/dist")
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "WARNING: embedded UI not available: %v\n", err)
+		return
+	}
+
+	fileServer := http.FileServer(http.FS(uiFS))
+
+	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		// Don't serve UI for API paths — let those 404 naturally
+		if strings.HasPrefix(r.URL.Path, "/api/") {
+			http.NotFound(w, r)
+			return
+		}
+
+		path := strings.TrimPrefix(r.URL.Path, "/")
+		if path == "" {
+			path = "index.html"
+		}
+
+		if _, err := fs.Stat(uiFS, path); err != nil {
+			r.URL.Path = "/"
+		}
+		fileServer.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	if len(os.Args) > 1 && os.Args[1] == "hash-password" {
 		if len(os.Args) < 3 {
@@ -101,18 +138,29 @@ func main() {
 
 		mux := http.NewServeMux()
 		_, runner := SetupAPI(mux, opts.EnclaveDir, authStore)
+		setupUIHandler(mux)
 
 		handler := api.BearerAuthMiddleware(authStore)(mux)
 
-		server := &http.Server{
-			Addr:    fmt.Sprintf(":%d", opts.Port),
+		httpsServer := &http.Server{
+			Addr:    fmt.Sprintf(":%d", opts.HTTPSPort),
 			Handler: handler,
 		}
 
 		hooks.OnStart(func() {
-			fmt.Printf("Enclave Wizard API listening on :%d (enclave-dir: %s)\n", opts.Port, opts.EnclaveDir)
-			fmt.Printf("API docs: http://localhost:%d/docs\n", opts.Port)
+			fmt.Printf("Enclave Wizard listening on https://localhost:%d (enclave-dir: %s)\n", opts.HTTPSPort, opts.EnclaveDir)
 
+			// HTTP → HTTPS redirect
+			go func() {
+				redirectHandler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+					target := fmt.Sprintf("https://%s:%d%s", strings.Split(r.Host, ":")[0], opts.HTTPSPort, r.RequestURI)
+					http.Redirect(w, r, target, http.StatusMovedPermanently)
+				})
+				fmt.Printf("HTTP redirect :%d → :%d\n", opts.HTTPPort, opts.HTTPSPort)
+				http.ListenAndServe(fmt.Sprintf(":%d", opts.HTTPPort), redirectHandler)
+			}()
+
+			// Graceful shutdown
 			go func() {
 				sigCh := make(chan os.Signal, 1)
 				signal.Notify(sigCh, syscall.SIGTERM, syscall.SIGINT)
@@ -130,10 +178,13 @@ func main() {
 
 				shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 				defer cancel()
-				server.Shutdown(shutdownCtx)
+				httpsServer.Shutdown(shutdownCtx)
 			}()
 
-			server.ListenAndServe()
+			if err := httpsServer.ListenAndServeTLS(opts.TLSCert, opts.TLSKey); err != http.ErrServerClosed {
+				fmt.Fprintf(os.Stderr, "HTTPS server error: %v\n", err)
+				os.Exit(1)
+			}
 		})
 	})
 	cli.Run()

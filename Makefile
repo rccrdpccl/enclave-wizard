@@ -1,22 +1,23 @@
 BINARY := enclave-wizard
 GO := go
 CONTAINER_RUNTIME := $(shell command -v podman 2> /dev/null || echo docker)
-UI_IMAGE := enclave-wizard-ui:dev
 
 .PHONY: build build-linux build-ui run test lint clean tidy deploy teardown generate
 
-build:
-	$(GO) build -o $(BINARY) .
-
-build-linux:
-	$(CONTAINER_RUNTIME) run --rm -v $(PWD):/app:z -w /app golang:latest \
-		sh -c "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -o $(BINARY) ."
-
 build-ui:
-	$(CONTAINER_RUNTIME) build -q -f ui/Containerfile -t $(UI_IMAGE) ui/
+	$(CONTAINER_RUNTIME) run --rm -v $(PWD)/ui:/app:z -w /app node:22-alpine \
+		sh -c "corepack enable && yarn install && \
+		yarn workspace @enclave-wizard-ui/wizard run -T vite build"
+
+build: build-ui
+	$(GO) build -ldflags="-w -s" -o $(BINARY) .
+
+build-linux: build-ui
+	$(CONTAINER_RUNTIME) run --rm -v $(PWD):/app:z -w /app golang:latest \
+		sh -c "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='-w -s' -o $(BINARY) ."
 
 run: build
-	./$(BINARY) --port 8080 --enclave-dir ../enclave
+	./$(BINARY) --enclave-dir ../enclave --tls-cert hack/tls/server.crt --tls-key hack/tls/server.key
 
 test:
 	$(GO) test ./...
@@ -26,6 +27,7 @@ lint:
 
 clean:
 	rm -f $(BINARY)
+	rm -rf ui/apps/wizard/dist
 
 tidy:
 	$(GO) mod tidy
@@ -33,10 +35,10 @@ tidy:
 generate:
 	$(GO) generate ./...
 
-rpm: build-linux build-ui
+rpm: build-linux
 	hack/rpm/build-rpm.sh
 
-deploy: build-linux build-ui
+deploy: build-linux
 	@test -n "$(TARGET)" || (echo "Usage: make deploy TARGET=root@host" && exit 1)
 	hack/deploy-wizard $(TARGET)
 
