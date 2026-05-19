@@ -1,0 +1,12 @@
+[Unit]
+Description=Enclave Wizard
+After=network-online.target
+
+[Service]
+ExecStart=/usr/local/bin/enclave-wizard --enclave-dir /opt/enclave --password-file /etc/enclave-wizard/password
+Restart=on-failure
+RestartSec=5
+WorkingDirectory=/opt/enclave
+
+[Install]
+WantedBy=multi-user.target

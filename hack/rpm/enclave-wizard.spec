@@ -6,27 +6,19 @@ License:        Apache-2.0
 URL:            https://github.com/carbonin/enclave-wizard
 
 Source0:        enclave-wizard
-Source1:        wizard-ui.tar
-Source2:        enclave-wizard-api.service
-Source3:        enclave-wizard-ui.container
-Source4:        nginx-deploy.conf
+Source1:        enclave-wizard.service
 
-Requires:       podman
 Requires:       curl
 Requires:       openssl
 
 %description
 Web-based install wizard for Red Hat Sovereign Enclave (RHSE).
-Installs and configures the wizard API (native Go binary) and
-wizard UI (nginx container via podman quadlet). Pulls and extracts
-the enclave distribution via ORAS on first install.
+Single binary that serves both the API and the embedded UI with TLS.
+Pulls and extracts the enclave distribution via ORAS on first install.
 
 %install
 install -D -m 0755 %{SOURCE0} %{buildroot}/usr/local/bin/enclave-wizard
-install -D -m 0644 %{SOURCE1} %{buildroot}/usr/share/enclave-wizard/wizard-ui.tar
-install -D -m 0644 %{SOURCE2} %{buildroot}/etc/systemd/system/enclave-wizard-api.service
-install -D -m 0644 %{SOURCE3} %{buildroot}/etc/containers/systemd/enclave-wizard-ui.container
-install -D -m 0644 %{SOURCE4} %{buildroot}/etc/enclave-wizard/nginx.conf
+install -D -m 0644 %{SOURCE1} %{buildroot}/etc/systemd/system/enclave-wizard.service
 
 %post
 ORAS_VERSION="v1.2.2"
@@ -58,10 +50,6 @@ if [ ! -d "${ENCLAVE_DIR}/config" ]; then
     done
 fi
 
-# Load UI container image
-echo "Loading wizard-ui container image..."
-podman load -i /usr/share/enclave-wizard/wizard-ui.tar 2>/dev/null || true
-
 # Generate self-signed TLS certificate
 TLS_DIR="/etc/enclave-wizard/tls"
 if [ ! -f "${TLS_DIR}/server.crt" ]; then
@@ -82,35 +70,30 @@ firewall-cmd --add-port=3001/tcp --permanent 2>/dev/null || true
 firewall-cmd --add-port=3443/tcp --permanent 2>/dev/null || true
 firewall-cmd --reload 2>/dev/null || true
 
-# Start services (API generates initial password on first boot)
+# Start service
 systemctl daemon-reload
-systemctl enable --now enclave-wizard-api
-sleep 2
-systemctl start enclave-wizard-ui
+systemctl enable --now enclave-wizard
 
 echo ""
 echo "Enclave Wizard installed and running."
 echo "  UI:  https://$(hostname -f):3443/wizard"
-echo "  API: http://localhost:8080/api/v1/defaults"
 echo "  (Self-signed cert — accept the browser warning)"
 if [ -f /tmp/enclave-wizard-init-pass ]; then
     echo ""
     echo "  Admin password: $(cat /tmp/enclave-wizard-init-pass)"
     echo "  (You must change it on first login)"
-    echo "  Check logs: journalctl -u enclave-wizard-api"
+    echo "  Check logs: journalctl -u enclave-wizard"
 fi
 
 %preun
 if [ $1 -eq 0 ]; then
-    systemctl stop enclave-wizard-ui 2>/dev/null || true
-    systemctl stop enclave-wizard-api 2>/dev/null || true
-    systemctl disable enclave-wizard-api 2>/dev/null || true
+    systemctl stop enclave-wizard 2>/dev/null || true
+    systemctl disable enclave-wizard 2>/dev/null || true
 fi
 
 %postun
 if [ $1 -eq 0 ]; then
     systemctl daemon-reload
-    podman rmi -f localhost/enclave-wizard-ui:dev 2>/dev/null || true
     rm -rf /opt/enclave
     firewall-cmd --remove-port=3001/tcp --permanent 2>/dev/null || true
     firewall-cmd --remove-port=3443/tcp --permanent 2>/dev/null || true
@@ -120,7 +103,4 @@ fi
 
 %files
 /usr/local/bin/enclave-wizard
-/usr/share/enclave-wizard/wizard-ui.tar
-/etc/systemd/system/enclave-wizard-api.service
-/etc/containers/systemd/enclave-wizard-ui.container
-%config(noreplace) /etc/enclave-wizard/nginx.conf
+/etc/systemd/system/enclave-wizard.service
