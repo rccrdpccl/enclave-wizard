@@ -1,12 +1,18 @@
-import { createBrowserRouter, Link, Navigate } from "react-router-dom";
+import { createBrowserRouter, Link } from "react-router-dom";
 import { ErrorPage } from "../pages/ErrorPage.tsx";
 import { AuthGuard } from "./AuthGuard.tsx";
+import { ConditionalRedirect } from "./ConditionalRedirect.tsx";
 
 export const router = createBrowserRouter([
   {
     path: "/",
-    index: true,
-    element: <Navigate to="/login" />,
+    element: <AuthGuard />,
+    children: [
+      {
+        index: true,
+        element: <ConditionalRedirect />,
+      },
+    ],
   },
   {
     path: "/login",
@@ -26,6 +32,20 @@ export const router = createBrowserRouter([
         lazy: async () => {
           const { WizardPage } = await import("../wizard/WizardPage.tsx");
           return { Component: WizardPage };
+        },
+      },
+    ],
+  },
+  {
+    path: "/tasks",
+    errorElement: <ErrorPage />,
+    element: <AuthGuard />,
+    children: [
+      {
+        index: true,
+        lazy: async () => {
+          const { TasksPage } = await import("../tasks/TasksPage.tsx");
+          return { Component: TasksPage };
         },
       },
     ],

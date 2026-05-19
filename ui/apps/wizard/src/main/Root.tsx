@@ -5,6 +5,7 @@ import {
   ConfigApi,
   DefaultsApi,
   PluginsApi,
+  TasksApi,
 } from "@enclave-wizard-ui/api-client";
 import {
   Container,
@@ -50,6 +51,7 @@ function AuthenticatedApp(): React.ReactElement {
     c.register(Symbols.ConfigApi, new ConfigApi(apiConfig));
     c.register(Symbols.DefaultsApi, new DefaultsApi(apiConfig));
     c.register(Symbols.PluginsApi, new PluginsApi(apiConfig));
+    c.register(Symbols.TasksApi, new TasksApi(apiConfig));
     return c;
   }, [token, handleUnauthorized]);
 

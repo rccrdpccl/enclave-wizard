@@ -500,6 +500,7 @@ __metadata:
     "@testing-library/react": "npm:^16.0.0"
     "@testing-library/user-event": "npm:^14.0.0"
     "@types/js-yaml": "npm:^4.0.9"
+    ansi_up: "npm:^6.0.6"
     codemirror: "npm:^6.0.0"
     js-yaml: "npm:^4.1.0"
     jsdom: "npm:^25.0.0"
@@ -1636,6 +1637,13 @@ __metadata:
   version: 5.2.0
   resolution: "ansi-styles@npm:5.2.0"
   checksum: 10c0/9c4ca80eb3c2fb7b33841c210d2f20807f40865d27008d7c3f707b7f95cab7d67462a565e2388ac3285b71cb3d9bb2173de8da37c57692a362885ec34d6e27df
+  languageName: node
+  linkType: hard
+
+"ansi_up@npm:^6.0.6":
+  version: 6.0.6
+  resolution: "ansi_up@npm:6.0.6"
+  checksum: 10c0/a94109bf8bb0da87260178c7d251fbbd3c4b7f079399bfc2de02a9ddcc82424a5392a813cc00270a25a3ae858cb2d30adc10e4999dd6da071ef4d59062cb440d
   languageName: node
   linkType: hard
 

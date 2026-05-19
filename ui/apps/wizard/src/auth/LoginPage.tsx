@@ -61,7 +61,7 @@ export const LoginPage: React.FC = () => {
 
   useEffect(() => {
     if (isAuthenticated && !mustChangePassword) {
-      navigate("/wizard", { replace: true });
+      navigate("/", { replace: true });
     }
   }, [isAuthenticated, mustChangePassword, navigate]);
 

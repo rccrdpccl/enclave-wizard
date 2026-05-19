@@ -68,6 +68,13 @@ All URIs are relative to *http://localhost*
 *QuayApi* | [**writeConfigQuay**](docs/QuayApi.md#writeconfigquay) | **PUT** /api/v1/config/quay | Update Quay registry configuration
 *StorageApi* | [**getConfigStorage**](docs/StorageApi.md#getconfigstorage) | **GET** /api/v1/config/storage | Load Block storage configuration
 *StorageApi* | [**writeConfigStorage**](docs/StorageApi.md#writeconfigstorage) | **PUT** /api/v1/config/storage | Update Block storage configuration
+*TasksApi* | [**getTask**](docs/TasksApi.md#gettask) | **GET** /api/v1/tasks/{id} | Get task run details
+*TasksApi* | [**getTaskEvents**](docs/TasksApi.md#gettaskevents) | **GET** /api/v1/tasks/{id}/events | Get task job events
+*TasksApi* | [**getTaskLogs**](docs/TasksApi.md#gettasklogs) | **GET** /api/v1/tasks/{id}/logs | Get task output logs
+*TasksApi* | [**listTasks**](docs/TasksApi.md#listtasks) | **GET** /api/v1/tasks | List all task runs
+*TasksApi* | [**startDeploy**](docs/TasksApi.md#startdeploy) | **POST** /api/v1/tasks/deploy | Start full deployment
+*TasksApi* | [**startDeployPhase**](docs/TasksApi.md#startdeployphase) | **POST** /api/v1/tasks/deploy/{phase} | Start a specific deployment phase
+*TasksApi* | [**startDeployPlugin**](docs/TasksApi.md#startdeployplugin) | **POST** /api/v1/tasks/plugins/{name} | Deploy a plugin
 
 
 ### Models
@@ -86,6 +93,7 @@ All URIs are relative to *http://localhost*
 - [LVMSStorageConfig](docs/LVMSStorageConfig.md)
 - [LVMSThinPoolConfig](docs/LVMSThinPoolConfig.md)
 - [LandingZoneConfig](docs/LandingZoneConfig.md)
+- [ListTasksOutputBody](docs/ListTasksOutputBody.md)
 - [NetworkConfig](docs/NetworkConfig.md)
 - [ODFConfig](docs/ODFConfig.md)
 - [Plugin](docs/Plugin.md)
@@ -97,6 +105,10 @@ All URIs are relative to *http://localhost*
 - [QuayBackendRGWConfiguration](docs/QuayBackendRGWConfiguration.md)
 - [QuayConfig](docs/QuayConfig.md)
 - [StorageConfig](docs/StorageConfig.md)
+- [TaskEventsOutputBody](docs/TaskEventsOutputBody.md)
+- [TaskRun](docs/TaskRun.md)
+- [TaskStatus](docs/TaskStatus.md)
+- [TaskType](docs/TaskType.md)
 - [ValidateConfigOutputBody](docs/ValidateConfigOutputBody.md)
 - [ValidationError](docs/ValidationError.md)
 

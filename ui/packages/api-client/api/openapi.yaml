@@ -795,6 +795,111 @@ components:
         - quayPassword
         - quayBackend
       type: object
+    ListTasksOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ListTasksOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        runs:
+          description: All known task runs
+          items:
+            $ref: "#/components/schemas/TaskRun"
+          type: array
+      required:
+        - runs
+      type: object
+    TaskEventsOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/TaskEventsOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        events:
+          description: Ansible Runner job events
+          items:
+            type: object
+          type: array
+      required:
+        - events
+      type: object
+    TaskRun:
+      additionalProperties: false
+      properties:
+        id:
+          description: Unique run identifier
+          type: string
+        type:
+          $ref: "#/components/schemas/TaskType"
+        status:
+          $ref: "#/components/schemas/TaskStatus"
+        playbook:
+          description: Playbook path relative to enclave directory
+          type: string
+        extraVars:
+          additionalProperties:
+            type: string
+          description: Extra variables passed to ansible-runner
+          type: object
+        pid:
+          description: OS process ID of ansible-runner
+          format: int64
+          type: integer
+        exitCode:
+          description: Process exit code
+          format: int64
+          type:
+            - integer
+            - "null"
+        createdAt:
+          description: When the run was created
+          format: date-time
+          type: string
+        startedAt:
+          description: When ansible-runner started
+          format: date-time
+          type:
+            - string
+            - "null"
+        endedAt:
+          description: When the run completed
+          format: date-time
+          type:
+            - string
+            - "null"
+        error:
+          description: Error message if failed
+          type: string
+      required:
+        - id
+        - type
+        - status
+        - playbook
+        - createdAt
+      type: object
+    TaskStatus:
+      description: Current execution status of a task
+      enum:
+        - running
+        - successful
+        - failed
+        - canceled
+      type: string
+    TaskType:
+      description: Type of task
+      enum:
+        - deploy
+        - deploy-phase
+        - deploy-plugin
+      type: string
     StorageConfig:
       additionalProperties: false
       properties:
@@ -1313,6 +1418,229 @@ paths:
       summary: List available plugins
       tags:
         - Plugins
+  /api/v1/tasks:
+    get:
+      description: Returns all known task runs, most recent first.
+      operationId: list-tasks
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ListTasksOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List all task runs
+      tags:
+        - Tasks
+  /api/v1/tasks/deploy:
+    post:
+      description: Runs the main.yaml playbook (all 7 phases).
+      operationId: start-deploy
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskRun"
+          description: OK
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: A task is already running
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Start full deployment
+      tags:
+        - Tasks
+  /api/v1/tasks/deploy/{phase}:
+    post:
+      description: Runs a single deployment phase (1-7).
+      operationId: start-deploy-phase
+      parameters:
+        - in: path
+          name: phase
+          required: true
+          schema:
+            maximum: 7
+            minimum: 1
+            type: integer
+          description: Deployment phase number (1-7)
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskRun"
+          description: OK
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: A task is already running
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Start a specific deployment phase
+      tags:
+        - Tasks
+  /api/v1/tasks/plugins/{name}:
+    post:
+      description: Runs the deploy-plugin.yaml playbook for the named plugin.
+      operationId: start-deploy-plugin
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            minLength: 1
+            type: string
+          description: Plugin name
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskRun"
+          description: OK
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Unknown plugin
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: A task is already running
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Deploy a plugin
+      tags:
+        - Tasks
+  /api/v1/tasks/{id}:
+    get:
+      description: Returns status and metadata for a specific run.
+      operationId: get-task
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            minLength: 1
+            type: string
+          description: Run identifier
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskRun"
+          description: OK
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Run not found
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get task run details
+      tags:
+        - Tasks
+  /api/v1/tasks/{id}/events:
+    get:
+      description: Returns ansible-runner job events as a JSON array.
+      operationId: get-task-events
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            minLength: 1
+            type: string
+          description: Run identifier
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskEventsOutputBody"
+          description: OK
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Run not found
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get task job events
+      tags:
+        - Tasks
+  /api/v1/tasks/{id}/logs:
+    get:
+      description: Returns ansible-runner stdout as plain text.
+      operationId: get-task-logs
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            minLength: 1
+            type: string
+          description: Run identifier
+      responses:
+        "200":
+          content:
+            text/plain:
+              schema:
+                type: string
+          description: OK
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Run not found
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get task output logs
+      tags:
+        - Tasks
   /api/v1/plugins/validate:
     post:
       description: Checks whether the given set of plugins forms a valid deployment combination.

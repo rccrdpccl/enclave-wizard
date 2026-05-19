@@ -21,6 +21,7 @@ docs/LVMSStorageConfig.md
 docs/LVMSThinPoolConfig.md
 docs/LandingZoneApi.md
 docs/LandingZoneConfig.md
+docs/ListTasksOutputBody.md
 docs/NetworkApi.md
 docs/NetworkConfig.md
 docs/ODFConfig.md
@@ -36,6 +37,11 @@ docs/QuayBackendRGWConfiguration.md
 docs/QuayConfig.md
 docs/StorageApi.md
 docs/StorageConfig.md
+docs/TaskEventsOutputBody.md
+docs/TaskRun.md
+docs/TaskStatus.md
+docs/TaskType.md
+docs/TasksApi.md
 docs/ValidateConfigOutputBody.md
 docs/ValidationError.md
 src/apis/CertificatesApi.ts
@@ -48,6 +54,7 @@ src/apis/NetworkApi.ts
 src/apis/PluginsApi.ts
 src/apis/QuayApi.ts
 src/apis/StorageApi.ts
+src/apis/TasksApi.ts
 src/apis/index.ts
 src/index.ts
 src/models/CertificatesConfig.ts
@@ -64,6 +71,7 @@ src/models/LVMSDeviceSelector.ts
 src/models/LVMSStorageConfig.ts
 src/models/LVMSThinPoolConfig.ts
 src/models/LandingZoneConfig.ts
+src/models/ListTasksOutputBody.ts
 src/models/NetworkConfig.ts
 src/models/ODFConfig.ts
 src/models/Plugin.ts
@@ -75,6 +83,10 @@ src/models/PreviewConfigOutputBody.ts
 src/models/QuayBackendRGWConfiguration.ts
 src/models/QuayConfig.ts
 src/models/StorageConfig.ts
+src/models/TaskEventsOutputBody.ts
+src/models/TaskRun.ts
+src/models/TaskStatus.ts
+src/models/TaskType.ts
 src/models/ValidateConfigOutputBody.ts
 src/models/ValidationError.ts
 src/models/index.ts

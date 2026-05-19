@@ -10,3 +10,4 @@ export * from './NetworkApi.js';
 export * from './PluginsApi.js';
 export * from './QuayApi.js';
 export * from './StorageApi.js';
+export * from './TasksApi.js';

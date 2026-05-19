@@ -8,10 +8,14 @@ import {
   FlexItem,
   ProgressStep,
   ProgressStepper,
+  Split,
+  SplitItem,
   Spinner,
 } from "@patternfly/react-core";
+import { ListIcon } from "@patternfly/react-icons";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { EnclaveConfigToJSON } from "@enclave-wizard-ui/api-client";
 import { useEnclaveApi } from "../api/useEnclaveApi.ts";
 import { RedHatLogo } from "../common/components/RedHatLogo.tsx";
@@ -32,6 +36,22 @@ import { SelectFlavorStep } from "./steps/SelectFlavorStep.tsx";
 import { WelcomeStep } from "./steps/WelcomeStep.tsx";
 import { useWizard, WizardProvider } from "./WizardContext.tsx";
 import { wizardStyles as styles } from "./wizardStyles.ts";
+import { css } from "@emotion/css";
+
+const taskNavButton = css`
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 1rem;
+  border: 1px solid var(--pf-t--global--border--color--default);
+  border-radius: var(--pf-t--global--border--radius--small);
+  color: var(--pf-t--global--text--color--regular);
+  text-decoration: none;
+  font-size: 0.875rem;
+  &:hover {
+    background-color: var(--pf-t--global--background--color--secondary--hover);
+  }
+`;
 
 interface StepDef {
   id: string;
@@ -213,7 +233,16 @@ function WizardContent(): React.ReactElement {
     <div className={styles.root}>
       <header className={styles.header}>
         <div className={styles.headerInner}>
-          <RedHatLogo width={240} />
+          <Split hasGutter>
+            <SplitItem isFilled>
+              <RedHatLogo width={240} />
+            </SplitItem>
+            <SplitItem>
+              <Link to="/tasks" className={taskNavButton}>
+                <ListIcon /> Tasks
+              </Link>
+            </SplitItem>
+          </Split>
         </div>
         <Divider />
         {!isWelcome && (
