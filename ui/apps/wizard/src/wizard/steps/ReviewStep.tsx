@@ -121,17 +121,32 @@ export const ReviewStep: React.FC = () => {
         errors: result.errors ?? [],
       });
       setValidationDone(true);
-    } catch (err) {
-      dispatch({
-        type: "SET_VALIDATION_ERRORS",
-        errors: [
-          {
-            field: "",
-            message:
-              err instanceof Error ? err.message : "Validation request failed",
-          },
-        ],
-      });
+    } catch (err: unknown) {
+      const errors: Array<{ field: string; message: string }> = [];
+      if (err && typeof err === "object" && "response" in err) {
+        try {
+          const body = await (err as { response: Response }).response.json();
+          if (body.errors && Array.isArray(body.errors)) {
+            for (const e of body.errors) {
+              errors.push({
+                field: e.location ?? e.field ?? "",
+                message: e.message ?? String(e),
+              });
+            }
+          } else if (body.detail) {
+            errors.push({ field: "", message: body.detail });
+          }
+        } catch {
+          // response body not JSON
+        }
+      }
+      if (errors.length === 0) {
+        errors.push({
+          field: "",
+          message: err instanceof Error ? err.message : "Validation request failed",
+        });
+      }
+      dispatch({ type: "SET_VALIDATION_ERRORS", errors });
       setValidationDone(true);
     } finally {
       setValidating(false);

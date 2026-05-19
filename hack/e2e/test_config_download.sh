@@ -25,7 +25,7 @@ CONFIG='{
     "quayPassword": "dl-secret",
     "quayBackend": "LocalStorage",
     "blockStorageBackend": "lvms",
-    "storage_plugin": "lvms",
+    "blockStorageBackend": "lvms",
     "disconnected": true,
     "enabled_plugins": ["lvms", "nvidia-gpu"],
     "pullSecret": {"auths":{}},

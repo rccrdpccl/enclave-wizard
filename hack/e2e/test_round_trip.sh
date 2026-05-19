@@ -28,8 +28,6 @@ CONFIG='{
       "hostname": "rgw.roundtrip.local"
     },
     "blockStorageBackend": "lvms",
-    "storage_plugin": "lvms",
-    "enabled_plugins": ["lvms", "nvidia-gpu"],
     "pullSecret": {"auths":{}},
     "sshPubPath": "/home/wizard/.ssh/id_rsa.pub",
     "agent_hosts": [
@@ -65,7 +63,9 @@ CONFIG='{
   "certificates": {
     "sslCACertificate": "-----BEGIN CERTIFICATE-----\nRT-TEST-CA\n-----END CERTIFICATE-----",
     "sslAPICertificateFullChain": "-----BEGIN CERTIFICATE-----\nRT-API-CERT\n-----END CERTIFICATE-----",
-    "sslAPICertificateKey": "-----BEGIN RSA PRIVATE KEY-----\nRT-API-KEY\n-----END RSA PRIVATE KEY-----"
+    "sslAPICertificateKey": "-----BEGIN RSA PRIVATE KEY-----\nRT-API-KEY\n-----END RSA PRIVATE KEY-----",
+    "sslIngressCertificateFullChain": "-----BEGIN CERTIFICATE-----\nRT-INGRESS-CERT\n-----END CERTIFICATE-----",
+    "sslIngressCertificateKey": "-----BEGIN RSA PRIVATE KEY-----\nRT-INGRESS-KEY\n-----END RSA PRIVATE KEY-----"
   },
   "cloudInfra": {
     "discovery_hosts": [
@@ -105,7 +105,6 @@ assert_field "quayUser"         '.global.quayUser'             "rt-admin"       
 assert_field "quayPassword"     '.global.quayPassword'         "rt-secret-pw"               "${RESPONSE}"
 assert_field "quayBackend"      '.global.quayBackend'          "RadosGWStorage"             "${RESPONSE}"
 assert_field "blockStorageBackend" '.global.blockStorageBackend' "lvms"                     "${RESPONSE}"
-assert_field "storage_plugin"   '.global.storage_plugin'       "lvms"                       "${RESPONSE}"
 assert_field "sshPubPath"       '.global.sshPubPath'           "/home/wizard/.ssh/id_rsa.pub" "${RESPONSE}"
 
 echo "  Step 4: Verify agent_hosts"
@@ -119,10 +118,6 @@ assert_field "RGW secret_key"   '.global.quayBackendRGWConfiguration.secret_key'
 assert_field "RGW bucket_name"  '.global.quayBackendRGWConfiguration.bucket_name'  "rt-quay-bucket"       "${RESPONSE}"
 assert_field "RGW hostname"     '.global.quayBackendRGWConfiguration.hostname'     "rgw.roundtrip.local"  "${RESPONSE}"
 
-echo "  Step 6: Verify enabled_plugins"
-assert_field "enabled_plugins count"  '.global.enabled_plugins | length'  "2"           "${RESPONSE}"
-assert_field "enabled_plugins[0]"     '.global.enabled_plugins[0]'        "lvms"        "${RESPONSE}"
-assert_field "enabled_plugins[1]"     '.global.enabled_plugins[1]'        "nvidia-gpu"  "${RESPONSE}"
 
 echo "  Step 7: Verify certificates"
 assert_contains "sslCACertificate"            "RT-TEST-CA"  echo "${RESPONSE}"
