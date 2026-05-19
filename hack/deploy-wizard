@@ -207,7 +207,8 @@ HTTPS_OK=false
 REDIRECT_OK=false
 EXT_OK=false
 
-${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -sf http://localhost:${API_PORT}/api/v1/defaults" > /dev/null 2>&1 && API_OK=true
+API_STATUS=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -sk -o /dev/null -w '%{http_code}' http://localhost:${API_PORT}/api/v1/defaults" 2>/dev/null)
+[ "${API_STATUS}" = "200" ] || [ "${API_STATUS}" = "401" ] && API_OK=true
 ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -sfk https://localhost:${HTTPS_PORT}" > /dev/null 2>&1 && HTTPS_OK=true
 REDIRECT_CODE=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "curl -so /dev/null -w '%{http_code}' http://localhost:${HTTP_PORT}" 2>/dev/null)
 [ "${REDIRECT_CODE}" = "301" ] && REDIRECT_OK=true

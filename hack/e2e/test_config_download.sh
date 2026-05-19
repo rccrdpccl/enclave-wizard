@@ -3,7 +3,7 @@ set -euo pipefail
 source "$(dirname "$0")/helpers.sh"
 
 echo "  Step 1: Verify wizard services are running"
-assert_http_status "API health" "200" "http://localhost:8080/api/v1/defaults"
+assert_http_status "API health" "401" "http://localhost:8080/api/v1/defaults"
 assert_http_status "UI health" "200" "https://localhost:3443/"
 
 echo "  Step 2: Write a config with distinctive values"

@@ -51,6 +51,19 @@ export class WizardPage {
     await this.page.waitForLoadState("networkidle");
   }
 
+  // --- Auth: Login & Change Password ---
+
+  async login(password: string) {
+    await this.page.fill("#password", password);
+    await this.page.getByRole("button", { name: "Sign in" }).click();
+  }
+
+  async changePassword(newPassword: string) {
+    await this.page.fill("#new-password", newPassword);
+    await this.page.fill("#confirm-password", newPassword);
+    await this.page.getByRole("button", { name: "Change password" }).click();
+  }
+
   // --- Step: Welcome ---
 
   async clickGetStarted() {

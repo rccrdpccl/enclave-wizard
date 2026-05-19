@@ -11,9 +11,10 @@ import {
   Provider as DependencyInjectionProvider,
 } from "@enclave-wizard-ui/ioc";
 import { Spinner } from "@patternfly/react-core";
-import React from "react";
+import React, { useCallback, useMemo } from "react";
 import ReactDOM from "react-dom/client";
 import { RouterProvider } from "react-router-dom";
+import { AuthProvider, useAuth } from "../auth/AuthContext.tsx";
 import { router } from "./Router.tsx";
 import { Symbols } from "./Symbols.ts";
 
@@ -21,17 +22,44 @@ function getApiBasePath(): string {
   return window.location.origin;
 }
 
-function getConfiguredContainer(): Container {
-  const apiConfig = new Configuration({
-    basePath: getApiBasePath(),
-    fetchApi: (url, init) => fetch(url, { ...init, cache: "no-store" }),
-  });
+function AuthenticatedApp(): React.ReactElement {
+  const { token, logout } = useAuth();
 
-  const container = new Container();
-  container.register(Symbols.ConfigApi, new ConfigApi(apiConfig));
-  container.register(Symbols.DefaultsApi, new DefaultsApi(apiConfig));
-  container.register(Symbols.PluginsApi, new PluginsApi(apiConfig));
-  return container;
+  const handleUnauthorized = useCallback(() => {
+    logout();
+  }, [logout]);
+
+  const container = useMemo(() => {
+    const apiConfig = new Configuration({
+      basePath: getApiBasePath(),
+      headers: token ? { Authorization: `Bearer ${token}` } : {},
+      middleware: [
+        {
+          post: async (context) => {
+            if (context.response.status === 401) {
+              handleUnauthorized();
+            }
+            return context.response;
+          },
+        },
+      ],
+      fetchApi: (url, init) => fetch(url, { ...init, cache: "no-store" }),
+    });
+
+    const c = new Container();
+    c.register(Symbols.ConfigApi, new ConfigApi(apiConfig));
+    c.register(Symbols.DefaultsApi, new DefaultsApi(apiConfig));
+    c.register(Symbols.PluginsApi, new PluginsApi(apiConfig));
+    return c;
+  }, [token, handleUnauthorized]);
+
+  return (
+    <DependencyInjectionProvider container={container}>
+      <React.Suspense fallback={<Spinner />}>
+        <RouterProvider router={router} />
+      </React.Suspense>
+    </DependencyInjectionProvider>
+  );
 }
 
 function main(): void {
@@ -41,14 +69,11 @@ function main(): void {
   }
 
   root.style.height = "inherit";
-  const container = getConfiguredContainer();
   ReactDOM.createRoot(root).render(
     <React.StrictMode>
-      <DependencyInjectionProvider container={container}>
-        <React.Suspense fallback={<Spinner />}>
-          <RouterProvider router={router} />
-        </React.Suspense>
-      </DependencyInjectionProvider>
+      <AuthProvider>
+        <AuthenticatedApp />
+      </AuthProvider>
     </React.StrictMode>,
   );
 }
