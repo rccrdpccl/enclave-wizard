@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"testing"
 
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/auth"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
 	"gopkg.in/yaml.v3"
 )
@@ -16,8 +17,12 @@ import (
 func setupTestServer(t *testing.T) (*httptest.Server, string) {
 	t.Helper()
 	enclaveDir := t.TempDir()
+	authStore := auth.NewStore(filepath.Join(t.TempDir(), "password"))
+	if _, err := authStore.Init(); err != nil {
+		t.Fatalf("auth store init: %v", err)
+	}
 	mux := http.NewServeMux()
-	SetupAPI(mux, enclaveDir)
+	SetupAPI(mux, enclaveDir, authStore)
 	return httptest.NewServer(mux), enclaveDir
 }
 
