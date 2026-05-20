@@ -16,6 +16,7 @@ export interface TasksApiClient {
   startDeploy: () => Promise<TaskRun>;
   startDeployPhase: (phase: number) => Promise<TaskRun>;
   startDeployPlugin: (name: string) => Promise<TaskRun>;
+  deleteTask: (id: string) => Promise<void>;
 }
 
 export function useTasksApi(): TasksApiClient {
@@ -56,6 +57,11 @@ export function useTasksApi(): TasksApiClient {
     [tasksApi],
   );
 
+  const deleteTask = useCallback(
+    (id: string) => tasksApi.deleteTask({ id }),
+    [tasksApi],
+  );
+
   return {
     listTasks,
     getTask,
@@ -64,5 +70,6 @@ export function useTasksApi(): TasksApiClient {
     startDeploy,
     startDeployPhase,
     startDeployPlugin,
+    deleteTask,
   };
 }

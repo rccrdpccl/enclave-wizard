@@ -29,7 +29,7 @@ import {
   ToolbarItem,
 } from "@patternfly/react-core";
 import { CogIcon, CubesIcon } from "@patternfly/react-icons";
-import { Table, Thead, Tbody, Tr, Th, Td } from "@patternfly/react-table";
+import { Table, Thead, Tbody, Tr, Th, Td, ActionsColumn } from "@patternfly/react-table";
 import { AnsiUp } from "ansi_up";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -248,6 +248,8 @@ export const TasksPage: React.FC = () => {
 
   const [statusFilterOpen, setStatusFilterOpen] = useState(false);
   const [typeFilterOpen, setTypeFilterOpen] = useState(false);
+  const [deletingIds, setDeletingIds] = useState<Set<string>>(new Set());
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
   const statusFilters = useMemo(
     () => searchParams.getAll("status"),
@@ -316,6 +318,24 @@ export const TasksPage: React.FC = () => {
     refresh();
   };
 
+  const handleDeleteTask = async (e: React.MouseEvent, id: string) => {
+    e.stopPropagation();
+    setDeletingIds((prev) => new Set(prev).add(id));
+    setDeleteError(null);
+    try {
+      await api.deleteTask(id);
+      refresh();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "Failed to delete task");
+    } finally {
+      setDeletingIds((prev) => {
+        const next = new Set(prev);
+        next.delete(id);
+        return next;
+      });
+    }
+  };
+
   const content = selectedTaskId ? (
     <TaskDetail
       taskId={selectedTaskId}
@@ -340,6 +360,14 @@ export const TasksPage: React.FC = () => {
               <Button variant="link" onClick={refresh} isInline style={{ marginLeft: "0.5rem" }}>
                 Retry
               </Button>
+            </Alert>
+          </StackItem>
+        )}
+
+        {deleteError && (
+          <StackItem>
+            <Alert variant="danger" title="Failed to delete task" isInline onClose={() => setDeleteError(null)}>
+              {deleteError}
             </Alert>
           </StackItem>
         )}
@@ -437,6 +465,7 @@ export const TasksPage: React.FC = () => {
                   <Th>Playbook</Th>
                   <Th>Started</Th>
                   <Th>Duration</Th>
+                  <Th></Th>
                 </Tr>
               </Thead>
               <Tbody>
@@ -456,6 +485,17 @@ export const TasksPage: React.FC = () => {
                       {run.status === "running" && (
                         <Spinner size="sm" style={{ marginLeft: "0.5rem" }} />
                       )}
+                    </Td>
+                    <Td isActionCell onClick={(e) => e.stopPropagation()}>
+                      <ActionsColumn
+                        items={[
+                          {
+                            title: "Delete",
+                            isDisabled: run.status === "running" || deletingIds.has(run.id),
+                            onClick: (e) => handleDeleteTask(e as unknown as React.MouseEvent, run.id),
+                          },
+                        ]}
+                      />
                     </Td>
                   </Tr>
                 ))}
