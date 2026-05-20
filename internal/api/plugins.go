@@ -2,6 +2,7 @@ package api
 
 import (
 	"context"
+	"log/slog"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -65,5 +66,8 @@ func (h *PluginsHandler) validateCombination(_ context.Context, input *PluginVal
 	out := &PluginValidateOutput{}
 	out.Body.Valid = len(errs) == 0
 	out.Body.Errors = errs
+	if !out.Body.Valid {
+		slog.Warn("plugin combination invalid", "plugins", input.Body.Plugins, "error_count", len(errs))
+	}
 	return out, nil
 }

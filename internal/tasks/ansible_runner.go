@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -97,6 +98,7 @@ func (r *AnsibleRunner) Start(req StartRequest) (*models.TaskRun, error) {
 
 	if err := cmd.Start(); err != nil {
 		r.releaseLock()
+		slog.Error("failed to start ansible-runner", "run_id", runID, "playbook", req.Playbook, "error", err)
 		return nil, fmt.Errorf("starting ansible-runner: %w", err)
 	}
 
@@ -104,8 +106,11 @@ func (r *AnsibleRunner) Start(req StartRequest) (*models.TaskRun, error) {
 	if err := writeRunJSON(runDir, run); err != nil {
 		cmd.Process.Kill()
 		r.releaseLock()
+		slog.Error("failed to write run metadata", "run_id", runID, "error", err)
 		return nil, fmt.Errorf("writing run metadata: %w", err)
 	}
+
+	slog.Info("task started", "run_id", runID, "type", req.Type, "playbook", req.Playbook, "pid", run.PID)
 
 	done := make(chan struct{})
 	r.mu.Lock()
@@ -126,6 +131,7 @@ func (r *AnsibleRunner) waitForCompletion(cmd *exec.Cmd, run *models.TaskRun, ru
 
 	now := time.Now()
 	run.EndedAt = &now
+	duration := now.Sub(*run.StartedAt)
 
 	arStatus := readAnsibleRunnerStatus(runDir)
 	switch arStatus {
@@ -141,6 +147,13 @@ func (r *AnsibleRunner) waitForCompletion(cmd *exec.Cmd, run *models.TaskRun, ru
 
 	if rc, err := readAnsibleRunnerRC(runDir); err == nil {
 		run.ExitCode = &rc
+	}
+
+	switch run.Status {
+	case models.TaskStatusSuccessful:
+		slog.Info("task completed", "run_id", run.ID, "playbook", run.Playbook, "duration", duration)
+	default:
+		slog.Warn("task did not complete successfully", "run_id", run.ID, "playbook", run.Playbook, "status", run.Status, "duration", duration)
 	}
 
 	writeRunJSON(runDir, run)
@@ -251,7 +264,11 @@ func (r *AnsibleRunner) Delete(id string) error {
 		return ErrNotFound
 	}
 
-	return os.RemoveAll(runDir)
+	if err := os.RemoveAll(runDir); err != nil {
+		return err
+	}
+	slog.Info("task deleted", "run_id", id)
+	return nil
 }
 
 func (r *AnsibleRunner) Recover() error {
@@ -263,6 +280,7 @@ func (r *AnsibleRunner) Recover() error {
 		return fmt.Errorf("reading artifacts dir: %w", err)
 	}
 
+	recovered := 0
 	for _, entry := range entries {
 		if !entry.IsDir() {
 			continue
@@ -277,6 +295,8 @@ func (r *AnsibleRunner) Recover() error {
 		if run.Status != models.TaskStatusRunning {
 			continue
 		}
+
+		slog.Warn("recovering interrupted task", "run_id", run.ID, "playbook", run.Playbook, "pid", run.PID)
 
 		if run.PID > 0 && processAlive(run.PID) {
 			syscall.Kill(run.PID, syscall.SIGTERM)
@@ -299,6 +319,11 @@ func (r *AnsibleRunner) Recover() error {
 		}
 
 		writeRunJSON(runDir, run)
+		recovered++
+	}
+
+	if recovered > 0 {
+		slog.Info("task recovery complete", "recovered", recovered)
 	}
 
 	return nil
@@ -319,6 +344,8 @@ func (r *AnsibleRunner) Shutdown(ctx context.Context) error {
 		return nil
 	}
 
+	slog.Info("shutting down active task", "run_id", run.ID, "playbook", run.Playbook)
+
 	if cmd.Process != nil {
 		syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
 	}
@@ -326,6 +353,7 @@ func (r *AnsibleRunner) Shutdown(ctx context.Context) error {
 	select {
 	case <-done:
 	case <-ctx.Done():
+		slog.Warn("task shutdown timed out, force-killing", "run_id", run.ID)
 		if cmd.Process != nil {
 			syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
 		}

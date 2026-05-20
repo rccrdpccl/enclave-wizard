@@ -3,6 +3,7 @@ package api
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -215,6 +216,9 @@ func (h *ConfigHandler) validateConfig(_ context.Context, input *ValidateConfigI
 	out := &ValidateConfigOutput{}
 	out.Body.Valid = len(errs) == 0
 	out.Body.Errors = errs
+	if !out.Body.Valid {
+		slog.Warn("config validation found errors", "error_count", len(errs))
+	}
 	return out, nil
 }
 

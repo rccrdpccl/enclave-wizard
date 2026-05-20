@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"io/fs"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -20,6 +21,7 @@ import (
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/api"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/auth"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/config"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/logger"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tasks"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/validation"
 )
@@ -34,6 +36,7 @@ type Options struct {
 	TLSKey       string `help:"Path to TLS key" default:"/etc/enclave-wizard/tls/server.key"`
 	EnclaveDir   string `help:"Path to the Enclave repository root" default:"../enclave"`
 	PasswordFile string `help:"Path to the password file" default:"/etc/enclave-wizard/password"`
+	LogLevel     string `help:"Log level (trace, debug, info, warn, error)" default:"info"`
 }
 
 func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store) (huma.API, *tasks.AnsibleRunner) {
@@ -61,10 +64,10 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store) (hum
 
 	runner, err := tasks.NewAnsibleRunner(enclaveDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "WARNING: task runner unavailable: %v (tasks API disabled)\n", err)
+		slog.Warn("task runner unavailable, tasks API disabled", "error", err)
 	} else {
 		if err := runner.Recover(); err != nil {
-			fmt.Fprintf(os.Stderr, "WARNING: task recovery failed: %v\n", err)
+			slog.Warn("task recovery failed", "error", err)
 		}
 		api.NewTasksHandler(runner).Register(humaAPI)
 	}
@@ -75,7 +78,7 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store) (hum
 func setupUIHandler(mux *http.ServeMux) {
 	uiFS, err := fs.Sub(uiFiles, "ui/apps/wizard/dist")
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "WARNING: embedded UI not available: %v\n", err)
+		slog.Warn("embedded UI not available", "error", err)
 		return
 	}
 
@@ -116,13 +119,15 @@ func main() {
 	}
 
 	cli := humacli.New(func(hooks humacli.Hooks, opts *Options) {
+		logger.Init(opts.LogLevel)
+
 		dir := filepath.Dir(opts.PasswordFile)
 		os.MkdirAll(dir, 0700)
 
 		authStore := auth.NewStore(opts.PasswordFile)
 		generatedPass, err := authStore.Init()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Failed to initialize auth: %v\n", err)
+			slog.Error("failed to initialize auth", "error", err)
 			os.Exit(1)
 		}
 
@@ -140,7 +145,7 @@ func main() {
 		_, runner := SetupAPI(mux, opts.EnclaveDir, authStore)
 		setupUIHandler(mux)
 
-		handler := api.BearerAuthMiddleware(authStore)(mux)
+		handler := api.LoggingMiddleware(api.BearerAuthMiddleware(authStore)(mux))
 
 		httpsServer := &http.Server{
 			Addr:    fmt.Sprintf(":%d", opts.HTTPSPort),
@@ -172,7 +177,7 @@ func main() {
 					shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 					defer cancel()
 					if err := runner.Shutdown(shutdownCtx); err != nil {
-						fmt.Fprintf(os.Stderr, "runner shutdown error: %v\n", err)
+						slog.Error("runner shutdown error", "error", err)
 					}
 				}
 
@@ -182,7 +187,7 @@ func main() {
 			}()
 
 			if err := httpsServer.ListenAndServeTLS(opts.TLSCert, opts.TLSKey); err != http.ErrServerClosed {
-				fmt.Fprintf(os.Stderr, "HTTPS server error: %v\n", err)
+				slog.Error("HTTPS server error", "error", err)
 				os.Exit(1)
 			}
 		})
