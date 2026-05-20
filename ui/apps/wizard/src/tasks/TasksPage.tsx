@@ -73,17 +73,25 @@ function TaskDetail({
 }): React.ReactElement {
   const api = useTasksApi();
 
+  const [taskDone, setTaskDone] = useState(false);
+
   const fetchTask = useCallback(() => api.getTask(taskId), [api, taskId]);
   const { data: task, error: taskError, loading: taskLoading } = usePolling(
     fetchTask,
     3000,
-    true,
+    !taskDone,
   );
 
   const isRunning = task?.status === "running";
 
+  useEffect(() => {
+    if (task != null && !isRunning) {
+      setTaskDone(true);
+    }
+  }, [task, isRunning]);
+
   const fetchLogs = useCallback(() => api.getTaskLogs(taskId), [api, taskId]);
-  const { data: logs } = usePolling(fetchLogs, 2000, true);
+  const { data: logs } = usePolling(fetchLogs, 2000, !taskDone);
 
   const ansiUp = useMemo(() => {
     const instance = new AnsiUp();
