@@ -178,7 +178,7 @@ func TestAnsibleRunner_Start_Success(t *testing.T) {
 	if run.PID == 0 {
 		t.Error("PID not set")
 	}
-	if run.StartedAt == nil {
+	if run.StartedAt.IsZero() {
 		t.Error("StartedAt not set")
 	}
 
@@ -287,7 +287,7 @@ func TestAnsibleRunner_Get_ReturnsStoredFields(t *testing.T) {
 		Status:    models.TaskStatusSuccessful,
 		Playbook:  "success.yaml",
 		ExtraVars: map[string]string{"k": "v"},
-		CreatedAt: now,
+		StartedAt: now,
 	}
 	seedRun(t, runner.artifactsDir, want)
 
@@ -331,9 +331,9 @@ func TestAnsibleRunner_List_SortedNewestFirst(t *testing.T) {
 	}
 
 	now := time.Now()
-	older := &models.TaskRun{ID: "older", Status: models.TaskStatusSuccessful, CreatedAt: now.Add(-1 * time.Hour)}
-	middle := &models.TaskRun{ID: "middle", Status: models.TaskStatusSuccessful, CreatedAt: now.Add(-30 * time.Minute)}
-	newer := &models.TaskRun{ID: "newer", Status: models.TaskStatusSuccessful, CreatedAt: now}
+	older := &models.TaskRun{ID: "older", Status: models.TaskStatusSuccessful, StartedAt: now.Add(-1 * time.Hour)}
+	middle := &models.TaskRun{ID: "middle", Status: models.TaskStatusSuccessful, StartedAt: now.Add(-30 * time.Minute)}
+	newer := &models.TaskRun{ID: "newer", Status: models.TaskStatusSuccessful, StartedAt: now}
 
 	for _, r := range []*models.TaskRun{older, newer, middle} {
 		seedRun(t, runner.artifactsDir, r)
@@ -365,7 +365,7 @@ func TestAnsibleRunner_List_IgnoresDirsWithoutRunJSON(t *testing.T) {
 	}
 
 	seedRun(t, runner.artifactsDir, &models.TaskRun{
-		ID: "valid-run", Status: models.TaskStatusSuccessful, CreatedAt: time.Now(),
+		ID: "valid-run", Status: models.TaskStatusSuccessful,
 	})
 	// A directory with no run.json should be silently skipped.
 	if err := os.MkdirAll(filepath.Join(runner.artifactsDir, "orphan-dir"), 0750); err != nil {
@@ -401,7 +401,7 @@ func TestAnsibleRunner_Logs_EmptyWhenStdoutMissing(t *testing.T) {
 		t.Fatalf("NewAnsibleRunner: %v", err)
 	}
 	seedRun(t, runner.artifactsDir, &models.TaskRun{
-		ID: "no-stdout", Status: models.TaskStatusRunning, CreatedAt: time.Now(),
+		ID: "no-stdout", Status: models.TaskStatusRunning,
 	})
 
 	logs, err := runner.Logs("no-stdout")
@@ -451,7 +451,7 @@ func TestAnsibleRunner_Events_EmptyWhenEventsDirMissing(t *testing.T) {
 		t.Fatalf("NewAnsibleRunner: %v", err)
 	}
 	seedRun(t, runner.artifactsDir, &models.TaskRun{
-		ID: "no-events", Status: models.TaskStatusSuccessful, CreatedAt: time.Now(),
+		ID: "no-events", Status: models.TaskStatusSuccessful,
 	})
 
 	events, err := runner.Events("no-events")
@@ -471,7 +471,7 @@ func TestAnsibleRunner_Events_OrderedByNumericPrefix(t *testing.T) {
 	}
 
 	runDir := seedRun(t, runner.artifactsDir, &models.TaskRun{
-		ID: "ordered-run", Status: models.TaskStatusSuccessful, CreatedAt: time.Now(),
+		ID: "ordered-run", Status: models.TaskStatusSuccessful,
 	})
 	eventsDir := filepath.Join(runDir, "job_events")
 	if err := os.MkdirAll(eventsDir, 0750); err != nil {
@@ -520,7 +520,7 @@ func TestAnsibleRunner_Events_SkipsNonJSONFiles(t *testing.T) {
 	}
 
 	runDir := seedRun(t, runner.artifactsDir, &models.TaskRun{
-		ID: "skip-non-json", Status: models.TaskStatusSuccessful, CreatedAt: time.Now(),
+		ID: "skip-non-json", Status: models.TaskStatusSuccessful,
 	})
 	eventsDir := filepath.Join(runDir, "job_events")
 	if err := os.MkdirAll(eventsDir, 0750); err != nil {
@@ -581,7 +581,6 @@ func TestAnsibleRunner_Delete_RemovesDirectory(t *testing.T) {
 	runDir := seedRun(t, runner.artifactsDir, &models.TaskRun{
 		ID:     "to-delete",
 		Status: models.TaskStatusSuccessful,
-		CreatedAt: time.Now(),
 	})
 
 	if err := runner.Delete("to-delete"); err != nil {
@@ -624,8 +623,7 @@ func TestAnsibleRunner_Recover_DeadProcessNoStatus(t *testing.T) {
 		Status:    models.TaskStatusRunning,
 		Playbook:  "success.yaml",
 		PID:       999999999,
-		CreatedAt: now,
-		StartedAt: &now,
+		StartedAt: now,
 	})
 
 	if err := runner.Recover(); err != nil {
@@ -660,8 +658,7 @@ func TestAnsibleRunner_Recover_DeadProcessWithSuccessStatus(t *testing.T) {
 		Status:    models.TaskStatusRunning,
 		Playbook:  "success.yaml",
 		PID:       999999999,
-		CreatedAt: now,
-		StartedAt: &now,
+		StartedAt: now,
 	})
 	// Pre-populate ansible-runner status files to simulate a completed run.
 	os.WriteFile(filepath.Join(runDir, "status"), []byte("successful"), 0640)
@@ -698,8 +695,7 @@ func TestAnsibleRunner_Recover_SkipsAlreadyCompletedRuns(t *testing.T) {
 		ID:        "already-done",
 		Status:    models.TaskStatusSuccessful,
 		Playbook:  "success.yaml",
-		CreatedAt: now,
-		StartedAt: &now,
+		StartedAt: now,
 	})
 
 	if err := runner.Recover(); err != nil {

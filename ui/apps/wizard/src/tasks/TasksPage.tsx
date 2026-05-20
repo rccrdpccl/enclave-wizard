@@ -161,12 +161,6 @@ function TaskDetail({
             <DescriptionListDescription>{task.playbook}</DescriptionListDescription>
           </DescriptionListGroup>
           <DescriptionListGroup>
-            <DescriptionListTerm>Created</DescriptionListTerm>
-            <DescriptionListDescription>
-              {formatTimestamp(task.createdAt)}
-            </DescriptionListDescription>
-          </DescriptionListGroup>
-          <DescriptionListGroup>
             <DescriptionListTerm>Started</DescriptionListTerm>
             <DescriptionListDescription>
               {formatTimestamp(task.startedAt)}

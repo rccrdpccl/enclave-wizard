@@ -188,6 +188,21 @@ export interface TasksApiInterface {
      */
     startDeployPlugin(requestParameters: StartDeployPluginRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TaskRun>;
 
+    /**
+     * Runs the enclave operational validation script that checks DNS, Redfish, certificates, and registry connectivity.
+     * @summary Run operational validation (validations.sh)
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof TasksApiInterface
+     */
+    startValidateRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TaskRun>>;
+
+    /**
+     * Runs the enclave operational validation script that checks DNS, Redfish, certificates, and registry connectivity.
+     * Run operational validation (validations.sh)
+     */
+    startValidate(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TaskRun>;
+
 }
 
 /**
@@ -491,6 +506,37 @@ export class TasksApi extends runtime.BaseAPI implements TasksApiInterface {
      */
     async startDeployPlugin(requestParameters: StartDeployPluginRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TaskRun> {
         const response = await this.startDeployPluginRaw(requestParameters, initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Runs the enclave operational validation script that checks DNS, Redfish, certificates, and registry connectivity.
+     * Run operational validation (validations.sh)
+     */
+    async startValidateRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<TaskRun>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/v1/tasks/validate`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'POST',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => TaskRunFromJSON(jsonValue));
+    }
+
+    /**
+     * Runs the enclave operational validation script that checks DNS, Redfish, certificates, and registry connectivity.
+     * Run operational validation (validations.sh)
+     */
+    async startValidate(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<TaskRun> {
+        const response = await this.startValidateRaw(initOverrides);
         return await response.value();
     }
 

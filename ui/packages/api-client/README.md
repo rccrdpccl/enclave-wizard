@@ -87,6 +87,7 @@ All URIs are relative to *http://localhost*
 *TasksApi* | [**startDeploy**](docs/TasksApi.md#startdeploy) | **POST** /api/v1/tasks/deploy | Start full deployment
 *TasksApi* | [**startDeployPhase**](docs/TasksApi.md#startdeployphase) | **POST** /api/v1/tasks/deploy/{phase} | Start a specific deployment phase
 *TasksApi* | [**startDeployPlugin**](docs/TasksApi.md#startdeployplugin) | **POST** /api/v1/tasks/plugins/{name} | Deploy a plugin
+*TasksApi* | [**startValidate**](docs/TasksApi.md#startvalidate) | **POST** /api/v1/tasks/validate | Run operational validation (validations.sh)
 
 
 ### Models

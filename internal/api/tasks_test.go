@@ -28,8 +28,7 @@ func sampleRun() *models.TaskRun {
 		Type:      models.TaskTypeDeploy,
 		Status:    models.TaskStatusRunning,
 		Playbook:  "playbooks/main.yaml",
-		CreatedAt: now,
-		StartedAt: &now,
+		StartedAt: now,
 	}
 }
 

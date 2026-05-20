@@ -92,8 +92,7 @@ func (r *AnsibleRunner) Start(req StartRequest) (*models.TaskRun, error) {
 		Status:    models.TaskStatusRunning,
 		Playbook:  req.Playbook,
 		ExtraVars: req.ExtraVars,
-		CreatedAt: now,
-		StartedAt: &now,
+		StartedAt: now,
 	}
 
 	if err := cmd.Start(); err != nil {
@@ -131,7 +130,7 @@ func (r *AnsibleRunner) waitForCompletion(cmd *exec.Cmd, run *models.TaskRun, ru
 
 	now := time.Now()
 	run.EndedAt = &now
-	duration := now.Sub(*run.StartedAt)
+	duration := now.Sub(run.StartedAt)
 
 	arStatus := readAnsibleRunnerStatus(runDir)
 	switch arStatus {
@@ -192,7 +191,7 @@ func (r *AnsibleRunner) List() ([]models.TaskRun, error) {
 	}
 
 	sort.Slice(runs, func(i, j int) bool {
-		return runs[i].CreatedAt.After(runs[j].CreatedAt)
+		return runs[i].StartedAt.After(runs[j].StartedAt)
 	})
 
 	return runs, nil

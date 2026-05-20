@@ -26,12 +26,6 @@ export interface TaskRun {
      */
     readonly $schema?: string;
     /**
-     * When the run was created
-     * @type {Date}
-     * @memberof TaskRun
-     */
-    createdAt: Date;
-    /**
      * When the run completed
      * @type {Date}
      * @memberof TaskRun
@@ -78,7 +72,7 @@ export interface TaskRun {
      * @type {Date}
      * @memberof TaskRun
      */
-    startedAt?: Date;
+    startedAt: Date;
     /**
      * Current execution status
      * @type {string}
@@ -111,7 +105,8 @@ export type TaskRunStatusEnum = typeof TaskRunStatusEnum[keyof typeof TaskRunSta
 export const TaskRunTypeEnum = {
     Deploy: 'deploy',
     DeployPhase: 'deploy-phase',
-    DeployPlugin: 'deploy-plugin'
+    DeployPlugin: 'deploy-plugin',
+    Validate: 'validate'
 } as const;
 export type TaskRunTypeEnum = typeof TaskRunTypeEnum[keyof typeof TaskRunTypeEnum];
 
@@ -120,9 +115,9 @@ export type TaskRunTypeEnum = typeof TaskRunTypeEnum[keyof typeof TaskRunTypeEnu
  * Check if a given object implements the TaskRun interface.
  */
 export function instanceOfTaskRun(value: object): value is TaskRun {
-    if (!('createdAt' in value) || value['createdAt'] === undefined) return false;
     if (!('id' in value) || value['id'] === undefined) return false;
     if (!('playbook' in value) || value['playbook'] === undefined) return false;
+    if (!('startedAt' in value) || value['startedAt'] === undefined) return false;
     if (!('status' in value) || value['status'] === undefined) return false;
     if (!('type' in value) || value['type'] === undefined) return false;
     return true;
@@ -139,7 +134,6 @@ export function TaskRunFromJSONTyped(json: any, ignoreDiscriminator: boolean): T
     return {
         
         '$schema': json['$schema'] == null ? undefined : json['$schema'],
-        'createdAt': (new Date(json['createdAt'])),
         'endedAt': json['endedAt'] == null ? undefined : (new Date(json['endedAt'])),
         'error': json['error'] == null ? undefined : json['error'],
         'exitCode': json['exitCode'] == null ? undefined : json['exitCode'],
@@ -147,7 +141,7 @@ export function TaskRunFromJSONTyped(json: any, ignoreDiscriminator: boolean): T
         'id': json['id'],
         'pid': json['pid'] == null ? undefined : json['pid'],
         'playbook': json['playbook'],
-        'startedAt': json['startedAt'] == null ? undefined : (new Date(json['startedAt'])),
+        'startedAt': (new Date(json['startedAt'])),
         'status': json['status'],
         'type': json['type'],
     };
@@ -164,7 +158,6 @@ export function TaskRunToJSONTyped(value?: Omit<TaskRun, '$schema'> | null, igno
 
     return {
         
-        'createdAt': value['createdAt'].toISOString(),
         'endedAt': value['endedAt'] == null ? value['endedAt'] : value['endedAt'].toISOString(),
         'error': value['error'],
         'exitCode': value['exitCode'],
@@ -172,7 +165,7 @@ export function TaskRunToJSONTyped(value?: Omit<TaskRun, '$schema'> | null, igno
         'id': value['id'],
         'pid': value['pid'],
         'playbook': value['playbook'],
-        'startedAt': value['startedAt'] == null ? value['startedAt'] : value['startedAt'].toISOString(),
+        'startedAt': value['startedAt'].toISOString(),
         'status': value['status'],
         'type': value['type'],
     };

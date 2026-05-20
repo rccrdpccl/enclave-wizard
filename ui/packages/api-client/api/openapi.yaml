@@ -991,10 +991,6 @@ components:
           format: uri
           readOnly: true
           type: string
-        createdAt:
-          description: When the run was created
-          format: date-time
-          type: string
         endedAt:
           description: When the run completed
           format: date-time
@@ -1039,13 +1035,14 @@ components:
             - deploy
             - deploy-phase
             - deploy-plugin
+            - validate
           type: string
       required:
         - id
         - type
         - status
         - playbook
-        - createdAt
+        - startedAt
       type: object
     VASTConfig:
       additionalProperties: false
@@ -1789,6 +1786,26 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       summary: Deploy a plugin
+      tags:
+        - Tasks
+  /api/v1/tasks/validate:
+    post:
+      description: Runs the enclave operational validation script that checks DNS, Redfish, certificates, and registry connectivity.
+      operationId: start-validate
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TaskRun"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Run operational validation (validations.sh)
       tags:
         - Tasks
   /api/v1/tasks/{id}:

@@ -28,8 +28,7 @@ type TaskRun struct {
 	ExtraVars map[string]string `json:"extraVars,omitempty" doc:"Extra variables passed to ansible-runner"`
 	PID       int               `json:"pid,omitempty" doc:"OS process ID of ansible-runner"`
 	ExitCode  *int              `json:"exitCode,omitempty" doc:"Process exit code"`
-	CreatedAt time.Time         `json:"createdAt" doc:"When the run was created"`
-	StartedAt *time.Time        `json:"startedAt,omitempty" doc:"When ansible-runner started"`
+	StartedAt time.Time          `json:"startedAt" doc:"When ansible-runner started"`
 	EndedAt   *time.Time        `json:"endedAt,omitempty" doc:"When the run completed"`
 	Error     string            `json:"error,omitempty" doc:"Error message if failed"`
 }

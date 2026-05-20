@@ -7,7 +7,6 @@
 Name | Type
 ------------ | -------------
 `$schema` | string
-`createdAt` | Date
 `endedAt` | Date
 `error` | string
 `exitCode` | number
@@ -27,7 +26,6 @@ import type { TaskRun } from '@enclave-wizard-ui/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "$schema": null,
-  "createdAt": null,
   "endedAt": null,
   "error": null,
   "exitCode": null,

@@ -12,6 +12,7 @@ All URIs are relative to *http://localhost*
 | [**startDeploy**](TasksApi.md#startdeploy) | **POST** /api/v1/tasks/deploy | Start full deployment |
 | [**startDeployPhase**](TasksApi.md#startdeployphase) | **POST** /api/v1/tasks/deploy/{phase} | Start a specific deployment phase |
 | [**startDeployPlugin**](TasksApi.md#startdeployplugin) | **POST** /api/v1/tasks/plugins/{name} | Deploy a plugin |
+| [**startValidate**](TasksApi.md#startvalidate) | **POST** /api/v1/tasks/validate | Run operational validation (validations.sh) |
 
 
 
@@ -519,6 +520,66 @@ example().catch(console.error);
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
 | **name** | `string` | Plugin name | [Defaults to `undefined`] |
+
+### Return type
+
+[**TaskRun**](TaskRun.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`, `application/problem+json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | OK |  -  |
+| **0** | Error |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## startValidate
+
+> TaskRun startValidate()
+
+Run operational validation (validations.sh)
+
+Runs the enclave operational validation script that checks DNS, Redfish, certificates, and registry connectivity.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  TasksApi,
+} from '@enclave-wizard-ui/api-client';
+import type { StartValidateRequest } from '@enclave-wizard-ui/api-client';
+
+async function example() {
+  console.log("🚀 Testing @enclave-wizard-ui/api-client SDK...");
+  const api = new TasksApi();
+
+  try {
+    const data = await api.startValidate();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
 
 ### Return type
 
