@@ -264,7 +264,7 @@ export const TasksPage: React.FC = () => {
     enclaveApi.getPlugins().then((result) => {
       setPlugins((result.plugins ?? []).map((p) => p.name));
     }).catch(() => {});
-  }, [enclaveApi]);
+  }, [enclaveApi.getPlugins]);
 
   const fetchTasks = useCallback(() => api.listTasks(), [api]);
 
