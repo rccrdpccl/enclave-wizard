@@ -24,18 +24,21 @@ CLOUD_IMAGE_URL="https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-S
 
 echo "=== Deploying Enclave Wizard to ${TARGET} (in VM) ==="
 
-# --- Find RPM ---
-RPM_FILE=$(ls -t "${REPO_DIR}/out/"enclave-wizard-*.rpm 2>/dev/null | head -1)
-if [ -z "${RPM_FILE}" ]; then
-    echo "ERROR: No RPM found in out/. Run 'make rpm' first."
+# --- Find RPMs ---
+ENCLAVE_RPM=$(ls -t "${REPO_DIR}/out/"enclave-0*.rpm 2>/dev/null | head -1)
+WIZARD_RPM=$(ls -t "${REPO_DIR}/out/"enclave-wizard-*.rpm 2>/dev/null | head -1)
+if [ -z "${WIZARD_RPM}" ]; then
+    echo "ERROR: No RPMs found in out/. Run 'make rpm' first."
     exit 1
 fi
-echo "  RPM: $(basename ${RPM_FILE})"
+[ -n "${ENCLAVE_RPM}" ] && echo "  Enclave RPM: $(basename ${ENCLAVE_RPM})"
+echo "  Wizard RPM:  $(basename ${WIZARD_RPM})"
 
-# --- Step 1: Transfer RPM to target host ---
+# --- Step 1: Transfer RPMs to target host ---
 echo ""
-echo "[1/6] Transferring RPM to target host..."
-${SCP} "${RPM_FILE}" "${TARGET}:/tmp/enclave-wizard.rpm"
+echo "[1/6] Transferring RPMs to target host..."
+[ -n "${ENCLAVE_RPM}" ] && ${SCP} "${ENCLAVE_RPM}" "${TARGET}:/tmp/enclave.rpm"
+${SCP} "${WIZARD_RPM}" "${TARGET}:/tmp/enclave-wizard.rpm"
 
 # --- Step 2: Download Fedora Cloud image on target ---
 echo "[2/6] Preparing VM image on target..."
@@ -138,13 +141,13 @@ echo "[5/6] Provisioning VM..."
 
 # Transfer RPM from target host into VM and install
 ${SSH} "${TARGET}" "
-  scp -o StrictHostKeyChecking=no /tmp/enclave-wizard.rpm wizard@${VM_IP}:/tmp/enclave-wizard.rpm
+  scp -o StrictHostKeyChecking=no /tmp/enclave*.rpm wizard@${VM_IP}:/tmp/
 "
 
 ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
   sudo cloud-init status --wait 2>/dev/null || sleep 10
-  sudo dnf install -y curl openssl 2>&1 | tail -3
-  sudo rpm -Uvh --force /tmp/enclave-wizard.rpm
+  ls /tmp/enclave.rpm &>/dev/null && sudo dnf install -y /tmp/enclave.rpm 2>&1 | tail -5
+  sudo dnf install -y /tmp/enclave-wizard.rpm 2>&1 | tail -5
 " 2>&1 | grep -v "^$"
 
 # --- Step 6: Set up port forwarding and verify ---

@@ -274,7 +274,7 @@ export const TasksPage: React.FC = () => {
     true,
   );
 
-  const runs = tasksData?.runs ?? [];
+  const runs = (tasksData?.runs ?? []).filter((r) => r.type !== "validate");
 
   const anyRunning = runs.some((r) => r.status === "running");
 

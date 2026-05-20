@@ -17,11 +17,12 @@ const (
 	TaskTypeDeploy       TaskType = "deploy"
 	TaskTypeDeployPhase  TaskType = "deploy-phase"
 	TaskTypeDeployPlugin TaskType = "deploy-plugin"
+	TaskTypeValidate     TaskType = "validate"
 )
 
 type TaskRun struct {
 	ID        string            `json:"id" doc:"Unique run identifier"`
-	Type      TaskType          `json:"type" doc:"Type of task" enum:"deploy,deploy-phase,deploy-plugin"`
+	Type      TaskType          `json:"type" doc:"Type of task" enum:"deploy,deploy-phase,deploy-plugin,validate"`
 	Status    TaskStatus        `json:"status" doc:"Current execution status" enum:"running,successful,failed,canceled"`
 	Playbook  string            `json:"playbook" doc:"Playbook path relative to enclave directory"`
 	ExtraVars map[string]string `json:"extraVars,omitempty" doc:"Extra variables passed to ansible-runner"`

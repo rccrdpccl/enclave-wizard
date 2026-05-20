@@ -25,7 +25,7 @@ CONFIG='{
     "quayPassword": "odf-gpu-secret",
     "quayBackend": "LocalStorage",
     "blockStorageBackend": "odf",
-    "storage_plugin": "odf",
+    "blockStorageBackend": "odf",
     "odfExternalConfig": "{\"clusterID\":\"e2e-ceph-cluster-id\",\"monitors\":[\"172.20.0.50:6789\"]}",
     "disconnected": true,
     "enabled_plugins": ["lvms", "odf", "nvidia-gpu"],

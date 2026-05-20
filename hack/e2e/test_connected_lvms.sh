@@ -25,7 +25,7 @@ CONFIG='{
     "quayPassword": "unused",
     "quayBackend": "LocalStorage",
     "blockStorageBackend": "lvms",
-    "storage_plugin": "lvms",
+    "blockStorageBackend": "lvms",
     "disconnected": false,
     "enabled_plugins": ["lvms"],
     "pullSecret": {"auths":{}},

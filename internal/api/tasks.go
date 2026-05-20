@@ -157,6 +157,15 @@ func (h *TasksHandler) Register(api huma.API) {
 		Description: "Removes the ansible-runner directory for the given run. Returns 409 if the task is still running.",
 		Tags:        []string{"Tasks"},
 	}, h.deleteTask)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "start-validate",
+		Method:      http.MethodPost,
+		Path:        "/api/v1/tasks/validate",
+		Summary:     "Run operational validation (validations.sh)",
+		Description: "Runs the enclave operational validation script that checks DNS, Redfish, certificates, and registry connectivity.",
+		Tags:        []string{"Tasks"},
+	}, h.startValidate)
 }
 
 // --- Handlers ---
@@ -248,6 +257,19 @@ func (h *TasksHandler) deleteTask(_ context.Context, input *DeleteTaskInput) (*s
 		return nil, mapTaskError(err)
 	}
 	return nil, nil
+}
+
+type StartValidateInput struct{}
+
+func (h *TasksHandler) startValidate(ctx context.Context, _ *StartValidateInput) (*StartTaskOutput, error) {
+	run, err := h.runner.Start(tasks.StartRequest{
+		Type:     models.TaskTypeValidate,
+		Playbook: "validations.sh",
+	})
+	if err != nil {
+		return nil, mapTaskError(err)
+	}
+	return &StartTaskOutput{Body: *run}, nil
 }
 
 func mapTaskError(err error) error {
