@@ -79,6 +79,7 @@ All URIs are relative to *http://localhost*
 *QuayApi* | [**writeConfigQuay**](docs/QuayApi.md#writeconfigquay) | **PUT** /api/v1/config/quay | Update Quay registry configuration
 *StorageApi* | [**getConfigStorage**](docs/StorageApi.md#getconfigstorage) | **GET** /api/v1/config/storage | Load Block storage configuration
 *StorageApi* | [**writeConfigStorage**](docs/StorageApi.md#writeconfigstorage) | **PUT** /api/v1/config/storage | Update Block storage configuration
+*TasksApi* | [**deleteTask**](docs/TasksApi.md#deletetask) | **DELETE** /api/v1/tasks/{id} | Delete a task run
 *TasksApi* | [**getTask**](docs/TasksApi.md#gettask) | **GET** /api/v1/tasks/{id} | Get task run details
 *TasksApi* | [**getTaskEvents**](docs/TasksApi.md#gettaskevents) | **GET** /api/v1/tasks/{id}/events | Get task job events
 *TasksApi* | [**getTaskLogs**](docs/TasksApi.md#gettasklogs) | **GET** /api/v1/tasks/{id}/logs | Get task output logs

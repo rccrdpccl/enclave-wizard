@@ -4,6 +4,7 @@ All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
+| [**deleteTask**](TasksApi.md#deletetask) | **DELETE** /api/v1/tasks/{id} | Delete a task run |
 | [**getTask**](TasksApi.md#gettask) | **GET** /api/v1/tasks/{id} | Get task run details |
 | [**getTaskEvents**](TasksApi.md#gettaskevents) | **GET** /api/v1/tasks/{id}/events | Get task job events |
 | [**getTaskLogs**](TasksApi.md#gettasklogs) | **GET** /api/v1/tasks/{id}/logs | Get task output logs |
@@ -12,6 +13,74 @@ All URIs are relative to *http://localhost*
 | [**startDeployPhase**](TasksApi.md#startdeployphase) | **POST** /api/v1/tasks/deploy/{phase} | Start a specific deployment phase |
 | [**startDeployPlugin**](TasksApi.md#startdeployplugin) | **POST** /api/v1/tasks/plugins/{name} | Deploy a plugin |
 
+
+
+## deleteTask
+
+> deleteTask(id)
+
+Delete a task run
+
+Removes the ansible-runner directory for the given run. Returns 409 if the task is still running.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  TasksApi,
+} from '@enclave-wizard-ui/api-client';
+import type { DeleteTaskRequest } from '@enclave-wizard-ui/api-client';
+
+async function example() {
+  console.log("🚀 Testing @enclave-wizard-ui/api-client SDK...");
+  const api = new TasksApi();
+
+  const body = {
+    // string | Run identifier
+    id: id_example,
+  } satisfies DeleteTaskRequest;
+
+  try {
+    const data = await api.deleteTask(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` | Run identifier | [Defaults to `undefined`] |
+
+### Return type
+
+`void` (Empty response body)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/problem+json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **204** | No Content |  -  |
+| **0** | Error |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
 
 
 ## getTask

@@ -31,6 +31,10 @@ import {
     TaskRunToJSON,
 } from '../models/index.js';
 
+export interface DeleteTaskRequest {
+    id: string;
+}
+
 export interface GetTaskRequest {
     id: string;
 }
@@ -58,6 +62,22 @@ export interface StartDeployPluginRequest {
  * @interface TasksApiInterface
  */
 export interface TasksApiInterface {
+    /**
+     * Removes the ansible-runner directory for the given run. Returns 409 if the task is still running.
+     * @summary Delete a task run
+     * @param {string} id Run identifier
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof TasksApiInterface
+     */
+    deleteTaskRaw(requestParameters: DeleteTaskRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>>;
+
+    /**
+     * Removes the ansible-runner directory for the given run. Returns 409 if the task is still running.
+     * Delete a task run
+     */
+    deleteTask(requestParameters: DeleteTaskRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void>;
+
     /**
      * Returns status and metadata for a specific run.
      * @summary Get task run details
@@ -174,6 +194,44 @@ export interface TasksApiInterface {
  * 
  */
 export class TasksApi extends runtime.BaseAPI implements TasksApiInterface {
+
+    /**
+     * Removes the ansible-runner directory for the given run. Returns 409 if the task is still running.
+     * Delete a task run
+     */
+    async deleteTaskRaw(requestParameters: DeleteTaskRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<void>> {
+        if (requestParameters['id'] == null) {
+            throw new runtime.RequiredError(
+                'id',
+                'Required parameter "id" was null or undefined when calling deleteTask().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/v1/tasks/{id}`;
+        urlPath = urlPath.replace(`{${"id"}}`, encodeURIComponent(String(requestParameters['id'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'DELETE',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.VoidApiResponse(response);
+    }
+
+    /**
+     * Removes the ansible-runner directory for the given run. Returns 409 if the task is still running.
+     * Delete a task run
+     */
+    async deleteTask(requestParameters: DeleteTaskRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<void> {
+        await this.deleteTaskRaw(requestParameters, initOverrides);
+    }
 
     /**
      * Returns status and metadata for a specific run.
