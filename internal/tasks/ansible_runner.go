@@ -237,6 +237,23 @@ func (r *AnsibleRunner) Events(id string) ([]json.RawMessage, error) {
 	return events, nil
 }
 
+func (r *AnsibleRunner) Delete(id string) error {
+	r.mu.Lock()
+	active := r.activeRun
+	r.mu.Unlock()
+
+	if active != nil && active.ID == id {
+		return ErrRunning
+	}
+
+	runDir := filepath.Join(r.artifactsDir, id)
+	if _, err := os.Stat(runDir); os.IsNotExist(err) {
+		return ErrNotFound
+	}
+
+	return os.RemoveAll(runDir)
+}
+
 func (r *AnsibleRunner) Recover() error {
 	entries, err := os.ReadDir(r.artifactsDir)
 	if err != nil {

@@ -1792,6 +1792,30 @@ paths:
       tags:
         - Tasks
   /api/v1/tasks/{id}:
+    delete:
+      description: Removes the ansible-runner directory for the given run. Returns 409 if the task is still running.
+      operationId: delete-task
+      parameters:
+        - description: Run identifier
+          in: path
+          name: id
+          required: true
+          schema:
+            description: Run identifier
+            minLength: 1
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Delete a task run
+      tags:
+        - Tasks
     get:
       description: Returns status and metadata for a specific run.
       operationId: get-task

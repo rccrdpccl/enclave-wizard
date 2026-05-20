@@ -558,6 +558,56 @@ func TestAnsibleRunner_Events_Integration(t *testing.T) {
 	}
 }
 
+// --- Delete ---
+
+func TestAnsibleRunner_Delete_NotFound(t *testing.T) {
+	skipIfNoAnsibleRunner(t)
+	runner, err := NewAnsibleRunner(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewAnsibleRunner: %v", err)
+	}
+	if err := runner.Delete("does-not-exist"); err != ErrNotFound {
+		t.Errorf("expected ErrNotFound, got %v", err)
+	}
+}
+
+func TestAnsibleRunner_Delete_RemovesDirectory(t *testing.T) {
+	skipIfNoAnsibleRunner(t)
+	runner, err := NewAnsibleRunner(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewAnsibleRunner: %v", err)
+	}
+
+	runDir := seedRun(t, runner.artifactsDir, &models.TaskRun{
+		ID:     "to-delete",
+		Status: models.TaskStatusSuccessful,
+		CreatedAt: time.Now(),
+	})
+
+	if err := runner.Delete("to-delete"); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if _, err := os.Stat(runDir); !os.IsNotExist(err) {
+		t.Error("expected run directory to be removed")
+	}
+}
+
+func TestAnsibleRunner_Delete_ActiveRunReturnsErrRunning(t *testing.T) {
+	runner := newRunner(t, newTestProject(t))
+
+	run, err := runner.Start(StartRequest{
+		Type:     models.TaskTypeDeploy,
+		Playbook: "slow.yaml",
+	})
+	if err != nil {
+		t.Fatalf("Start: %v", err)
+	}
+
+	if err := runner.Delete(run.ID); err != ErrRunning {
+		t.Errorf("expected ErrRunning, got %v", err)
+	}
+}
+
 // --- Recover ---
 
 func TestAnsibleRunner_Recover_DeadProcessNoStatus(t *testing.T) {

@@ -85,6 +85,7 @@ Task endpoints start and monitor long-running Ansible playbook executions. Only 
 | GET | `/api/v1/tasks/{id}` | Get status and metadata for a specific run |
 | GET | `/api/v1/tasks/{id}/logs` | Get ansible-runner stdout as `text/plain` |
 | GET | `/api/v1/tasks/{id}/events` | Get ansible-runner job events as a JSON array |
+| DELETE | `/api/v1/tasks/{id}` | Delete a task run and remove its ansible-runner directory. Returns `409 Conflict` if the task is still running |
 
 Each run is represented by a `TaskRun` object:
 

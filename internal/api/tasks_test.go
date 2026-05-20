@@ -413,6 +413,59 @@ func TestGetTaskEvents_NotFound(t *testing.T) {
 	assertEqual(t, "status", http.StatusNotFound, resp.StatusCode)
 }
 
+// --- Delete task ---
+
+func TestDeleteTask_Success(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	m := tasks.NewMockRunner(ctrl)
+	m.EXPECT().Delete("run-123").Return(nil)
+
+	srv := setupTasksAPI(m)
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodDelete, srv.URL+"/api/v1/tasks/run-123", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("DELETE: %v", err)
+	}
+	resp.Body.Close()
+	assertEqual(t, "status", http.StatusNoContent, resp.StatusCode)
+}
+
+func TestDeleteTask_NotFound(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	m := tasks.NewMockRunner(ctrl)
+	m.EXPECT().Delete("nonexistent").Return(tasks.ErrNotFound)
+
+	srv := setupTasksAPI(m)
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodDelete, srv.URL+"/api/v1/tasks/nonexistent", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("DELETE: %v", err)
+	}
+	resp.Body.Close()
+	assertEqual(t, "status", http.StatusNotFound, resp.StatusCode)
+}
+
+func TestDeleteTask_StillRunning(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	m := tasks.NewMockRunner(ctrl)
+	m.EXPECT().Delete("run-123").Return(tasks.ErrRunning)
+
+	srv := setupTasksAPI(m)
+	defer srv.Close()
+
+	req, _ := http.NewRequest(http.MethodDelete, srv.URL+"/api/v1/tasks/run-123", nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatalf("DELETE: %v", err)
+	}
+	resp.Body.Close()
+	assertEqual(t, "status", http.StatusConflict, resp.StatusCode)
+}
+
 func assertEqual[T comparable](t *testing.T, field string, want, got T) {
 	t.Helper()
 	if want != got {

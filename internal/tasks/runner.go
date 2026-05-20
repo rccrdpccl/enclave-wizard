@@ -13,6 +13,7 @@ var (
 	ErrBusy      = errors.New("a task is already running")
 	ErrNotFound  = errors.New("run not found")
 	ErrRunnerBin = errors.New("ansible-runner binary not found in PATH")
+	ErrRunning   = errors.New("task is still running")
 )
 
 type StartRequest struct {
@@ -28,6 +29,7 @@ type Runner interface {
 	List() ([]models.TaskRun, error)
 	Logs(id string) ([]byte, error)
 	Events(id string) ([]json.RawMessage, error)
+	Delete(id string) error
 	Shutdown(ctx context.Context) error
 	Recover() error
 }

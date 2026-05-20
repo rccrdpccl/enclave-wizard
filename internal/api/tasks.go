@@ -79,6 +79,10 @@ type GetTaskEventsOutput struct {
 	}
 }
 
+type DeleteTaskInput struct {
+	ID string `path:"id" doc:"Run identifier" minLength:"1"`
+}
+
 // --- Registration ---
 
 func (h *TasksHandler) Register(api huma.API) {
@@ -144,6 +148,15 @@ func (h *TasksHandler) Register(api huma.API) {
 		Description: "Returns ansible-runner job events as a JSON array.",
 		Tags:        []string{"Tasks"},
 	}, h.getTaskEvents)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "delete-task",
+		Method:      http.MethodDelete,
+		Path:        "/api/v1/tasks/{id}",
+		Summary:     "Delete a task run",
+		Description: "Removes the ansible-runner directory for the given run. Returns 409 if the task is still running.",
+		Tags:        []string{"Tasks"},
+	}, h.deleteTask)
 }
 
 // --- Handlers ---
@@ -230,10 +243,19 @@ func (h *TasksHandler) getTaskEvents(_ context.Context, input *GetTaskEventsInpu
 	return out, nil
 }
 
+func (h *TasksHandler) deleteTask(_ context.Context, input *DeleteTaskInput) (*struct{}, error) {
+	if err := h.runner.Delete(input.ID); err != nil {
+		return nil, mapTaskError(err)
+	}
+	return nil, nil
+}
+
 func mapTaskError(err error) error {
 	switch {
 	case errors.Is(err, tasks.ErrBusy):
 		return huma.Error409Conflict("a task is already running")
+	case errors.Is(err, tasks.ErrRunning):
+		return huma.Error409Conflict("task is still running")
 	case errors.Is(err, tasks.ErrNotFound):
 		return huma.Error404NotFound("run not found")
 	default:
