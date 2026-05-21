@@ -81,12 +81,6 @@ export interface GlobalConfig {
      */
     baseDomain: string;
     /**
-     * Block storage backend
-     * @type {string}
-     * @memberof GlobalConfig
-     */
-    blockStorageBackend: GlobalConfigBlockStorageBackendEnum;
-    /**
      * OpenShift cluster name
      * @type {string}
      * @memberof GlobalConfig
@@ -183,7 +177,7 @@ export interface GlobalConfig {
      */
     odfDefaults?: ODFConfig;
     /**
-     * ODF external Ceph cluster config JSON (required when blockStorageBackend is odf)
+     * ODF external Ceph cluster config JSON (required when storage_plugin is odf)
      * @type {string}
      * @memberof GlobalConfig
      */
@@ -231,11 +225,11 @@ export interface GlobalConfig {
      */
     sshPubPath: string;
     /**
-     * Modern replacement for blockStorageBackend
+     * Storage plugin
      * @type {string}
      * @memberof GlobalConfig
      */
-    storagePlugin?: GlobalConfigStoragePluginEnum;
+    storagePlugin: GlobalConfigStoragePluginEnum;
     /**
      * VAST management API password
      * @type {string}
@@ -278,16 +272,6 @@ export interface GlobalConfig {
 /**
  * @export
  */
-export const GlobalConfigBlockStorageBackendEnum = {
-    Lvms: 'lvms',
-    Odf: 'odf',
-    VastCsi: 'vast-csi'
-} as const;
-export type GlobalConfigBlockStorageBackendEnum = typeof GlobalConfigBlockStorageBackendEnum[keyof typeof GlobalConfigBlockStorageBackendEnum];
-
-/**
- * @export
- */
 export const GlobalConfigOcMirrorLogLevelEnum = {
     Trace: 'trace',
     Debug: 'debug',
@@ -323,7 +307,6 @@ export function instanceOfGlobalConfig(value: object): value is GlobalConfig {
     if (!('agentHosts' in value) || value['agentHosts'] === undefined) return false;
     if (!('apiVIP' in value) || value['apiVIP'] === undefined) return false;
     if (!('baseDomain' in value) || value['baseDomain'] === undefined) return false;
-    if (!('blockStorageBackend' in value) || value['blockStorageBackend'] === undefined) return false;
     if (!('clusterName' in value) || value['clusterName'] === undefined) return false;
     if (!('defaultDNS' in value) || value['defaultDNS'] === undefined) return false;
     if (!('defaultGateway' in value) || value['defaultGateway'] === undefined) return false;
@@ -354,7 +337,6 @@ export function GlobalConfigFromJSONTyped(json: any, ignoreDiscriminator: boolea
         'agentHosts': (json['agent_hosts'] == null ? null : (json['agent_hosts'] as Array<any>).map(HostEntryFromJSON)),
         'apiVIP': json['apiVIP'],
         'baseDomain': json['baseDomain'],
-        'blockStorageBackend': json['blockStorageBackend'],
         'clusterName': json['clusterName'],
         'defaultDNS': json['defaultDNS'],
         'defaultGateway': json['defaultGateway'],
@@ -379,7 +361,7 @@ export function GlobalConfigFromJSONTyped(json: any, ignoreDiscriminator: boolea
         'quayUser': json['quayUser'],
         'rendezvousIP': json['rendezvousIP'],
         'sshPubPath': json['sshPubPath'],
-        'storagePlugin': json['storage_plugin'] == null ? undefined : json['storage_plugin'],
+        'storagePlugin': json['storage_plugin'],
         'vastAdminPassword': json['vastAdminPassword'] == null ? undefined : json['vastAdminPassword'],
         'vastAdminUsername': json['vastAdminUsername'] == null ? undefined : json['vastAdminUsername'],
         'vastDefaults': json['vastDefaults'] == null ? undefined : VASTConfigFromJSON(json['vastDefaults']),
@@ -403,7 +385,6 @@ export function GlobalConfigToJSONTyped(value?: GlobalConfig | null, ignoreDiscr
         'agent_hosts': (value['agentHosts'] == null ? null : (value['agentHosts'] as Array<any>).map(HostEntryToJSON)),
         'apiVIP': value['apiVIP'],
         'baseDomain': value['baseDomain'],
-        'blockStorageBackend': value['blockStorageBackend'],
         'clusterName': value['clusterName'],
         'defaultDNS': value['defaultDNS'],
         'defaultGateway': value['defaultGateway'],

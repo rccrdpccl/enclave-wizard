@@ -55,12 +55,6 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store) (hum
 
 	reader := config.NewReader(enclaveDir)
 	writer := config.NewWriter(enclaveDir)
-	validator := validation.NewValidator(enclaveDir)
-
-	api.NewAuthHandler(authStore).Register(humaAPI)
-	api.NewConfigHandler(reader, writer, validator).Register(humaAPI)
-	api.NewDefaultsHandler(enclaveDir).Register(humaAPI)
-	api.NewPluginsHandler().Register(humaAPI)
 
 	runner, err := tasks.NewAnsibleRunner(enclaveDir)
 	if err != nil {
@@ -71,6 +65,13 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store) (hum
 		}
 		api.NewTasksHandler(runner).Register(humaAPI)
 	}
+
+	validator := validation.NewValidator(enclaveDir, runner)
+
+	api.NewAuthHandler(authStore).Register(humaAPI)
+	api.NewConfigHandler(reader, writer, validator).Register(humaAPI)
+	api.NewDefaultsHandler(enclaveDir).Register(humaAPI)
+	api.NewPluginsHandler().Register(humaAPI)
 
 	return humaAPI, runner
 }

@@ -5,26 +5,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tasks"
 	"gopkg.in/yaml.v3"
 )
 
-
 type Validator struct {
-	enclaveDir   string
-	playbookPath string
-	available    bool
+	enclaveDir string
+	runner     tasks.Runner
+	available  bool
 }
 
-func NewValidator(enclaveDir string) *Validator {
-	if _, err := exec.LookPath("ansible-playbook"); err != nil {
-		fmt.Println("WARNING: schema validation unavailable (ansible-playbook not found)")
+func NewValidator(enclaveDir string, runner tasks.Runner) *Validator {
+	if runner == nil {
+		fmt.Println("WARNING: schema validation unavailable (task runner not available)")
 		return &Validator{enclaveDir: enclaveDir}
 	}
 
@@ -34,13 +32,26 @@ func NewValidator(enclaveDir string) *Validator {
 		return &Validator{enclaveDir: enclaveDir}
 	}
 
-	fmt.Println("Schema validation enabled (using enclave's validate-schema.yaml)")
-	return &Validator{enclaveDir: enclaveDir, playbookPath: playbook, available: true}
+	patchValidationNoLog(enclaveDir)
+
+	fmt.Println("Schema validation enabled")
+	return &Validator{enclaveDir: enclaveDir, runner: runner, available: true}
 }
 
-// Validate writes config to the enclave config/ directory, runs the Ansible
-// schema validation playbook in-place, and rolls back to the previous config
-// if validation fails.
+func patchValidationNoLog(enclaveDir string) {
+	taskFile := filepath.Join(enclaveDir, "playbooks", "validation", "tasks", "variables_schema_validation.yaml")
+	data, err := os.ReadFile(taskFile)
+	if err != nil {
+		return
+	}
+	patched := strings.ReplaceAll(string(data), "  no_log: true", "  no_log: false")
+	if patched == string(data) {
+		return
+	}
+	os.WriteFile(taskFile, []byte(patched), 0640)
+	fmt.Println("Patched validation playbook: disabled no_log for error visibility")
+}
+
 func (v *Validator) Validate(cfg *models.EnclaveConfig) []models.ValidationError {
 	if !v.available {
 		return nil
@@ -48,7 +59,6 @@ func (v *Validator) Validate(cfg *models.EnclaveConfig) []models.ValidationError
 
 	configDir := filepath.Join(v.enclaveDir, "config")
 
-	// Back up existing config files
 	backupDir, err := os.MkdirTemp("", "enclave-wizard-backup-")
 	if err != nil {
 		return []models.ValidationError{{Message: fmt.Sprintf("failed to create backup dir: %v", err)}}
@@ -63,7 +73,6 @@ func (v *Validator) Validate(cfg *models.EnclaveConfig) []models.ValidationError
 		}
 	}
 
-	// Write new config to the real config/ directory
 	if err := writeConfigToDir(configDir, cfg); err != nil {
 		return []models.ValidationError{{Message: fmt.Sprintf("failed to write config: %v", err)}}
 	}
@@ -71,161 +80,97 @@ func (v *Validator) Validate(cfg *models.EnclaveConfig) []models.ValidationError
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	output, exitCode := runAnsibleValidation(ctx, v.playbookPath, v.enclaveDir)
+	run, _, err := v.runner.RunSync(ctx, tasks.StartRequest{
+		Type:     models.TaskTypeValidate,
+		Playbook: "playbooks/validation/validate-schema.yaml",
+		Tags:     []string{"validate-config"},
+	})
 
-	if exitCode == 0 {
+	rollbackConfig(backupDir, configDir, configFiles)
+
+	if err != nil {
+		return []models.ValidationError{{Message: fmt.Sprintf("validation error: %v", err)}}
+	}
+
+	if run.Status == models.TaskStatusSuccessful {
 		return nil
 	}
 
-	// Validation failed — rollback to previous config
-	for _, name := range configFiles {
+	events, _ := v.runner.Events(run.ID)
+	if errs := parseFailedEvents(events); len(errs) > 0 {
+		return errs
+	}
+
+	return []models.ValidationError{{Message: "schema validation failed"}}
+}
+
+func parseFailedEvents(events []json.RawMessage) []models.ValidationError {
+	var result []models.ValidationError
+	for _, raw := range events {
+		var ev struct {
+			Event     string `json:"event"`
+			EventData struct {
+				Task string `json:"task"`
+				Res  struct {
+					Msg    string `json:"msg"`
+					Errors []struct {
+						Message    string `json:"message"`
+						DataPath   string `json:"data_path"`
+						SchemaPath string `json:"schema_path"`
+					} `json:"errors"`
+				} `json:"res"`
+			} `json:"event_data"`
+		}
+		if json.Unmarshal(raw, &ev) != nil {
+			continue
+		}
+		if ev.Event != "runner_on_failed" {
+			continue
+		}
+
+		if len(ev.EventData.Res.Errors) > 0 {
+			for _, e := range ev.EventData.Res.Errors {
+				field := e.DataPath
+				if field == "" {
+					field = e.SchemaPath
+				}
+				result = append(result, models.ValidationError{
+					Field:   field,
+					Message: e.Message,
+				})
+			}
+			continue
+		}
+
+		if ev.EventData.Res.Msg != "" {
+			result = append(result, models.ValidationError{
+				Message: ev.EventData.Res.Msg,
+			})
+			continue
+		}
+
+		msg := "schema validation failed"
+		if ev.EventData.Task != "" {
+			msg = fmt.Sprintf("task failed: %s", ev.EventData.Task)
+		}
+		result = append(result, models.ValidationError{Message: msg})
+	}
+	return result
+}
+
+func rollbackConfig(backupDir, configDir string, files []string) {
+	for _, name := range files {
 		backup := filepath.Join(backupDir, name)
 		if data, err := os.ReadFile(backup); err == nil {
 			os.WriteFile(filepath.Join(configDir, name), data, 0640)
 		}
 	}
-
-	return parseAnsibleErrors(output)
 }
 
-// ValidateAndPersist validates config, then copies temp files to the real
-// config directory only if validation passes.
-func (v *Validator) ValidateAndPersist(cfg *models.EnclaveConfig) []models.ValidationError {
-	if !v.available {
-		return nil
-	}
+// --- Config serialization ---
 
-	errs := v.Validate(cfg)
-	if len(errs) > 0 {
-		return errs
-	}
-
-	return nil
-}
-
-func runAnsibleValidation(ctx context.Context, playbookPath, enclaveDir string) (string, int) {
-	args := []string{
-		playbookPath,
-	}
-
-	cmd := exec.CommandContext(ctx, "ansible-playbook", args...)
-	cmd.Dir = enclaveDir
-	cmd.Env = append(os.Environ(),
-		"ANSIBLE_STDOUT_CALLBACK=json",
-		"ANSIBLE_CALLBACKS_ENABLED=",
-	)
-
-	var stdout, stderr strings.Builder
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-
-	err := cmd.Run()
-	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			return stdout.String(), exitErr.ExitCode()
-		}
-		return stderr.String(), -1
-	}
-	return stdout.String(), 0
-}
-
-func parseAnsibleErrors(output string) []models.ValidationError {
-	var errors []models.ValidationError
-
-	// Try JSON callback format first (ANSIBLE_STDOUT_CALLBACK=json)
-	errors = parseJSONCallbackOutput(output)
-	if len(errors) > 0 {
-		return errors
-	}
-
-	// Fallback: extract from "msg" in fatal lines
-	fatalPattern := regexp.MustCompile(`fatal:.*FAILED!.*=>\s*(.+)`)
-	for _, line := range strings.Split(output, "\n") {
-		matches := fatalPattern.FindStringSubmatch(line)
-		if len(matches) < 2 {
-			continue
-		}
-		var result map[string]any
-		if err := json.Unmarshal([]byte(matches[1]), &result); err == nil {
-			if msg, ok := result["msg"].(string); ok {
-				for _, errLine := range strings.Split(msg, "\n") {
-					errLine = strings.TrimSpace(errLine)
-					if errLine != "" && !strings.HasPrefix(errLine, "Validation errors") {
-						errors = append(errors, models.ValidationError{Message: errLine})
-					}
-				}
-			}
-		}
-	}
-
-	if len(errors) == 0 {
-		trimmed := strings.TrimSpace(output)
-		if len(trimmed) > 500 {
-			trimmed = trimmed[len(trimmed)-500:]
-		}
-		errors = append(errors, models.ValidationError{Message: "Schema validation failed: " + trimmed})
-	}
-	return errors
-}
-
-type ansibleJSONOutput struct {
-	Plays []struct {
-		Tasks []struct {
-			Hosts map[string]struct {
-				Failed bool   `json:"failed"`
-				Msg    string `json:"msg"`
-				Errors []struct {
-					Message    string `json:"message"`
-					DataPath   string `json:"data_path"`
-					SchemaPath string `json:"schema_path"`
-				} `json:"errors"`
-			} `json:"hosts"`
-		} `json:"tasks"`
-	} `json:"plays"`
-}
-
-func parseJSONCallbackOutput(output string) []models.ValidationError {
-	var parsed ansibleJSONOutput
-	if err := json.Unmarshal([]byte(output), &parsed); err != nil {
-		return nil
-	}
-
-	var errors []models.ValidationError
-	for _, play := range parsed.Plays {
-		for _, task := range play.Tasks {
-			for _, result := range task.Hosts {
-				if !result.Failed {
-					continue
-				}
-				if len(result.Errors) > 0 {
-					for _, e := range result.Errors {
-						field := e.DataPath
-						if field == "" {
-							field = e.SchemaPath
-						}
-						errors = append(errors, models.ValidationError{
-							Field:   field,
-							Message: e.Message,
-						})
-					}
-				} else if result.Msg != "" {
-					for _, line := range strings.Split(result.Msg, "\n") {
-						line = strings.TrimSpace(line)
-						if line != "" && !strings.HasPrefix(line, "Validation errors") {
-							errors = append(errors, models.ValidationError{Message: line})
-						}
-					}
-				}
-			}
-		}
-	}
-	return errors
-}
-
-// wizardOnlyFields are fields in the Go model that don't exist in the
-// enclave schema and should be stripped before validation.
 var wizardOnlyFields = []string{
-	"enabled_plugins", "enabledPlugins",
+	"enabledPlugins",
 }
 
 func writeConfigToDir(dir string, cfg *models.EnclaveConfig) error {
@@ -233,15 +178,6 @@ func writeConfigToDir(dir string, cfg *models.EnclaveConfig) error {
 	for _, key := range wizardOnlyFields {
 		delete(globalMap, key)
 	}
-
-	// Map blockStorageBackend → storage_plugin (enclave renamed this field)
-	if bsb, ok := globalMap["blockStorageBackend"]; ok {
-		if _, hasSP := globalMap["storage_plugin"]; !hasSP {
-			globalMap["storage_plugin"] = bsb
-		}
-		delete(globalMap, "blockStorageBackend")
-	}
-	delete(globalMap, "storagePlugin")
 
 	if err := writeYAMLMap(filepath.Join(dir, "global.yaml"), globalMap); err != nil {
 		return err
@@ -253,18 +189,13 @@ func writeConfigToDir(dir string, cfg *models.EnclaveConfig) error {
 	}
 
 	cloudInfraMap := structToMap(cfg.CloudInfra)
-	if err := writeYAMLMap(filepath.Join(dir, "cloud_infra.yaml"), cloudInfraMap); err != nil {
-		return err
-	}
-
-	return nil
+	return writeYAMLMap(filepath.Join(dir, "cloud_infra.yaml"), cloudInfraMap)
 }
 
 func structToMap(v any) map[string]any {
 	data, _ := json.Marshal(v)
 	var m map[string]any
 	json.Unmarshal(data, &m)
-	// Remove null values
 	for k, val := range m {
 		if val == nil {
 			delete(m, k)

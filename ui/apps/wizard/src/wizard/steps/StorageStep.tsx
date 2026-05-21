@@ -119,7 +119,7 @@ export const StorageStep: React.FC = () => {
   const enabledPlugins: string[] = Array.isArray(globalData.enabled_plugins)
     ? (globalData.enabled_plugins as string[])
     : ["lvms"];
-  const backend = (globalData.blockStorageBackend as string) ?? "lvms";
+  const backend = (globalData.storage_plugin as string) ?? "lvms";
   const quayBackend = (globalData.quayBackend as string) ?? "LocalStorage";
   const odfExternalConfig = (globalData.odfExternalConfig as string) ?? "";
   const vastEndpoint = (globalData.vastEndpoint as string) ?? "";
@@ -134,8 +134,7 @@ export const StorageStep: React.FC = () => {
     const nonStorage = enabledPlugins.filter((p) => !STORAGE_PLUGINS.includes(p));
     onChange("global.enabled_plugins", [...nonStorage, next]);
     onChange("global.storage_plugin", next);
-    onChange("global.blockStorageBackend", next);
-    if (next !== "odf") onChange("global.odfExternalConfig", "");
+        if (next !== "odf") onChange("global.odfExternalConfig", "");
     if (next !== "vast-csi") {
       onChange("global.vastEndpoint", "");
       onChange("global.vastAdminUsername", "");

@@ -51,9 +51,8 @@ type LVMSStorageConfig struct {
 }
 
 type StorageConfig struct {
-	BlockStorageBackend string             `json:"blockStorageBackend" yaml:"blockStorageBackend" doc:"Block storage backend" enum:"lvms,odf,vast-csi"`
-	StoragePlugin       *string            `json:"storage_plugin,omitempty" yaml:"storage_plugin,omitempty" doc:"Modern replacement for blockStorageBackend" enum:"lvms,odf,vast-csi"`
-	ODFExternalConfig   *string            `json:"odfExternalConfig,omitempty" yaml:"odfExternalConfig,omitempty" doc:"ODF external Ceph cluster config JSON (required when blockStorageBackend is odf)"`
+	StoragePlugin     string             `json:"storage_plugin" yaml:"storage_plugin" doc:"Storage plugin" enum:"lvms,odf,vast-csi"`
+	ODFExternalConfig *string            `json:"odfExternalConfig,omitempty" yaml:"odfExternalConfig,omitempty" doc:"ODF external Ceph cluster config JSON (required when storage_plugin is odf)"`
 	LVMSConfig          *LVMSStorageConfig `json:"lvmsConfig,omitempty" yaml:"lvmsConfig,omitempty" doc:"LVMS device selector configuration"`
 	VASTEndpoint        *string            `json:"vastEndpoint,omitempty" yaml:"vastEndpoint,omitempty" doc:"VAST management endpoint URL (required when storage_plugin is vast-csi)"`
 	VASTAdminUsername   *string            `json:"vastAdminUsername,omitempty" yaml:"vastAdminUsername,omitempty" doc:"VAST management API username"`

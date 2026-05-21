@@ -3,7 +3,7 @@ export const STEP_REQUIRED_FIELDS: Record<string, string[]> = {
     "global.lzBmcIP",
   ],
   "storage": [
-    "global.blockStorageBackend",
+    "global.storage_plugin",
   ],
   "hub-cluster": [
     "global.baseDomain",

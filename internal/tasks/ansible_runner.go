@@ -51,30 +51,58 @@ func NewAnsibleRunner(enclaveDir string) (*AnsibleRunner, error) {
 }
 
 func (r *AnsibleRunner) Start(req StartRequest) (*models.TaskRun, error) {
+	run, _, err := r.runAsync(req)
+	return run, err
+}
+
+func (r *AnsibleRunner) RunSync(ctx context.Context, req StartRequest) (*models.TaskRun, []byte, error) {
+	run, done, err := r.runAsync(req)
+	if err != nil {
+		return nil, nil, err
+	}
+
+	select {
+	case <-ctx.Done():
+		return run, nil, ctx.Err()
+	case <-done:
+		updated, _ := r.Get(run.ID)
+		if updated != nil {
+			run = updated
+		}
+		logs, _ := r.Logs(run.ID)
+		return run, logs, nil
+	}
+}
+
+func (r *AnsibleRunner) runAsync(req StartRequest) (*models.TaskRun, <-chan struct{}, error) {
 	if err := r.acquireLock(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	runID := generateRunID()
 	runDir := filepath.Join(r.artifactsDir, runID)
 	if err := os.MkdirAll(runDir, 0750); err != nil {
 		r.releaseLock()
-		return nil, fmt.Errorf("creating run directory: %w", err)
+		return nil, nil, fmt.Errorf("creating run directory: %w", err)
 	}
 
 	args := []string{"run", r.enclaveDir, "-p", req.Playbook, "--ident", runID}
+
+	var cmdParts []string
 	if len(req.ExtraVars) > 0 {
-		// ansible-runner does not accept --extra-vars directly; extra vars must
-		// be forwarded to ansible-playbook via --cmdline.
 		keys := make([]string, 0, len(req.ExtraVars))
 		for k := range req.ExtraVars {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
-		var cmdParts []string
 		for _, k := range keys {
 			cmdParts = append(cmdParts, "--extra-vars", k+"="+req.ExtraVars[k])
 		}
+	}
+	if len(req.Tags) > 0 {
+		cmdParts = append(cmdParts, "--tags", strings.Join(req.Tags, ","))
+	}
+	if len(cmdParts) > 0 {
 		args = append(args, "--cmdline", strings.Join(cmdParts, " "))
 	}
 
@@ -83,6 +111,9 @@ func (r *AnsibleRunner) Start(req StartRequest) (*models.TaskRun, error) {
 	cmd.Env = append(os.Environ(),
 		"ANSIBLE_CONFIG="+filepath.Join(r.enclaveDir, "ansible.cfg"),
 	)
+	for k, v := range req.Env {
+		cmd.Env = append(cmd.Env, k+"="+v)
+	}
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	now := time.Now()
@@ -98,7 +129,7 @@ func (r *AnsibleRunner) Start(req StartRequest) (*models.TaskRun, error) {
 	if err := cmd.Start(); err != nil {
 		r.releaseLock()
 		slog.Error("failed to start ansible-runner", "run_id", runID, "playbook", req.Playbook, "error", err)
-		return nil, fmt.Errorf("starting ansible-runner: %w", err)
+		return nil, nil, fmt.Errorf("starting ansible-runner: %w", err)
 	}
 
 	run.PID = cmd.Process.Pid
@@ -106,7 +137,7 @@ func (r *AnsibleRunner) Start(req StartRequest) (*models.TaskRun, error) {
 		cmd.Process.Kill()
 		r.releaseLock()
 		slog.Error("failed to write run metadata", "run_id", runID, "error", err)
-		return nil, fmt.Errorf("writing run metadata: %w", err)
+		return nil, nil, fmt.Errorf("writing run metadata: %w", err)
 	}
 
 	slog.Info("task started", "run_id", runID, "type", req.Type, "playbook", req.Playbook, "pid", run.PID)
@@ -116,17 +147,15 @@ func (r *AnsibleRunner) Start(req StartRequest) (*models.TaskRun, error) {
 	r.activeRun = run
 	r.activeCmd = cmd
 	r.done = done
-
 	r.mu.Unlock()
 
 	go r.waitForCompletion(cmd, run, runDir, done)
 
-	return run, nil
+	return run, done, nil
 }
 
 func (r *AnsibleRunner) waitForCompletion(cmd *exec.Cmd, run *models.TaskRun, runDir string, done chan struct{}) {
 	_ = cmd.Wait()
-	close(done)
 
 	now := time.Now()
 	run.EndedAt = &now
@@ -158,6 +187,7 @@ func (r *AnsibleRunner) waitForCompletion(cmd *exec.Cmd, run *models.TaskRun, ru
 	writeRunJSON(runDir, run)
 
 	r.releaseLock()
+	close(done)
 }
 
 func (r *AnsibleRunner) Get(id string) (*models.TaskRun, error) {
@@ -269,6 +299,7 @@ func (r *AnsibleRunner) Delete(id string) error {
 	slog.Info("task deleted", "run_id", id)
 	return nil
 }
+
 
 func (r *AnsibleRunner) Recover() error {
 	entries, err := os.ReadDir(r.artifactsDir)

@@ -244,13 +244,6 @@ with open(\"config/global.yaml\") as f:
 
 schema[\"definitions\"] = defs.get(\"definitions\", {})
 
-for extra in [\"enabled_plugins\"]:
-    config.pop(extra, None)
-
-# Map blockStorageBackend -> storage_plugin (enclave renamed this field)
-if \"blockStorageBackend\" in config:
-    config.setdefault(\"storage_plugin\", config.pop(\"blockStorageBackend\"))
-
 try:
     validate(instance=config, schema=schema)
     print(\"Schema validation: PASS\")

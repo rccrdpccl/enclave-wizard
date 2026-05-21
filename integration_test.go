@@ -85,7 +85,7 @@ func testConfig() models.EnclaveConfig {
 				QuayBackend:  "LocalStorage",
 			},
 			StorageConfig: models.StorageConfig{
-				BlockStorageBackend: "lvms",
+				StoragePlugin: "lvms",
 			},
 		},
 		Certificates: models.CertificatesConfig{
@@ -150,7 +150,7 @@ func TestWriteConfig(t *testing.T) {
 		assertEqual(t, "defaultGateway", cfg.Global.DefaultGateway, got.DefaultGateway)
 		assertEqual(t, "defaultPrefix", cfg.Global.DefaultPrefix, got.DefaultPrefix)
 		assertEqual(t, "quayBackend", cfg.Global.QuayBackend, got.QuayBackend)
-		assertEqual(t, "blockStorageBackend", cfg.Global.BlockStorageBackend, got.BlockStorageBackend)
+		assertEqual(t, "storage_plugin", cfg.Global.StoragePlugin, got.StoragePlugin)
 		assertEqual(t, "sshPubPath", cfg.Global.SSHPubPath, got.SSHPubPath)
 		assertEqual(t, "agent_hosts count", len(cfg.Global.AgentHosts), len(got.AgentHosts))
 
@@ -319,7 +319,7 @@ func TestGetConfigSection(t *testing.T) {
 		if err := json.NewDecoder(resp.Body).Decode(&got); err != nil {
 			t.Fatalf("decode: %v", err)
 		}
-		assertEqual(t, "blockStorageBackend", cfg.Global.BlockStorageBackend, got.BlockStorageBackend)
+		assertEqual(t, "storage_plugin", cfg.Global.StoragePlugin, got.StoragePlugin)
 	})
 
 	t.Run("certificates", func(t *testing.T) {
@@ -439,7 +439,7 @@ func TestWriteConfigSectionRoundTrip(t *testing.T) {
 	defer srv.Close()
 
 	want := models.StorageConfig{
-		BlockStorageBackend: "odf",
+		StoragePlugin: "odf",
 		ODFExternalConfig:   strPtr(`{"key":"value"}`),
 	}
 	body, _ := json.Marshal(want)
@@ -464,7 +464,7 @@ func TestWriteConfigSectionRoundTrip(t *testing.T) {
 	if err := json.NewDecoder(getResp.Body).Decode(&got); err != nil {
 		t.Fatalf("decode: %v", err)
 	}
-	assertEqual(t, "blockStorageBackend", want.BlockStorageBackend, got.BlockStorageBackend)
+	assertEqual(t, "storage_plugin", want.StoragePlugin, got.StoragePlugin)
 	if got.ODFExternalConfig == nil {
 		t.Fatal("odfExternalConfig is nil after round-trip")
 	}

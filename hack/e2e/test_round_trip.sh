@@ -27,7 +27,7 @@ CONFIG='{
       "bucket_name": "rt-quay-bucket",
       "hostname": "rgw.roundtrip.local"
     },
-    "blockStorageBackend": "lvms",
+    "storage_plugin": "lvms",
     "pullSecret": {"auths":{}},
     "sshPubPath": "/home/wizard/.ssh/id_rsa.pub",
     "agent_hosts": [
@@ -104,7 +104,7 @@ assert_field "disconnected"     '.global.disconnected'         "true"           
 assert_field "quayUser"         '.global.quayUser'             "rt-admin"                   "${RESPONSE}"
 assert_field "quayPassword"     '.global.quayPassword'         "rt-secret-pw"               "${RESPONSE}"
 assert_field "quayBackend"      '.global.quayBackend'          "RadosGWStorage"             "${RESPONSE}"
-assert_field "blockStorageBackend" '.global.blockStorageBackend' "lvms"                     "${RESPONSE}"
+assert_field "storage_plugin" '.global.storage_plugin' "lvms"                     "${RESPONSE}"
 assert_field "sshPubPath"       '.global.sshPubPath'           "/home/wizard/.ssh/id_rsa.pub" "${RESPONSE}"
 
 echo "  Step 4: Verify agent_hosts"
