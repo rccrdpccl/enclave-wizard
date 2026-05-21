@@ -158,3 +158,18 @@ func (mr *MockRunnerMockRecorder) Start(req any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockRunner)(nil).Start), req)
 }
+
+func (m *MockRunner) RunSync(ctx context.Context, req StartRequest) (*models.TaskRun, []byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RunSync", ctx, req)
+	ret0, _ := ret[0].(*models.TaskRun)
+	ret1, _ := ret[1].([]byte)
+	ret2, _ := ret[2].(error)
+	return ret0, ret1, ret2
+}
+
+// RunSync indicates an expected call of RunSync.
+func (mr *MockRunnerMockRecorder) RunSync(ctx, req any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RunSync", reflect.TypeOf((*MockRunner)(nil).RunSync), ctx, req)
+}

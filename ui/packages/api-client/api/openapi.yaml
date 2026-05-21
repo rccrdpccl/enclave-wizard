@@ -321,13 +321,6 @@ components:
           description: Base DNS domain for the cluster
           minLength: 1
           type: string
-        blockStorageBackend:
-          description: Block storage backend
-          enum:
-            - lvms
-            - odf
-            - vast-csi
-          type: string
         clusterName:
           description: OpenShift cluster name
           minLength: 1
@@ -401,7 +394,7 @@ components:
           $ref: "#/components/schemas/ODFConfig"
           description: ODF deployment configuration
         odfExternalConfig:
-          description: ODF external Ceph cluster config JSON (required when blockStorageBackend is odf)
+          description: ODF external Ceph cluster config JSON (required when storage_plugin is odf)
           type: string
         pullSecret:
           description: OpenShift pull secret object
@@ -431,7 +424,7 @@ components:
           minLength: 1
           type: string
         storage_plugin:
-          description: Modern replacement for blockStorageBackend
+          description: Storage plugin
           enum:
             - lvms
             - odf
@@ -474,7 +467,7 @@ components:
         - quayUser
         - quayPassword
         - quayBackend
-        - blockStorageBackend
+        - storage_plugin
       type: object
     HostEntry:
       additionalProperties: false
@@ -946,21 +939,14 @@ components:
           format: uri
           readOnly: true
           type: string
-        blockStorageBackend:
-          description: Block storage backend
-          enum:
-            - lvms
-            - odf
-            - vast-csi
-          type: string
         lvmsConfig:
           $ref: "#/components/schemas/LVMSStorageConfig"
           description: LVMS device selector configuration
         odfExternalConfig:
-          description: ODF external Ceph cluster config JSON (required when blockStorageBackend is odf)
+          description: ODF external Ceph cluster config JSON (required when storage_plugin is odf)
           type: string
         storage_plugin:
-          description: Modern replacement for blockStorageBackend
+          description: Storage plugin
           enum:
             - lvms
             - odf
@@ -979,7 +965,7 @@ components:
           $ref: "#/components/schemas/VASTVipPool"
           description: VIP pool configuration for CSI traffic (required when storage_plugin is vast-csi)
       required:
-        - blockStorageBackend
+        - storage_plugin
       type: object
     TaskRun:
       additionalProperties: false

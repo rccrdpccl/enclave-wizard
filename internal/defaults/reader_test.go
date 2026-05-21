@@ -25,7 +25,6 @@ masterMaxPods: 500
 diskEncryption: false
 ocMirrorLogLevel: info
 storage_plugin: lvms
-blockStorageBackend: "{{ storage_plugin }}"
 enabled_plugins:
   - "{{ storage_plugin }}"
 pullSecretPath: "{{ workingDir }}/config/pull-secret.json"

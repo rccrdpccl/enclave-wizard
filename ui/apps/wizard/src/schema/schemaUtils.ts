@@ -48,7 +48,6 @@ const LABEL_OVERRIDES: Record<string, string> = {
   quayPassword: "Quay Admin Password",
   quayBackend: "Quay Storage Backend",
   quayBackendRGWConfiguration: "RadosGW Configuration",
-  blockStorageBackend: "Block Storage Backend",
   storage_plugin: "Storage Plugin",
   odfExternalConfig: "ODF External Config",
   lvmsConfig: "LVMS Configuration",

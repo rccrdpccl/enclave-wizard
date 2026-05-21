@@ -145,7 +145,6 @@ function WizardContent(): React.ReactElement {
           const d = defaults.value;
           dispatch({ type: "SET_FIELD", path: "global.disconnected", value: d.disconnected });
           dispatch({ type: "SET_FIELD", path: "global.storage_plugin", value: d.storagePlugin });
-          dispatch({ type: "SET_FIELD", path: "global.blockStorageBackend", value: d.storagePlugin });
           dispatch({ type: "SET_FIELD", path: "global.defaultPrefix", value: 24 });
           dispatch({ type: "SET_FIELD", path: "global.quayBackend", value: "LocalStorage" });
           dispatch({ type: "SET_FIELD", path: "global.enabled_plugins", value: ["lvms"] });
@@ -192,7 +191,7 @@ function WizardContent(): React.ReactElement {
       if (currentStepId === "storage") {
         const globalData = ((state.configData as Record<string, unknown>).global ?? {}) as Record<string, unknown>;
         const disconnected = globalData.disconnected !== false;
-        const backend = globalData.blockStorageBackend as string;
+        const backend = globalData.storage_plugin as string;
         if (backend === "odf" && !((globalData.odfExternalConfig as string) ?? "").trim()) {
           errors.push({ path: "global.odfExternalConfig", label: "ODF connection details", message: "ODF external Ceph connection details are required" });
         }

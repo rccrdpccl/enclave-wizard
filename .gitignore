@@ -1,3 +1,5 @@
 enclave-wizard
 out/
 wizard-ui.tar
+.superpowers/
+docs/superpowers/
