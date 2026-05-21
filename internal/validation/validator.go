@@ -68,14 +68,11 @@ const pluginValidationPlaybook = `---
 `
 
 func writePluginValidationPlaybook(enclaveDir string) {
-	path := filepath.Join(enclaveDir, "playbooks", "validation", "validate-plugins.yaml")
-	if _, err := os.Stat(path); err == nil {
-		return
-	}
 	tasksFile := filepath.Join(enclaveDir, "playbooks", "tasks", "validate_enabled_plugins.yaml")
 	if _, err := os.Stat(tasksFile); err != nil {
 		return
 	}
+	path := filepath.Join(enclaveDir, "playbooks", "validate-plugins.yaml")
 	os.WriteFile(path, []byte(pluginValidationPlaybook), 0640)
 	fmt.Println("Created plugin validation playbook wrapper")
 }
@@ -92,7 +89,7 @@ func (v *Validator) Validate(cfg *models.EnclaveConfig) []models.ValidationError
 	if len(errs) > 0 {
 		return errs
 	}
-	return v.runPlaybook(ctx, cfg, "playbooks/validation/validate-plugins.yaml", nil)
+	return v.runPlaybook(ctx, cfg, "playbooks/validate-plugins.yaml", nil)
 }
 
 func (v *Validator) runPlaybook(ctx context.Context, cfg *models.EnclaveConfig, playbook string, tags []string) []models.ValidationError {
@@ -148,12 +145,16 @@ func parseFailedEvents(events []json.RawMessage) []models.ValidationError {
 			EventData struct {
 				Task string `json:"task"`
 				Res  struct {
-					Msg    string `json:"msg"`
-					Errors []struct {
+					Msg     string `json:"msg"`
+					Errors  []struct {
 						Message    string `json:"message"`
 						DataPath   string `json:"data_path"`
 						SchemaPath string `json:"schema_path"`
 					} `json:"errors"`
+					Results []struct {
+						Failed bool   `json:"failed"`
+						Msg    string `json:"msg"`
+					} `json:"results"`
 				} `json:"res"`
 			} `json:"event_data"`
 		}
@@ -173,6 +174,18 @@ func parseFailedEvents(events []json.RawMessage) []models.ValidationError {
 				result = append(result, models.ValidationError{
 					Field:   field,
 					Message: e.Message,
+				})
+			}
+			continue
+		}
+
+		if len(ev.EventData.Res.Results) > 0 {
+			for _, r := range ev.EventData.Res.Results {
+				if !r.Failed {
+					continue
+				}
+				result = append(result, models.ValidationError{
+					Message: r.Msg,
 				})
 			}
 			continue

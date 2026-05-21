@@ -102,6 +102,13 @@ func (r *AnsibleRunner) runAsync(req StartRequest) (*models.TaskRun, <-chan stru
 	if len(req.Tags) > 0 {
 		cmdParts = append(cmdParts, "--tags", strings.Join(req.Tags, ","))
 	}
+	envDir := filepath.Join(r.enclaveDir, "env")
+	os.MkdirAll(envDir, 0750)
+	cmdline := strings.Join(cmdParts, " ")
+	if cmdline == "" {
+		cmdline = " "
+	}
+	os.WriteFile(filepath.Join(envDir, "cmdline"), []byte(cmdline), 0640)
 	if len(cmdParts) > 0 {
 		args = append(args, "--cmdline", strings.Join(cmdParts, " "))
 	}
