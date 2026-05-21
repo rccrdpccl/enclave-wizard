@@ -33,6 +33,7 @@ func NewValidator(enclaveDir string, runner tasks.Runner) *Validator {
 	}
 
 	patchValidationNoLog(enclaveDir)
+	writePluginValidationPlaybook(enclaveDir)
 
 	fmt.Println("Schema validation enabled")
 	return &Validator{enclaveDir: enclaveDir, runner: runner, available: true}
@@ -52,11 +53,49 @@ func patchValidationNoLog(enclaveDir string) {
 	fmt.Println("Patched validation playbook: disabled no_log for error visibility")
 }
 
+const pluginValidationPlaybook = `---
+- name: Plugin Requirement Validation
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Include load-vars
+      ansible.builtin.include_tasks:
+        file: common/load-vars.yaml
+
+    - name: Validate enabled plugin requirements
+      ansible.builtin.include_tasks:
+        file: tasks/validate_enabled_plugins.yaml
+`
+
+func writePluginValidationPlaybook(enclaveDir string) {
+	path := filepath.Join(enclaveDir, "playbooks", "validation", "validate-plugins.yaml")
+	if _, err := os.Stat(path); err == nil {
+		return
+	}
+	tasksFile := filepath.Join(enclaveDir, "playbooks", "tasks", "validate_enabled_plugins.yaml")
+	if _, err := os.Stat(tasksFile); err != nil {
+		return
+	}
+	os.WriteFile(path, []byte(pluginValidationPlaybook), 0640)
+	fmt.Println("Created plugin validation playbook wrapper")
+}
+
 func (v *Validator) Validate(cfg *models.EnclaveConfig) []models.ValidationError {
 	if !v.available {
 		return nil
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	errs := v.runPlaybook(ctx, cfg, "playbooks/validation/validate-schema.yaml", []string{"validate-config"})
+	if len(errs) > 0 {
+		return errs
+	}
+	return v.runPlaybook(ctx, cfg, "playbooks/validation/validate-plugins.yaml", nil)
+}
+
+func (v *Validator) runPlaybook(ctx context.Context, cfg *models.EnclaveConfig, playbook string, tags []string) []models.ValidationError {
 	configDir := filepath.Join(v.enclaveDir, "config")
 
 	backupDir, err := os.MkdirTemp("", "enclave-wizard-backup-")
@@ -77,13 +116,10 @@ func (v *Validator) Validate(cfg *models.EnclaveConfig) []models.ValidationError
 		return []models.ValidationError{{Message: fmt.Sprintf("failed to write config: %v", err)}}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
 	run, _, err := v.runner.RunSync(ctx, tasks.StartRequest{
 		Type:     models.TaskTypeValidate,
-		Playbook: "playbooks/validation/validate-schema.yaml",
-		Tags:     []string{"validate-config"},
+		Playbook: playbook,
+		Tags:     tags,
 	})
 
 	rollbackConfig(backupDir, configDir, configFiles)
@@ -101,7 +137,7 @@ func (v *Validator) Validate(cfg *models.EnclaveConfig) []models.ValidationError
 		return errs
 	}
 
-	return []models.ValidationError{{Message: "schema validation failed"}}
+	return []models.ValidationError{{Message: "validation failed"}}
 }
 
 func parseFailedEvents(events []json.RawMessage) []models.ValidationError {
@@ -149,7 +185,7 @@ func parseFailedEvents(events []json.RawMessage) []models.ValidationError {
 			continue
 		}
 
-		msg := "schema validation failed"
+		msg := "validation failed"
 		if ev.EventData.Task != "" {
 			msg = fmt.Sprintf("task failed: %s", ev.EventData.Task)
 		}

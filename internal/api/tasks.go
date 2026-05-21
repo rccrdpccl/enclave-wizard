@@ -24,11 +24,12 @@ var phasePlaybooks = map[int]string{
 }
 
 type TasksHandler struct {
-	runner tasks.Runner
+	runner   tasks.Runner
+	registry *plugins.Registry
 }
 
-func NewTasksHandler(runner tasks.Runner) *TasksHandler {
-	return &TasksHandler{runner: runner}
+func NewTasksHandler(runner tasks.Runner, registry *plugins.Registry) *TasksHandler {
+	return &TasksHandler{runner: runner, registry: registry}
 }
 
 // --- Request / Response types ---
@@ -197,7 +198,7 @@ func (h *TasksHandler) startDeployPhase(ctx context.Context, input *StartDeployP
 }
 
 func (h *TasksHandler) startDeployPlugin(ctx context.Context, input *StartDeployPluginInput) (*StartTaskOutput, error) {
-	if _, ok := plugins.Get(input.Name); !ok {
+	if _, ok := h.registry.Get(input.Name); !ok {
 		return nil, huma.Error404NotFound("unknown plugin: " + input.Name)
 	}
 	run, err := h.runner.Start(tasks.StartRequest{

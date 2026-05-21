@@ -13,10 +13,20 @@ import (
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
 )
 
+func testPluginRegistry() *plugins.Registry {
+	return plugins.NewRegistry([]models.Plugin{
+		{Name: "lvms", Type: models.PluginTypeFoundation, Order: 10},
+		{Name: "odf", Type: models.PluginTypeFoundation, Order: 10},
+		{Name: "vast-csi", Type: models.PluginTypeFoundation, Order: 10},
+		{Name: "nvidia-gpu", Type: models.PluginTypeAddon, Order: 110},
+		{Name: "openshift-ai", Type: models.PluginTypeAddon, Order: 100},
+	})
+}
+
 func setupPluginsAPI() *httptest.Server {
 	mux := http.NewServeMux()
 	api := humago.New(mux, huma.DefaultConfig("test", "0.0.0"))
-	NewPluginsHandler().Register(api)
+	NewPluginsHandler(testPluginRegistry()).Register(api)
 	return httptest.NewServer(mux)
 }
 
@@ -51,12 +61,12 @@ func TestListPlugins_ReturnsAllPlugins(t *testing.T) {
 		t.Fatalf("decode: %v", err)
 	}
 
-	if len(out.Plugins) != len(plugins.All) {
-		t.Errorf("expected %d plugins, got %d", len(plugins.All), len(out.Plugins))
+	if len(out.Plugins) != 5 {
+		t.Errorf("expected 5 plugins, got %d", len(out.Plugins))
 	}
 }
 
-func TestListPlugins_EachPluginHasNameTypeDescription(t *testing.T) {
+func TestListPlugins_EachPluginHasNameAndType(t *testing.T) {
 	srv := setupPluginsAPI()
 	defer srv.Close()
 
@@ -77,9 +87,6 @@ func TestListPlugins_EachPluginHasNameTypeDescription(t *testing.T) {
 		}
 		if p.Type == "" {
 			t.Errorf("plugin %q has empty type", p.Name)
-		}
-		if p.Description == "" {
-			t.Errorf("plugin %q has empty description", p.Name)
 		}
 	}
 }

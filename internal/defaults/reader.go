@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
-	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
 	"gopkg.in/yaml.v3"
 )
 
@@ -39,6 +38,7 @@ type deploymentDefaults struct {
 }
 
 type pluginFile struct {
+	Name     string         `yaml:"name"`
 	Defaults map[string]any `yaml:"defaults"`
 }
 
@@ -80,26 +80,36 @@ func (r *Reader) readDeploymentDefaults(d *Defaults) error {
 }
 
 func (r *Reader) readPluginDefaults(d *Defaults) error {
-	for _, p := range plugins.All {
-		path := filepath.Join(r.enclaveDir, "plugins", p.Name, "plugin.yaml")
+	pluginsDir := filepath.Join(r.enclaveDir, "plugins")
+	entries, err := os.ReadDir(pluginsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil
+		}
+		return fmt.Errorf("reading plugins directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+
+		path := filepath.Join(pluginsDir, entry.Name(), "plugin.yaml")
 		data, err := os.ReadFile(path)
 		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return fmt.Errorf("reading %s plugin.yaml: %w", p.Name, err)
+			continue
 		}
 
 		var pf pluginFile
-		if err := yaml.Unmarshal(data, &pf); err != nil {
-			return fmt.Errorf("parsing %s plugin.yaml: %w", p.Name, err)
+		if yaml.Unmarshal(data, &pf) != nil {
+			continue
 		}
 
 		if len(pf.Defaults) == 0 {
 			continue
 		}
 
-		switch p.Name {
+		switch pf.Name {
 		case "lvms":
 			if err := extractDefault(pf.Defaults, "lvmsDefaults", &d.LVMSDefaults); err != nil {
 				return fmt.Errorf("lvms defaults: %w", err)
