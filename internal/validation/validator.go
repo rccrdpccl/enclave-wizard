@@ -169,15 +169,8 @@ func rollbackConfig(backupDir, configDir string, files []string) {
 
 // --- Config serialization ---
 
-var wizardOnlyFields = []string{
-	"enabledPlugins",
-}
-
 func writeConfigToDir(dir string, cfg *models.EnclaveConfig) error {
 	globalMap := structToMap(cfg.Global)
-	for _, key := range wizardOnlyFields {
-		delete(globalMap, key)
-	}
 
 	if err := writeYAMLMap(filepath.Join(dir, "global.yaml"), globalMap); err != nil {
 		return err
