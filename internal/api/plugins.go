@@ -10,10 +10,12 @@ import (
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
 )
 
-type PluginsHandler struct{}
+type PluginsHandler struct {
+	registry *plugins.Registry
+}
 
-func NewPluginsHandler() *PluginsHandler {
-	return &PluginsHandler{}
+func NewPluginsHandler(registry *plugins.Registry) *PluginsHandler {
+	return &PluginsHandler{registry: registry}
 }
 
 type PluginsOutput struct {
@@ -57,12 +59,12 @@ func (h *PluginsHandler) Register(api huma.API) {
 
 func (h *PluginsHandler) listPlugins(_ context.Context, _ *struct{}) (*PluginsOutput, error) {
 	out := &PluginsOutput{}
-	out.Body.Plugins = plugins.All
+	out.Body.Plugins = h.registry.All()
 	return out, nil
 }
 
 func (h *PluginsHandler) validateCombination(_ context.Context, input *PluginValidateInput) (*PluginValidateOutput, error) {
-	errs := plugins.ValidateCombination(input.Body.Plugins)
+	errs := h.registry.ValidateCombination(input.Body.Plugins)
 	out := &PluginValidateOutput{}
 	out.Body.Valid = len(errs) == 0
 	out.Body.Errors = errs

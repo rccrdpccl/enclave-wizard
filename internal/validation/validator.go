@@ -33,6 +33,7 @@ func NewValidator(enclaveDir string, runner tasks.Runner) *Validator {
 	}
 
 	patchValidationNoLog(enclaveDir)
+	writePluginValidationPlaybook(enclaveDir)
 
 	fmt.Println("Schema validation enabled")
 	return &Validator{enclaveDir: enclaveDir, runner: runner, available: true}
@@ -52,11 +53,46 @@ func patchValidationNoLog(enclaveDir string) {
 	fmt.Println("Patched validation playbook: disabled no_log for error visibility")
 }
 
+const pluginValidationPlaybook = `---
+- name: Plugin Requirement Validation
+  hosts: localhost
+  gather_facts: false
+  tasks:
+    - name: Include load-vars
+      ansible.builtin.include_tasks:
+        file: common/load-vars.yaml
+
+    - name: Validate enabled plugin requirements
+      ansible.builtin.include_tasks:
+        file: tasks/validate_enabled_plugins.yaml
+`
+
+func writePluginValidationPlaybook(enclaveDir string) {
+	tasksFile := filepath.Join(enclaveDir, "playbooks", "tasks", "validate_enabled_plugins.yaml")
+	if _, err := os.Stat(tasksFile); err != nil {
+		return
+	}
+	path := filepath.Join(enclaveDir, "playbooks", "validate-plugins.yaml")
+	os.WriteFile(path, []byte(pluginValidationPlaybook), 0640)
+	fmt.Println("Created plugin validation playbook wrapper")
+}
+
 func (v *Validator) Validate(cfg *models.EnclaveConfig) []models.ValidationError {
 	if !v.available {
 		return nil
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
+	defer cancel()
+
+	errs := v.runPlaybook(ctx, cfg, "playbooks/validation/validate-schema.yaml", []string{"validate-config"})
+	if len(errs) > 0 {
+		return errs
+	}
+	return v.runPlaybook(ctx, cfg, "playbooks/validate-plugins.yaml", nil)
+}
+
+func (v *Validator) runPlaybook(ctx context.Context, cfg *models.EnclaveConfig, playbook string, tags []string) []models.ValidationError {
 	configDir := filepath.Join(v.enclaveDir, "config")
 
 	backupDir, err := os.MkdirTemp("", "enclave-wizard-backup-")
@@ -77,13 +113,10 @@ func (v *Validator) Validate(cfg *models.EnclaveConfig) []models.ValidationError
 		return []models.ValidationError{{Message: fmt.Sprintf("failed to write config: %v", err)}}
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
 	run, _, err := v.runner.RunSync(ctx, tasks.StartRequest{
 		Type:     models.TaskTypeValidate,
-		Playbook: "playbooks/validation/validate-schema.yaml",
-		Tags:     []string{"validate-config"},
+		Playbook: playbook,
+		Tags:     tags,
 	})
 
 	rollbackConfig(backupDir, configDir, configFiles)
@@ -101,7 +134,7 @@ func (v *Validator) Validate(cfg *models.EnclaveConfig) []models.ValidationError
 		return errs
 	}
 
-	return []models.ValidationError{{Message: "schema validation failed"}}
+	return []models.ValidationError{{Message: "validation failed"}}
 }
 
 func parseFailedEvents(events []json.RawMessage) []models.ValidationError {
@@ -112,12 +145,16 @@ func parseFailedEvents(events []json.RawMessage) []models.ValidationError {
 			EventData struct {
 				Task string `json:"task"`
 				Res  struct {
-					Msg    string `json:"msg"`
-					Errors []struct {
+					Msg     string `json:"msg"`
+					Errors  []struct {
 						Message    string `json:"message"`
 						DataPath   string `json:"data_path"`
 						SchemaPath string `json:"schema_path"`
 					} `json:"errors"`
+					Results []struct {
+						Failed bool   `json:"failed"`
+						Msg    string `json:"msg"`
+					} `json:"results"`
 				} `json:"res"`
 			} `json:"event_data"`
 		}
@@ -142,6 +179,18 @@ func parseFailedEvents(events []json.RawMessage) []models.ValidationError {
 			continue
 		}
 
+		if len(ev.EventData.Res.Results) > 0 {
+			for _, r := range ev.EventData.Res.Results {
+				if !r.Failed {
+					continue
+				}
+				result = append(result, models.ValidationError{
+					Message: r.Msg,
+				})
+			}
+			continue
+		}
+
 		if ev.EventData.Res.Msg != "" {
 			result = append(result, models.ValidationError{
 				Message: ev.EventData.Res.Msg,
@@ -149,7 +198,7 @@ func parseFailedEvents(events []json.RawMessage) []models.ValidationError {
 			continue
 		}
 
-		msg := "schema validation failed"
+		msg := "validation failed"
 		if ev.EventData.Task != "" {
 			msg = fmt.Sprintf("task failed: %s", ev.EventData.Task)
 		}

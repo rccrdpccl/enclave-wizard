@@ -5,21 +5,16 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
-	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
 	"gopkg.in/yaml.v3"
 )
 
 type Defaults struct {
-	Disconnected     bool   `json:"disconnected"`
-	MasterMaxPods    int    `json:"masterMaxPods"`
-	DiskEncryption   bool   `json:"diskEncryption"`
-	OCMirrorLogLevel string `json:"ocMirrorLogLevel"`
-	StoragePlugin    string `json:"storagePlugin"`
-
-	LVMSDefaults *models.LVMSConfig `json:"lvmsDefaults,omitempty"`
-	ODFDefaults  *models.ODFConfig  `json:"odfDefaults,omitempty"`
-	VASTDefaults *models.VASTConfig `json:"vastDefaults,omitempty"`
+	Disconnected     bool              `json:"disconnected"`
+	MasterMaxPods    int               `json:"masterMaxPods"`
+	DiskEncryption   bool              `json:"diskEncryption"`
+	OCMirrorLogLevel string            `json:"ocMirrorLogLevel"`
+	StoragePlugin    string            `json:"storagePlugin"`
+	PluginDefaults   map[string]any    `json:"pluginDefaults,omitempty"`
 }
 
 type Reader struct {
@@ -39,6 +34,7 @@ type deploymentDefaults struct {
 }
 
 type pluginFile struct {
+	Name     string         `yaml:"name"`
 	Defaults map[string]any `yaml:"defaults"`
 }
 
@@ -49,9 +45,7 @@ func (r *Reader) ReadAll() (*Defaults, error) {
 		return nil, fmt.Errorf("reading deployment defaults: %w", err)
 	}
 
-	if err := r.readPluginDefaults(d); err != nil {
-		return nil, fmt.Errorf("reading plugin defaults: %w", err)
-	}
+	r.readPluginDefaults(d)
 
 	return d, nil
 }
@@ -79,57 +73,36 @@ func (r *Reader) readDeploymentDefaults(d *Defaults) error {
 	return nil
 }
 
-func (r *Reader) readPluginDefaults(d *Defaults) error {
-	for _, p := range plugins.All {
-		path := filepath.Join(r.enclaveDir, "plugins", p.Name, "plugin.yaml")
-		data, err := os.ReadFile(path)
-		if err != nil {
-			if os.IsNotExist(err) {
-				continue
-			}
-			return fmt.Errorf("reading %s plugin.yaml: %w", p.Name, err)
-		}
+func (r *Reader) readPluginDefaults(d *Defaults) {
+	pluginsDir := filepath.Join(r.enclaveDir, "plugins")
+	entries, err := os.ReadDir(pluginsDir)
+	if err != nil {
+		return
+	}
 
-		var pf pluginFile
-		if err := yaml.Unmarshal(data, &pf); err != nil {
-			return fmt.Errorf("parsing %s plugin.yaml: %w", p.Name, err)
-		}
-
-		if len(pf.Defaults) == 0 {
+	merged := make(map[string]any)
+	for _, entry := range entries {
+		if !entry.IsDir() {
 			continue
 		}
 
-		switch p.Name {
-		case "lvms":
-			if err := extractDefault(pf.Defaults, "lvmsDefaults", &d.LVMSDefaults); err != nil {
-				return fmt.Errorf("lvms defaults: %w", err)
-			}
-		case "odf":
-			if err := extractDefault(pf.Defaults, "odfDefaults", &d.ODFDefaults); err != nil {
-				return fmt.Errorf("odf defaults: %w", err)
-			}
-		case "vast-csi":
-			if err := extractDefault(pf.Defaults, "vastDefaults", &d.VASTDefaults); err != nil {
-				return fmt.Errorf("vast-csi defaults: %w", err)
-			}
+		path := filepath.Join(pluginsDir, entry.Name(), "plugin.yaml")
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
+
+		var pf pluginFile
+		if yaml.Unmarshal(data, &pf) != nil {
+			continue
+		}
+
+		for k, v := range pf.Defaults {
+			merged[k] = v
 		}
 	}
-	return nil
-}
 
-func extractDefault[T any](defaults map[string]any, key string, target **T) error {
-	raw, ok := defaults[key]
-	if !ok {
-		return nil
+	if len(merged) > 0 {
+		d.PluginDefaults = merged
 	}
-	b, err := yaml.Marshal(raw)
-	if err != nil {
-		return fmt.Errorf("marshaling %s: %w", key, err)
-	}
-	var v T
-	if err := yaml.Unmarshal(b, &v); err != nil {
-		return fmt.Errorf("unmarshaling %s: %w", key, err)
-	}
-	*target = &v
-	return nil
 }

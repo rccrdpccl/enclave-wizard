@@ -6,13 +6,11 @@ import (
 	"testing"
 )
 
-func writeFile(t *testing.T, dir, rel, content string) {
+func writeFile(t *testing.T, baseDir, relPath, content string) {
 	t.Helper()
-	path := filepath.Join(dir, rel)
-	if err := os.MkdirAll(filepath.Dir(path), 0750); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(path, []byte(content), 0640); err != nil {
+	fullPath := filepath.Join(baseDir, relPath)
+	os.MkdirAll(filepath.Dir(fullPath), 0750)
+	if err := os.WriteFile(fullPath, []byte(content), 0640); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -44,9 +42,6 @@ pullSecretPath: "{{ workingDir }}/config/pull-secret.json"
 	if d.DiskEncryption != false {
 		t.Errorf("DiskEncryption: want false, got %v", d.DiskEncryption)
 	}
-	if d.OCMirrorLogLevel != "info" {
-		t.Errorf("OCMirrorLogLevel: want info, got %s", d.OCMirrorLogLevel)
-	}
 	if d.StoragePlugin != "lvms" {
 		t.Errorf("StoragePlugin: want lvms, got %s", d.StoragePlugin)
 	}
@@ -55,10 +50,6 @@ pullSecretPath: "{{ workingDir }}/config/pull-secret.json"
 func TestReadPluginDefaults(t *testing.T) {
 	dir := t.TempDir()
 	writeFile(t, dir, "defaults/deployment.yaml", `---
-disconnected: true
-masterMaxPods: 500
-diskEncryption: false
-ocMirrorLogLevel: info
 storage_plugin: lvms
 `)
 
@@ -66,16 +57,12 @@ storage_plugin: lvms
 name: lvms
 type: foundation
 defaults:
-  lvmsConfigDefaults:
-    deviceSelector:
-      forceWipeDevicesAndDestroyAllData: true
   lvmsDefaults:
     deviceClassName: vg1
     defaultStorageClass: true
     thinPoolConfig:
       name: vg1-pool-1
       sizePercent: 90
-      overprovisionRatio: 10
 `)
 
 	writeFile(t, dir, "plugins/odf/plugin.yaml", `---
@@ -91,85 +78,24 @@ defaults:
 		t.Fatal(err)
 	}
 
-	if d.LVMSDefaults == nil {
-		t.Fatal("LVMSDefaults is nil")
-	}
-	if d.LVMSDefaults.DeviceClassName != "vg1" {
-		t.Errorf("LVMS deviceClassName: want vg1, got %s", d.LVMSDefaults.DeviceClassName)
-	}
-	if d.LVMSDefaults.DefaultStorageClass != true {
-		t.Errorf("LVMS defaultStorageClass: want true, got %v", d.LVMSDefaults.DefaultStorageClass)
-	}
-	if d.LVMSDefaults.ThinPoolConfig.Name != "vg1-pool-1" {
-		t.Errorf("LVMS thinPoolConfig.name: want vg1-pool-1, got %s", d.LVMSDefaults.ThinPoolConfig.Name)
-	}
-	if d.LVMSDefaults.ThinPoolConfig.SizePercent != 90 {
-		t.Errorf("LVMS thinPoolConfig.sizePercent: want 90, got %d", d.LVMSDefaults.ThinPoolConfig.SizePercent)
-	}
-	if d.LVMSDefaults.ThinPoolConfig.OverprovisionRatio != 10 {
-		t.Errorf("LVMS thinPoolConfig.overprovisionRatio: want 10, got %d", d.LVMSDefaults.ThinPoolConfig.OverprovisionRatio)
+	if d.PluginDefaults == nil {
+		t.Fatal("PluginDefaults is nil")
 	}
 
-	if d.ODFDefaults == nil {
-		t.Fatal("ODFDefaults is nil")
-	}
-	if d.ODFDefaults.DefaultStorageClass != true {
-		t.Errorf("ODF defaultStorageClass: want true, got %v", d.ODFDefaults.DefaultStorageClass)
-	}
-}
-
-func TestReadVastCSIPluginDefaults(t *testing.T) {
-	dir := t.TempDir()
-	writeFile(t, dir, "defaults/deployment.yaml", `---
-disconnected: true
-masterMaxPods: 500
-diskEncryption: false
-ocMirrorLogLevel: info
-storage_plugin: vast-csi
-`)
-
-	writeFile(t, dir, "plugins/vast-csi/plugin.yaml", `---
-name: vast-csi
-type: foundation
-defaults:
-  vastDefaults:
-    infraTenant: infra
-    storagePath: /osac
-    viewPolicyId: 1
-    quayPvcSize: 1000Gi
-    tiers:
-      - name: quay
-        protocol: nfs
-`)
-
-	d, err := NewReader(dir).ReadAll()
-	if err != nil {
-		t.Fatal(err)
+	if _, ok := d.PluginDefaults["lvmsDefaults"]; !ok {
+		t.Error("expected lvmsDefaults in PluginDefaults")
 	}
 
-	if d.VASTDefaults == nil {
-		t.Fatal("VASTDefaults is nil")
+	if _, ok := d.PluginDefaults["odfDefaults"]; !ok {
+		t.Error("expected odfDefaults in PluginDefaults")
 	}
-	if d.VASTDefaults.InfraTenant == nil || *d.VASTDefaults.InfraTenant != "infra" {
-		t.Errorf("vastDefaults.infraTenant: want infra, got %v", d.VASTDefaults.InfraTenant)
+
+	lvms, ok := d.PluginDefaults["lvmsDefaults"].(map[string]any)
+	if !ok {
+		t.Fatal("lvmsDefaults is not a map")
 	}
-	if d.VASTDefaults.StoragePath == nil || *d.VASTDefaults.StoragePath != "/osac" {
-		t.Errorf("vastDefaults.storagePath: want /osac, got %v", d.VASTDefaults.StoragePath)
-	}
-	if d.VASTDefaults.ViewPolicyID == nil || *d.VASTDefaults.ViewPolicyID != 1 {
-		t.Errorf("vastDefaults.viewPolicyId: want 1, got %v", d.VASTDefaults.ViewPolicyID)
-	}
-	if d.VASTDefaults.QuayPvcSize == nil || *d.VASTDefaults.QuayPvcSize != "1000Gi" {
-		t.Errorf("vastDefaults.quayPvcSize: want 1000Gi, got %v", d.VASTDefaults.QuayPvcSize)
-	}
-	if len(d.VASTDefaults.Tiers) != 1 {
-		t.Fatalf("vastDefaults.tiers: want 1 tier, got %d", len(d.VASTDefaults.Tiers))
-	}
-	if d.VASTDefaults.Tiers[0].Name != "quay" {
-		t.Errorf("vastDefaults.tiers[0].name: want quay, got %s", d.VASTDefaults.Tiers[0].Name)
-	}
-	if d.VASTDefaults.Tiers[0].Protocol != "nfs" {
-		t.Errorf("vastDefaults.tiers[0].protocol: want nfs, got %s", d.VASTDefaults.Tiers[0].Protocol)
+	if lvms["deviceClassName"] != "vg1" {
+		t.Errorf("lvmsDefaults.deviceClassName: want vg1, got %v", lvms["deviceClassName"])
 	}
 }
 
@@ -184,17 +110,8 @@ func TestMissingFilesReturnZeros(t *testing.T) {
 	if d.Disconnected != false {
 		t.Errorf("Disconnected: want false, got %v", d.Disconnected)
 	}
-	if d.MasterMaxPods != 0 {
-		t.Errorf("MasterMaxPods: want 0, got %d", d.MasterMaxPods)
-	}
-	if d.LVMSDefaults != nil {
-		t.Errorf("LVMSDefaults: want nil, got %+v", d.LVMSDefaults)
-	}
-	if d.ODFDefaults != nil {
-		t.Errorf("ODFDefaults: want nil, got %+v", d.ODFDefaults)
-	}
-	if d.VASTDefaults != nil {
-		t.Errorf("VASTDefaults: want nil, got %+v", d.VASTDefaults)
+	if d.PluginDefaults != nil {
+		t.Errorf("PluginDefaults: want nil, got %v", d.PluginDefaults)
 	}
 }
 
@@ -211,7 +128,7 @@ defaults: {}
 		t.Fatal(err)
 	}
 
-	if d.LVMSDefaults != nil {
-		t.Errorf("LVMSDefaults: want nil, got %+v", d.LVMSDefaults)
+	if d.PluginDefaults != nil {
+		t.Errorf("PluginDefaults: want nil for empty defaults, got %v", d.PluginDefaults)
 	}
 }

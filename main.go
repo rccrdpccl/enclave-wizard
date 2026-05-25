@@ -22,6 +22,7 @@ import (
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/auth"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/config"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/logger"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tasks"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/validation"
 )
@@ -56,14 +57,22 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store) (hum
 	reader := config.NewReader(enclaveDir)
 	writer := config.NewWriter(enclaveDir)
 
+	loadedPlugins, err := plugins.LoadFromDir(enclaveDir)
+	if err != nil {
+		slog.Warn("plugin discovery failed, using empty registry", "error", err)
+	}
+	registry := plugins.NewRegistry(loadedPlugins)
+	slog.Info("plugins loaded", "count", len(loadedPlugins))
+
 	runner, err := tasks.NewAnsibleRunner(enclaveDir)
 	if err != nil {
 		slog.Warn("task runner unavailable, tasks API disabled", "error", err)
-	} else {
+	}
+	if runner != nil {
 		if err := runner.Recover(); err != nil {
 			slog.Warn("task recovery failed", "error", err)
 		}
-		api.NewTasksHandler(runner).Register(humaAPI)
+		api.NewTasksHandler(runner, registry).Register(humaAPI)
 	}
 
 	validator := validation.NewValidator(enclaveDir, runner)
@@ -71,7 +80,7 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store) (hum
 	api.NewAuthHandler(authStore).Register(humaAPI)
 	api.NewConfigHandler(reader, writer, validator).Register(humaAPI)
 	api.NewDefaultsHandler(enclaveDir).Register(humaAPI)
-	api.NewPluginsHandler().Register(humaAPI)
+	api.NewPluginsHandler(registry).Register(humaAPI)
 
 	return humaAPI, runner
 }

@@ -10,6 +10,7 @@ import (
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tasks"
 	"go.uber.org/mock/gomock"
 )
@@ -17,7 +18,10 @@ import (
 func setupTasksAPI(runner tasks.Runner) *httptest.Server {
 	mux := http.NewServeMux()
 	api := humago.New(mux, huma.DefaultConfig("test", "0.0.0"))
-	NewTasksHandler(runner).Register(api)
+	registry := plugins.NewRegistry([]models.Plugin{
+		{Name: "lvms", Type: models.PluginTypeFoundation},
+	})
+	NewTasksHandler(runner, registry).Register(api)
 	return httptest.NewServer(mux)
 }
 

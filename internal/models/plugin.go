@@ -8,9 +8,10 @@ const (
 )
 
 type Plugin struct {
-	Name        string     `json:"name" doc:"Plugin identifier"`
-	Type        PluginType `json:"type" doc:"Plugin type" enum:"foundation,addon"`
-	Description string     `json:"description" doc:"Human-readable description"`
+	Name     string         `json:"name" yaml:"name" doc:"Plugin identifier"`
+	Type     PluginType     `json:"type" yaml:"type" doc:"Plugin type" enum:"foundation,addon"`
+	Order    int            `json:"order,omitempty" yaml:"order,omitempty" doc:"Deployment order within type"`
+	Defaults map[string]any `json:"defaults,omitempty" yaml:"defaults,omitempty" doc:"Plugin default configuration values"`
 }
 
 // LVMS plugin configuration
