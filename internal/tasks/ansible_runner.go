@@ -20,7 +20,7 @@ import (
 type AnsibleRunner struct {
 	enclaveDir    string
 	artifactsDir  string
-	demoMode      bool
+	demoTypes     map[models.TaskType]bool
 	recordingsDir string
 	demoSpeed     float64
 
@@ -52,7 +52,7 @@ func NewAnsibleRunner(enclaveDir string) (*AnsibleRunner, error) {
 	}, nil
 }
 
-func NewDemoRunner(enclaveDir, recordingsDir string, speed float64) (*AnsibleRunner, error) {
+func NewDemoRunner(enclaveDir, recordingsDir string, speed float64, demoTypes map[models.TaskType]bool) (*AnsibleRunner, error) {
 	if _, err := os.Stat(enclaveDir); err != nil {
 		return nil, fmt.Errorf("enclave directory: %w", err)
 	}
@@ -68,7 +68,7 @@ func NewDemoRunner(enclaveDir, recordingsDir string, speed float64) (*AnsibleRun
 	return &AnsibleRunner{
 		enclaveDir:    enclaveDir,
 		artifactsDir:  artifactsDir,
-		demoMode:      true,
+		demoTypes:     demoTypes,
 		recordingsDir: recordingsDir,
 		demoSpeed:     speed,
 	}, nil
@@ -110,7 +110,7 @@ func (r *AnsibleRunner) runAsync(req StartRequest) (*models.TaskRun, <-chan stru
 		return nil, nil, fmt.Errorf("creating run directory: %w", err)
 	}
 
-	if r.demoMode {
+	if r.demoTypes[req.Type] {
 		key := ScenarioKey(req.Playbook, req.Tags)
 		recordingFile := filepath.Join(r.recordingsDir, key+".json")
 		if _, err := os.Stat(recordingFile); err != nil {
