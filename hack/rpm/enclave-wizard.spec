@@ -19,6 +19,8 @@ Requires the enclave package for schemas, playbooks, and runtime deps.
 %install
 install -D -m 0755 %{SOURCE0} %{buildroot}/usr/local/bin/enclave-wizard
 install -D -m 0644 %{SOURCE1} %{buildroot}/etc/systemd/system/enclave-wizard.service
+mkdir -p %{buildroot}/opt/enclave/fixtures/recordings
+cp -r %{_sourcedir}/fixtures/recordings/*.json %{buildroot}/opt/enclave/fixtures/recordings/ 2>/dev/null || true
 
 %post
 # Generate self-signed TLS certificate
@@ -74,3 +76,4 @@ fi
 %files
 /usr/local/bin/enclave-wizard
 /etc/systemd/system/enclave-wizard.service
+/opt/enclave/fixtures

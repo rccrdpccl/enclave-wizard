@@ -3,15 +3,103 @@ package tasks
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
 
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
 )
+
+var ErrNoRecording = errors.New("no recording found for this playbook/tags combination")
+
+func artifactGet(artifactsDir, id string) (*models.TaskRun, error) {
+	runDir := filepath.Join(artifactsDir, id)
+	run, err := readRunJSON(runDir)
+	if err != nil {
+		return nil, ErrNotFound
+	}
+	return run, nil
+}
+
+func artifactList(artifactsDir string) ([]models.TaskRun, error) {
+	entries, err := os.ReadDir(artifactsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []models.TaskRun{}, nil
+		}
+		return nil, err
+	}
+
+	var runs []models.TaskRun
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			continue
+		}
+		run, err := artifactGet(artifactsDir, entry.Name())
+		if err != nil {
+			continue
+		}
+		runs = append(runs, *run)
+	}
+
+	sort.Slice(runs, func(i, j int) bool {
+		return runs[i].StartedAt.After(runs[j].StartedAt)
+	})
+
+	return runs, nil
+}
+
+func artifactLogs(artifactsDir, id string) ([]byte, error) {
+	runDir := filepath.Join(artifactsDir, id)
+	if _, err := readRunJSON(runDir); err != nil {
+		return nil, ErrNotFound
+	}
+	data, err := os.ReadFile(filepath.Join(runDir, "stdout"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []byte{}, nil
+		}
+		return nil, err
+	}
+	return data, nil
+}
+
+func artifactEvents(artifactsDir, id string) ([]json.RawMessage, error) {
+	runDir := filepath.Join(artifactsDir, id)
+	if _, err := readRunJSON(runDir); err != nil {
+		return nil, ErrNotFound
+	}
+
+	eventsDir := filepath.Join(runDir, "job_events")
+	entries, err := os.ReadDir(eventsDir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []json.RawMessage{}, nil
+		}
+		return nil, err
+	}
+
+	sortEventEntries(entries)
+
+	var events []json.RawMessage
+	for _, entry := range entries {
+		if !strings.HasSuffix(entry.Name(), ".json") {
+			continue
+		}
+		data, err := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
+		if err != nil {
+			continue
+		}
+		events = append(events, json.RawMessage(data))
+	}
+
+	return events, nil
+}
 
 func readRunJSON(runDir string) (*models.TaskRun, error) {
 	data, err := os.ReadFile(filepath.Join(runDir, "run.json"))
@@ -51,6 +139,14 @@ func readAnsibleRunnerRC(runDir string) (int, error) {
 
 func processAlive(pid int) bool {
 	return syscall.Kill(pid, 0) == nil
+}
+
+func sortEventEntries(entries []os.DirEntry) {
+	sort.Slice(entries, func(i, j int) bool {
+		ni, _ := strconv.Atoi(strings.SplitN(entries[i].Name(), "-", 2)[0])
+		nj, _ := strconv.Atoi(strings.SplitN(entries[j].Name(), "-", 2)[0])
+		return ni < nj
+	})
 }
 
 func generateRunID() string {

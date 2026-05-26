@@ -17,7 +17,7 @@ SCP="scp -o StrictHostKeyChecking=no -q"
 VM_NAME="enclave-wizard-lz"
 VM_MEMORY=4096
 VM_CPUS=2
-VM_DISK_SIZE=20
+VM_DISK_SIZE=60
 HTTP_PORT=3001
 HTTPS_PORT=3443
 CLOUD_IMAGE_URL="https://cloud.centos.org/centos/9-stream/x86_64/images/CentOS-Stream-GenericCloud-9-latest.x86_64.qcow2"

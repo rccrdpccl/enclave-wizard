@@ -24,12 +24,13 @@ var phasePlaybooks = map[int]string{
 }
 
 type TasksHandler struct {
-	runner   tasks.Runner
-	registry *plugins.Registry
+	runner     tasks.Runner
+	registry   *plugins.Registry
+	enclaveDir string
 }
 
-func NewTasksHandler(runner tasks.Runner, registry *plugins.Registry) *TasksHandler {
-	return &TasksHandler{runner: runner, registry: registry}
+func NewTasksHandler(runner tasks.Runner, registry *plugins.Registry, enclaveDir string) *TasksHandler {
+	return &TasksHandler{runner: runner, registry: registry, enclaveDir: enclaveDir}
 }
 
 // --- Request / Response types ---
@@ -175,6 +176,9 @@ func (h *TasksHandler) startDeploy(ctx context.Context, _ *StartDeployInput) (*S
 	run, err := h.runner.Start(tasks.StartRequest{
 		Type:     models.TaskTypeDeploy,
 		Playbook: "playbooks/main.yaml",
+		ExtraVars: map[string]string{
+			"workingDir": h.enclaveDir,
+		},
 	})
 	if err != nil {
 		return nil, mapTaskError(err)
@@ -190,6 +194,9 @@ func (h *TasksHandler) startDeployPhase(ctx context.Context, input *StartDeployP
 	run, err := h.runner.Start(tasks.StartRequest{
 		Type:     models.TaskTypeDeployPhase,
 		Playbook: playbook,
+		ExtraVars: map[string]string{
+			"workingDir": h.enclaveDir,
+		},
 	})
 	if err != nil {
 		return nil, mapTaskError(err)
@@ -206,6 +213,7 @@ func (h *TasksHandler) startDeployPlugin(ctx context.Context, input *StartDeploy
 		Playbook: "playbooks/deploy-plugin.yaml",
 		ExtraVars: map[string]string{
 			"plugin_name": input.Name,
+			"workingDir":  h.enclaveDir,
 		},
 	})
 	if err != nil {

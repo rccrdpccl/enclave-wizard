@@ -10,14 +10,18 @@ build-ui:
 		yarn workspace @enclave-wizard-ui/wizard run -T vite build"
 
 build: build-ui
-	$(GO) build -ldflags="-w -s" -o $(BINARY) .
+	$(GO) build -ldflags="-w -s" -tags "$(TAGS)" -o $(BINARY) .
 
 build-linux: build-ui
 	$(CONTAINER_RUNTIME) run --rm -v $(PWD):/app:z -w /app golang:latest \
-		sh -c "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='-w -s' -o $(BINARY) ."
+		sh -c "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='-w -s' -tags '$(TAGS)' -o $(BINARY) ."
 
 run: build
 	./$(BINARY) --enclave-dir ../enclave --tls-cert hack/tls/server.crt --tls-key hack/tls/server.key
+
+run-demo: build-ui
+	$(GO) build -ldflags="-w -s" -tags dev -o $(BINARY) .
+	./$(BINARY) --demo --enclave-dir ../enclave --tls-cert hack/tls/server.crt --tls-key hack/tls/server.key
 
 test:
 	$(GO) test -cover ./...

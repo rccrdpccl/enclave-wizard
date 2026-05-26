@@ -16,6 +16,9 @@ Requires:       jq
 Requires:       ipcalc
 Requires:       bind-utils
 Requires:       git-core
+Requires:       nmstate
+Requires:       podman
+Requires:       httpd
 
 %description
 Red Hat Sovereign Enclave distribution with all runtime dependencies
@@ -41,11 +44,19 @@ echo "Installing ansible-runner..."
 pip3 install ansible-runner 2>&1 | tail -3
 
 echo "Installing Ansible collections..."
-ansible-galaxy collection install ansible.utils ansible.posix community.general 2>&1 | tail -3
+ansible-galaxy collection install \
+    -p /usr/share/ansible/collections \
+    ansible.utils \
+    ansible.posix \
+    community.general \
+    community.crypto \
+    containers.podman \
+    kubernetes.core \
+    2>&1 | tail -5
 
-# Install Python dependencies if requirements.txt exists
+echo "Installing Python dependencies..."
+pip3 install kubernetes 2>&1 | tail -3
 if [ -f "${ENCLAVE_DIR}/requirements.txt" ]; then
-    echo "Installing Python dependencies..."
     pip3 install -r "${ENCLAVE_DIR}/requirements.txt" 2>&1 | tail -3
 fi
 
