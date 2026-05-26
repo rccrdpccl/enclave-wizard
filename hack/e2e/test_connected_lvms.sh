@@ -29,7 +29,7 @@ CONFIG='{
     "disconnected": false,
     "enabled_plugins": ["lvms"],
     "pullSecret": {"auths":{}},
-    "sshPubPath": "/home/wizard/.ssh/id_rsa.pub",
+    "sshPubKey": "ssh-rsa AAAAB3test test@wizard",
     "agent_hosts": [
       {
         "name": "ctrl-01",
@@ -77,19 +77,19 @@ assert_contains "storage is lvms" "lvms" api_get "/api/v1/config"
 assert_contains "3 agent hosts" "ctrl-03" api_get "/api/v1/config"
 
 echo "  Step 4: Verify config files exist on disk"
-assert_ok "global.yaml exists" vm_exec "test -f /opt/enclave/config/global.yaml"
-assert_ok "certificates.yaml exists" vm_exec "test -f /opt/enclave/config/certificates.yaml"
-assert_ok "cloud_infra.yaml exists" vm_exec "test -f /opt/enclave/config/cloud_infra.yaml"
+assert_ok "global.yaml exists" vm_exec "sudo test -f /opt/enclave/config/global.yaml"
+assert_ok "certificates.yaml exists" vm_exec "sudo test -f /opt/enclave/config/certificates.yaml"
+assert_ok "cloud_infra.yaml exists" vm_exec "sudo test -f /opt/enclave/config/cloud_infra.yaml"
 
 echo "  Step 5: Verify config content in YAML files"
 assert_contains "global.yaml has baseDomain" "connected-lvms.lab.local" \
-    vm_exec "cat /opt/enclave/config/global.yaml"
+    vm_exec "sudo cat /opt/enclave/config/global.yaml"
 assert_contains "global.yaml has clusterName" "edge-conn" \
-    vm_exec "cat /opt/enclave/config/global.yaml"
+    vm_exec "sudo cat /opt/enclave/config/global.yaml"
 assert_contains "global.yaml has 3 nodes" "ctrl-03" \
-    vm_exec "cat /opt/enclave/config/global.yaml"
+    vm_exec "sudo cat /opt/enclave/config/global.yaml"
 assert_contains "global.yaml has disconnected false" "false" \
-    vm_exec "cat /opt/enclave/config/global.yaml"
+    vm_exec "sudo cat /opt/enclave/config/global.yaml"
 
 echo "  Step 6: Validate config against API schema"
 VALIDATION=$(api_post "/api/v1/config/validate" "${CONFIG}")

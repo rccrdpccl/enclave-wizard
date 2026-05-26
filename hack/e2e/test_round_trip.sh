@@ -29,7 +29,7 @@ CONFIG='{
     },
     "storage_plugin": "lvms",
     "pullSecret": {"auths":{}},
-    "sshPubPath": "/home/wizard/.ssh/id_rsa.pub",
+    "sshPubKey": "ssh-rsa AAAAB3test test@wizard",
     "agent_hosts": [
       {
         "name": "rt-cp-0",
@@ -105,7 +105,7 @@ assert_field "quayUser"         '.global.quayUser'             "rt-admin"       
 assert_field "quayPassword"     '.global.quayPassword'         "rt-secret-pw"               "${RESPONSE}"
 assert_field "quayBackend"      '.global.quayBackend'          "RadosGWStorage"             "${RESPONSE}"
 assert_field "storage_plugin" '.global.storage_plugin' "lvms"                     "${RESPONSE}"
-assert_field "sshPubPath"       '.global.sshPubPath'           "/home/wizard/.ssh/id_rsa.pub" "${RESPONSE}"
+assert_field "sshPubKey"       '.global.sshPubKey'           "ssh-rsa AAAAB3test test@wizard" "${RESPONSE}"
 
 echo "  Step 4: Verify agent_hosts"
 assert_field "agent_hosts count"      '.global.agent_hosts | length'   "3"         "${RESPONSE}"

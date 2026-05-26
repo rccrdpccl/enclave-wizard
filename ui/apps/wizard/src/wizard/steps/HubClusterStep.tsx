@@ -68,7 +68,7 @@ export const HUB_REQUIRED_FIELDS = [
   "global.defaultGateway",
   "global.defaultPrefix",
   "global.pullSecret",
-  "global.sshPubPath",
+  "global.sshPubKey",
 ];
 
 export const HubClusterStep: React.FC = () => {
@@ -150,8 +150,8 @@ export const HubClusterStep: React.FC = () => {
       <FormGroup label="SSH Public Key" isRequired fieldId="ssh-pub-key">
         <TextArea
           id="ssh-pub-key"
-          value={(globalData.sshPubPath as string) ?? ""}
-          onChange={(_e, v) => onChange("global.sshPubPath", v)}
+          value={(globalData.sshPubKey as string) ?? ""}
+          onChange={(_e, v) => onChange("global.sshPubKey", v)}
           placeholder="ssh-rsa AAAA..."
           rows={3}
           isRequired

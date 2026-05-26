@@ -53,7 +53,7 @@ const LABEL_OVERRIDES: Record<string, string> = {
   lvmsConfig: "LVMS Configuration",
   enabled_plugins: "Enabled Plugins",
   pullSecret: "Pull Secret",
-  sshPubPath: "SSH Public Key Path",
+  sshPubKey: "SSH Public Key",
   agent_hosts: "Agent Hosts",
   discovery_hosts: "Discovery Hosts",
   macAddress: "MAC Address",

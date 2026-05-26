@@ -29,7 +29,7 @@ CONFIG='{
     "disconnected": false,
     "enabled_plugins": ["lvms", "nvidia-gpu", "openshift-ai"],
     "pullSecret": {"auths":{}},
-    "sshPubPath": "/home/wizard/.ssh/id_rsa.pub",
+    "sshPubKey": "ssh-rsa AAAAB3test test@wizard",
     "agent_hosts": [
       {
         "name": "ai-node-01",
@@ -79,21 +79,21 @@ assert_contains "lvms storage backend" "lvms" api_get "/api/v1/config"
 assert_contains "3 agent hosts" "ai-node-03" api_get "/api/v1/config"
 
 echo "  Step 4: Verify config files exist on disk"
-assert_ok "global.yaml exists" vm_exec "test -f /opt/enclave/config/global.yaml"
-assert_ok "certificates.yaml exists" vm_exec "test -f /opt/enclave/config/certificates.yaml"
-assert_ok "cloud_infra.yaml exists" vm_exec "test -f /opt/enclave/config/cloud_infra.yaml"
+assert_ok "global.yaml exists" vm_exec "sudo test -f /opt/enclave/config/global.yaml"
+assert_ok "certificates.yaml exists" vm_exec "sudo test -f /opt/enclave/config/certificates.yaml"
+assert_ok "cloud_infra.yaml exists" vm_exec "sudo test -f /opt/enclave/config/cloud_infra.yaml"
 
 echo "  Step 5: Verify config content in YAML files"
 assert_contains "global.yaml has baseDomain" "rhoai.lab.example.com" \
-    vm_exec "cat /opt/enclave/config/global.yaml"
+    vm_exec "sudo cat /opt/enclave/config/global.yaml"
 assert_contains "global.yaml has openshift-ai" "openshift-ai" \
-    vm_exec "cat /opt/enclave/config/global.yaml"
+    vm_exec "sudo cat /opt/enclave/config/global.yaml"
 assert_contains "global.yaml has nvidia-gpu" "nvidia-gpu" \
-    vm_exec "cat /opt/enclave/config/global.yaml"
+    vm_exec "sudo cat /opt/enclave/config/global.yaml"
 assert_contains "global.yaml has disconnected false" "false" \
-    vm_exec "cat /opt/enclave/config/global.yaml"
+    vm_exec "sudo cat /opt/enclave/config/global.yaml"
 assert_contains "global.yaml has disconnected false" "false" \
-    vm_exec "cat /opt/enclave/config/global.yaml"
+    vm_exec "sudo cat /opt/enclave/config/global.yaml"
 
 echo "  Step 6: Validate config against API schema"
 VALIDATION=$(api_post "/api/v1/config/validate" "${CONFIG}")

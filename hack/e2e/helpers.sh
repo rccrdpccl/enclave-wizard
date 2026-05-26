@@ -227,7 +227,7 @@ assert_http_code_with_token() {
 validate_enclave_schema() {
     vm_exec "
         cd /opt/enclave
-        python3 -c '
+        sudo python3 -c '
 import yaml, sys
 try:
     from jsonschema import validate, ValidationError
