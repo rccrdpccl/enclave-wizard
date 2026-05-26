@@ -27,7 +27,7 @@ import {
 import { useOpenApiSchema } from "../schema/useOpenApiSchema.ts";
 import { STEP_REQUIRED_FIELDS } from "./stepFields.ts";
 import { CaasStep } from "./steps/CaasStep.tsx";
-import { GenerateStep } from "./steps/GenerateStep.tsx";
+import { DeployStep } from "./steps/DeployStep.tsx";
 import { GpuAiStep } from "./steps/GpuAiStep.tsx";
 import { HubClusterStep } from "./steps/HubClusterStep.tsx";
 import { LandingZoneStep } from "./steps/LandingZoneStep.tsx";
@@ -72,7 +72,7 @@ const GPU_AI_STEP: StepDef = { id: "gpu-ai", label: "GPU & AI" };
 
 const TAIL_STEPS: StepDef[] = [
   { id: "review", label: "Review" },
-  { id: "generate", label: "Generate" },
+  { id: "deploy", label: "Deploy" },
 ];
 
 function buildSteps(selectedFlavors: Set<string>): StepDef[] {
@@ -105,8 +105,8 @@ function StepContent({ stepId }: { stepId: string }): React.ReactElement {
       return <GpuAiStep />;
     case "review":
       return <ReviewStep />;
-    case "generate":
-      return <GenerateStep />;
+    case "deploy":
+      return <DeployStep />;
     default:
       return <div>Unknown step</div>;
   }
