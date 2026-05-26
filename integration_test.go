@@ -22,7 +22,9 @@ func setupTestServer(t *testing.T) (*httptest.Server, string) {
 		t.Fatalf("auth store init: %v", err)
 	}
 	mux := http.NewServeMux()
-	SetupAPI(mux, enclaveDir, authStore)
+	if _, _, err := SetupAPI(mux, enclaveDir, authStore, &Options{}); err != nil {
+		t.Fatalf("SetupAPI: %v", err)
+	}
 	return httptest.NewServer(mux), enclaveDir
 }
 

@@ -21,7 +21,7 @@ func setupTasksAPI(runner tasks.Runner) *httptest.Server {
 	registry := plugins.NewRegistry([]models.Plugin{
 		{Name: "lvms", Type: models.PluginTypeFoundation},
 	})
-	NewTasksHandler(runner, registry).Register(api)
+	NewTasksHandler(runner, registry, "/opt/enclave").Register(api)
 	return httptest.NewServer(mux)
 }
 
@@ -45,6 +45,9 @@ func TestStartDeploy_Success(t *testing.T) {
 	m.EXPECT().Start(tasks.StartRequest{
 		Type:     models.TaskTypeDeploy,
 		Playbook: "playbooks/main.yaml",
+		ExtraVars: map[string]string{
+			"workingDir": "/opt/enclave",
+		},
 	}).Return(run, nil)
 
 	srv := setupTasksAPI(m)
@@ -91,6 +94,9 @@ func TestStartDeployPhase_Success(t *testing.T) {
 	m.EXPECT().Start(tasks.StartRequest{
 		Type:     models.TaskTypeDeployPhase,
 		Playbook: "playbooks/03-deploy.yaml",
+		ExtraVars: map[string]string{
+			"workingDir": "/opt/enclave",
+		},
 	}).Return(run, nil)
 
 	srv := setupTasksAPI(m)
@@ -145,6 +151,9 @@ func TestStartDeployPhase_AllPhases(t *testing.T) {
 			m.EXPECT().Start(tasks.StartRequest{
 				Type:     models.TaskTypeDeployPhase,
 				Playbook: playbook,
+				ExtraVars: map[string]string{
+					"workingDir": "/opt/enclave",
+				},
 			}).Return(run, nil)
 
 			srv := setupTasksAPI(m)
@@ -173,12 +182,13 @@ func TestStartDeployPlugin_Success(t *testing.T) {
 	run := sampleRun()
 	run.Type = models.TaskTypeDeployPlugin
 	run.Playbook = "playbooks/deploy-plugin.yaml"
-	run.ExtraVars = map[string]string{"plugin_name": "lvms"}
+	run.ExtraVars = map[string]string{"plugin_name": "lvms", "workingDir": "/opt/enclave"}
 	m.EXPECT().Start(tasks.StartRequest{
 		Type:     models.TaskTypeDeployPlugin,
 		Playbook: "playbooks/deploy-plugin.yaml",
 		ExtraVars: map[string]string{
 			"plugin_name": "lvms",
+			"workingDir":  "/opt/enclave",
 		},
 	}).Return(run, nil)
 

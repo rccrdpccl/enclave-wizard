@@ -38,9 +38,10 @@ type Options struct {
 	EnclaveDir   string `help:"Path to the Enclave repository root" default:"../enclave"`
 	PasswordFile string `help:"Path to the password file" default:"/etc/enclave-wizard/password"`
 	LogLevel     string `help:"Log level (trace, debug, info, warn, error)" default:"info"`
+	DevOptions
 }
 
-func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store) (huma.API, *tasks.AnsibleRunner) {
+func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store, opts *Options) (huma.API, tasks.Runner, error) {
 	apiConfig := huma.DefaultConfig("Enclave Configuration Wizard", "0.1.0")
 	apiConfig.Info.Description = "API for managing Enclave deployment configuration files on the Landing Zone."
 
@@ -64,15 +65,13 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store) (hum
 	registry := plugins.NewRegistry(loadedPlugins)
 	slog.Info("plugins loaded", "count", len(loadedPlugins))
 
-	runner, err := tasks.NewAnsibleRunner(enclaveDir)
+	runner, err := initRunner(opts, enclaveDir)
 	if err != nil {
-		slog.Warn("task runner unavailable, tasks API disabled", "error", err)
+		return nil, nil, err
 	}
+
 	if runner != nil {
-		if err := runner.Recover(); err != nil {
-			slog.Warn("task recovery failed", "error", err)
-		}
-		api.NewTasksHandler(runner, registry).Register(humaAPI)
+		api.NewTasksHandler(runner, registry, enclaveDir).Register(humaAPI)
 	}
 
 	validator := validation.NewValidator(enclaveDir, runner)
@@ -82,7 +81,7 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store) (hum
 	api.NewDefaultsHandler(enclaveDir).Register(humaAPI)
 	api.NewPluginsHandler(registry).Register(humaAPI)
 
-	return humaAPI, runner
+	return humaAPI, runner, nil
 }
 
 func setupUIHandler(mux *http.ServeMux) {
@@ -152,7 +151,11 @@ func main() {
 		}
 
 		mux := http.NewServeMux()
-		_, runner := SetupAPI(mux, opts.EnclaveDir, authStore)
+		_, runner, err := SetupAPI(mux, opts.EnclaveDir, authStore, opts)
+		if err != nil {
+			slog.Error("API setup failed", "error", err)
+			os.Exit(1)
+		}
 		setupUIHandler(mux)
 
 		handler := api.LoggingMiddleware(api.BearerAuthMiddleware(authStore)(mux))

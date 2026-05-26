@@ -68,6 +68,7 @@ podman run --rm \
 
         cp /src/enclave-wizard                          ${RPMBUILD_DIR}/SOURCES/enclave-wizard
         cp /src/hack/systemd/enclave-wizard.service     ${RPMBUILD_DIR}/SOURCES/enclave-wizard.service
+        cp -r /src/fixtures                             ${RPMBUILD_DIR}/SOURCES/fixtures
         cp /src/hack/rpm/enclave-wizard.spec             ${RPMBUILD_DIR}/SPECS/
 
         rpmbuild -bb \

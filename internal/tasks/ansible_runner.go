@@ -9,7 +9,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -19,8 +18,11 @@ import (
 )
 
 type AnsibleRunner struct {
-	enclaveDir   string
-	artifactsDir string
+	enclaveDir    string
+	artifactsDir  string
+	demoMode      bool
+	recordingsDir string
+	demoSpeed     float64
 
 	mu       sync.Mutex
 	lockFile *os.File
@@ -47,6 +49,28 @@ func NewAnsibleRunner(enclaveDir string) (*AnsibleRunner, error) {
 	return &AnsibleRunner{
 		enclaveDir:   enclaveDir,
 		artifactsDir: artifactsDir,
+	}, nil
+}
+
+func NewDemoRunner(enclaveDir, recordingsDir string, speed float64) (*AnsibleRunner, error) {
+	if _, err := os.Stat(enclaveDir); err != nil {
+		return nil, fmt.Errorf("enclave directory: %w", err)
+	}
+	if _, err := os.Stat(recordingsDir); err != nil {
+		return nil, fmt.Errorf("recordings directory: %w", err)
+	}
+
+	artifactsDir := filepath.Join(enclaveDir, "artifacts")
+	if err := os.MkdirAll(artifactsDir, 0750); err != nil {
+		return nil, fmt.Errorf("creating artifacts directory: %w", err)
+	}
+
+	return &AnsibleRunner{
+		enclaveDir:    enclaveDir,
+		artifactsDir:  artifactsDir,
+		demoMode:      true,
+		recordingsDir: recordingsDir,
+		demoSpeed:     speed,
 	}, nil
 }
 
@@ -84,6 +108,38 @@ func (r *AnsibleRunner) runAsync(req StartRequest) (*models.TaskRun, <-chan stru
 	if err := os.MkdirAll(runDir, 0750); err != nil {
 		r.releaseLock()
 		return nil, nil, fmt.Errorf("creating run directory: %w", err)
+	}
+
+	if r.demoMode {
+		key := ScenarioKey(req.Playbook, req.Tags)
+		recordingFile := filepath.Join(r.recordingsDir, key+".json")
+		if _, err := os.Stat(recordingFile); err != nil {
+			r.releaseLock()
+			return nil, nil, fmt.Errorf("%w: %s", ErrNoRecording, key)
+		}
+
+		now := time.Now()
+		run := &models.TaskRun{
+			ID:        runID,
+			Type:      req.Type,
+			Status:    models.TaskStatusRunning,
+			Playbook:  req.Playbook,
+			ExtraVars: req.ExtraVars,
+			StartedAt: now,
+		}
+		writeRunJSON(runDir, run)
+
+		slog.Info("demo task started", "run_id", runID, "playbook", req.Playbook, "speed", r.demoSpeed)
+
+		done := make(chan struct{})
+		r.mu.Lock()
+		r.activeRun = run
+		r.activeCmd = nil
+		r.done = done
+		r.mu.Unlock()
+
+		go r.runFake(recordingFile, run, runDir, done)
+		return run, done, nil
 	}
 
 	args := []string{"run", r.enclaveDir, "-p", req.Playbook, "--ident", runID}
@@ -161,6 +217,76 @@ func (r *AnsibleRunner) runAsync(req StartRequest) (*models.TaskRun, <-chan stru
 	return run, done, nil
 }
 
+func (r *AnsibleRunner) runFake(recordingFile string, run *models.TaskRun, runDir string, done chan struct{}) {
+	data, err := os.ReadFile(recordingFile)
+	if err != nil {
+		slog.Error("failed to read recording", "error", err)
+		r.releaseLock()
+		close(done)
+		return
+	}
+
+	var rec Recording
+	if err := json.Unmarshal(data, &rec); err != nil {
+		slog.Error("failed to parse recording", "error", err)
+		r.releaseLock()
+		close(done)
+		return
+	}
+
+	eventsDir := filepath.Join(runDir, "job_events")
+	os.MkdirAll(eventsDir, 0750)
+
+	var totalDuration time.Duration
+	if rec.Run.EndedAt != nil {
+		totalDuration = rec.Run.EndedAt.Sub(rec.Run.StartedAt)
+	}
+
+	var stdoutBuilder strings.Builder
+	for _, event := range rec.Events {
+		if r.demoSpeed > 0 && totalDuration > 0 && len(rec.Events) > 1 {
+			delay := time.Duration(float64(totalDuration) / float64(len(rec.Events)) / r.demoSpeed)
+			time.Sleep(delay)
+		}
+
+		var meta struct {
+			UUID    string `json:"uuid"`
+			Counter int    `json:"counter"`
+			Stdout  string `json:"stdout"`
+		}
+		json.Unmarshal(event, &meta)
+
+		filename := fmt.Sprintf("%03d-%s.json", meta.Counter, meta.UUID)
+		os.WriteFile(filepath.Join(eventsDir, filename), event, 0640)
+
+		if meta.Stdout != "" {
+			stdoutBuilder.WriteString(meta.Stdout)
+			stdoutBuilder.WriteString("\n")
+			os.WriteFile(filepath.Join(runDir, "stdout"), []byte(stdoutBuilder.String()), 0640)
+		}
+	}
+
+	os.WriteFile(filepath.Join(runDir, "stdout"), []byte(rec.Stdout), 0640)
+	os.WriteFile(filepath.Join(runDir, "stderr"), []byte(rec.Stderr), 0640)
+	os.WriteFile(filepath.Join(runDir, "status"), []byte(rec.Status), 0640)
+	os.WriteFile(filepath.Join(runDir, "rc"), []byte(fmt.Sprintf("%d", rec.RC)), 0640)
+
+	now := time.Now()
+	run.EndedAt = &now
+	switch rec.Status {
+	case "successful":
+		run.Status = models.TaskStatusSuccessful
+	default:
+		run.Status = models.TaskStatusFailed
+	}
+	run.ExitCode = &rec.RC
+	writeRunJSON(runDir, run)
+
+	slog.Info("demo task completed", "run_id", run.ID, "status", run.Status, "events", len(rec.Events))
+	r.releaseLock()
+	close(done)
+}
+
 func (r *AnsibleRunner) waitForCompletion(cmd *exec.Cmd, run *models.TaskRun, runDir string, done chan struct{}) {
 	_ = cmd.Wait()
 
@@ -198,92 +324,19 @@ func (r *AnsibleRunner) waitForCompletion(cmd *exec.Cmd, run *models.TaskRun, ru
 }
 
 func (r *AnsibleRunner) Get(id string) (*models.TaskRun, error) {
-	runDir := filepath.Join(r.artifactsDir, id)
-	run, err := readRunJSON(runDir)
-	if err != nil {
-		return nil, ErrNotFound
-	}
-	return run, nil
+	return artifactGet(r.artifactsDir, id)
 }
 
 func (r *AnsibleRunner) List() ([]models.TaskRun, error) {
-	entries, err := os.ReadDir(r.artifactsDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []models.TaskRun{}, nil
-		}
-		return nil, err
-	}
-
-	var runs []models.TaskRun
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		run, err := r.Get(entry.Name())
-		if err != nil {
-			continue
-		}
-		runs = append(runs, *run)
-	}
-
-	sort.Slice(runs, func(i, j int) bool {
-		return runs[i].StartedAt.After(runs[j].StartedAt)
-	})
-
-	return runs, nil
+	return artifactList(r.artifactsDir)
 }
 
 func (r *AnsibleRunner) Logs(id string) ([]byte, error) {
-	runDir := filepath.Join(r.artifactsDir, id)
-	if _, err := readRunJSON(runDir); err != nil {
-		return nil, ErrNotFound
-	}
-
-	data, err := os.ReadFile(filepath.Join(runDir, "stdout"))
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []byte{}, nil
-		}
-		return nil, err
-	}
-	return data, nil
+	return artifactLogs(r.artifactsDir, id)
 }
 
 func (r *AnsibleRunner) Events(id string) ([]json.RawMessage, error) {
-	runDir := filepath.Join(r.artifactsDir, id)
-	if _, err := readRunJSON(runDir); err != nil {
-		return nil, ErrNotFound
-	}
-
-	eventsDir := filepath.Join(runDir, "job_events")
-	entries, err := os.ReadDir(eventsDir)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []json.RawMessage{}, nil
-		}
-		return nil, err
-	}
-
-	sort.Slice(entries, func(i, j int) bool {
-		ni, _ := strconv.Atoi(strings.SplitN(entries[i].Name(), "-", 2)[0])
-		nj, _ := strconv.Atoi(strings.SplitN(entries[j].Name(), "-", 2)[0])
-		return ni < nj
-	})
-
-	var events []json.RawMessage
-	for _, entry := range entries {
-		if !strings.HasSuffix(entry.Name(), ".json") {
-			continue
-		}
-		data, err := os.ReadFile(filepath.Join(eventsDir, entry.Name()))
-		if err != nil {
-			continue
-		}
-		events = append(events, json.RawMessage(data))
-	}
-
-	return events, nil
+	return artifactEvents(r.artifactsDir, id)
 }
 
 func (r *AnsibleRunner) Delete(id string) error {
@@ -342,16 +395,16 @@ func (r *AnsibleRunner) Recover() error {
 		}
 
 		now := time.Now()
+		run.EndedAt = &now
 		arStatus := readAnsibleRunnerStatus(runDir)
 		if arStatus == "successful" || arStatus == "failed" {
 			run.Status = models.TaskStatus(arStatus)
-			run.EndedAt = &now
 			if rc, err := readAnsibleRunnerRC(runDir); err == nil {
 				run.ExitCode = &rc
 			}
-		} else {
+		}
+		if run.Status == models.TaskStatusRunning {
 			run.Status = models.TaskStatusFailed
-			run.EndedAt = &now
 			run.Error = "recovered after server restart: process no longer running"
 		}
 
