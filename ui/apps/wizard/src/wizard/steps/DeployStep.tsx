@@ -45,21 +45,41 @@ export const DeployStep: React.FC = () => {
   const tasksApi = useTasksApi();
   const [status, setStatus] = useState<DeployStatus>("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [errorDetails, setErrorDetails] = useState<string[]>([]);
   const [taskId, setTaskId] = useState<string | null>(null);
   const [taskDone, setTaskDone] = useState(false);
 
   const handleDeploy = useCallback(async () => {
     setStatus("writing");
     setErrorMessage("");
+    setErrorDetails([]);
     try {
       await api.writeConfig(buildFinalConfig(state));
       setStatus("deploying");
       const task = await tasksApi.startDeploy();
       setTaskId(task.id);
-    } catch (err) {
+    } catch (err: unknown) {
       setStatus("error");
+      const details: string[] = [];
+      if (err && typeof err === "object" && "response" in err) {
+        try {
+          const body = await (err as { response: Response }).response.json();
+          if (body.errors && Array.isArray(body.errors)) {
+            for (const e of body.errors) {
+              details.push(e.message ?? String(e));
+            }
+          } else if (body.detail) {
+            details.push(body.detail);
+          }
+        } catch {
+          // response not JSON
+        }
+      }
+      setErrorDetails(details);
       setErrorMessage(
-        err instanceof Error ? err.message : "Failed to start deployment",
+        details.length > 0
+          ? "Configuration validation failed"
+          : err instanceof Error ? err.message : "Failed to start deployment",
       );
     }
   }, [api, tasksApi, state]);
@@ -131,11 +151,17 @@ export const DeployStep: React.FC = () => {
         {status === "error" && (
           <Alert
             variant="danger"
-            title="Deployment failed to start"
+            title={errorMessage}
             isInline
             style={{ margin: "1rem 0" }}
           >
-            {errorMessage}
+            {errorDetails.length > 0 && (
+              <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>
+                {errorDetails.map((d, i) => (
+                  <li key={i}>{d}</li>
+                ))}
+              </ul>
+            )}
           </Alert>
         )}
 

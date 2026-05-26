@@ -21,7 +21,7 @@ run: build
 
 run-demo: build-ui
 	$(GO) build -ldflags="-w -s" -tags dev -o $(BINARY) .
-	./$(BINARY) --demo --enclave-dir ../enclave --tls-cert hack/tls/server.crt --tls-key hack/tls/server.key
+	./$(BINARY) --demo-deploy --enclave-dir ../enclave --tls-cert hack/tls/server.crt --tls-key hack/tls/server.key
 
 test:
 	$(GO) test -cover ./...
