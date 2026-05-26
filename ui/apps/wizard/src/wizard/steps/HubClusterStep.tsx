@@ -129,8 +129,18 @@ export const HubClusterStep: React.FC = () => {
       <FormGroup label="Pull Secret" isRequired fieldId="pull-secret">
         <TextArea
           id="pull-secret"
-          value={(globalData.pullSecret as string) ?? ""}
-          onChange={(_e, v) => onChange("global.pullSecret", v)}
+          value={
+            typeof globalData.pullSecret === "object" && globalData.pullSecret !== null
+              ? JSON.stringify(globalData.pullSecret, null, 2)
+              : (globalData.pullSecret as string) ?? ""
+          }
+          onChange={(_e, v) => {
+            try {
+              onChange("global.pullSecret", JSON.parse(v));
+            } catch {
+              onChange("global.pullSecret", v);
+            }
+          }}
           placeholder='{"auths":{}}'
           rows={4}
           isRequired
