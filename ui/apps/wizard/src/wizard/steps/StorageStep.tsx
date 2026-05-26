@@ -134,11 +134,13 @@ export const StorageStep: React.FC = () => {
     const nonStorage = enabledPlugins.filter((p) => !STORAGE_PLUGINS.includes(p));
     onChange("global.enabled_plugins", [...nonStorage, next]);
     onChange("global.storage_plugin", next);
-        if (next !== "odf") onChange("global.odfExternalConfig", "");
+    if (next !== "odf") {
+      onChange("global.odfExternalConfig", undefined);
+    }
     if (next !== "vast-csi") {
-      onChange("global.vastEndpoint", "");
-      onChange("global.vastAdminUsername", "");
-      onChange("global.vastAdminPassword", "");
+      onChange("global.vastEndpoint", undefined);
+      onChange("global.vastAdminUsername", undefined);
+      onChange("global.vastAdminPassword", undefined);
       onChange("global.vastVipPool", undefined);
     }
   };
