@@ -16,7 +16,7 @@ export const STEP_REQUIRED_FIELDS: Record<string, string[]> = {
     "global.defaultGateway",
     "global.defaultPrefix",
     "global.pullSecret",
-    "global.sshPubPath",
+    "global.sshPubKey",
     "global.agentHosts",
   ],
 };

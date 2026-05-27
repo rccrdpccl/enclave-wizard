@@ -17,7 +17,7 @@ type ClusterConfig struct {
 	IngressVIP        string      `json:"ingressVIP" yaml:"ingressVIP" doc:"Virtual IP for ingress wildcard" pattern:"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"`
 	RendezvousIP      string      `json:"rendezvousIP" yaml:"rendezvousIP" doc:"IP of first control-plane node" pattern:"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"`
 	PullSecret        any         `json:"pullSecret" yaml:"pullSecret" doc:"OpenShift pull secret object"`
-	SSHPubPath        string      `json:"sshPubPath" yaml:"sshPubPath" doc:"Path to SSH public key file" minLength:"1"`
+	SSHPubKey        string      `json:"sshPubKey,omitempty" yaml:"sshPubKey" doc:"SSH public key content (e.g. ssh-rsa AAAA...)" minLength:"1"`
 	AgentHosts        []HostEntry `json:"agent_hosts" yaml:"agent_hosts" doc:"Control plane nodes (exactly 3)" minItems:"3" maxItems:"3"`
 	DiskEncryption    *bool       `json:"diskEncryption,omitempty" yaml:"diskEncryption,omitempty" doc:"Enable TPM v2 disk encryption"`
 	DefaultNTPServers []string    `json:"defaultNtpServers,omitempty" yaml:"defaultNtpServers,omitempty" doc:"Additional NTP server addresses"`

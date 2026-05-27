@@ -27,7 +27,7 @@ CONFIG='{
     "disconnected": false,
     "enabled_plugins": ["lvms"],
     "pullSecret": {"auths":{}},
-    "sshPubPath": "/home/wizard/.ssh/id_rsa.pub",
+    "sshPubKey": "ssh-rsa AAAAB3test test@wizard",
     "agent_hosts": [
       {
         "name": "node-01",

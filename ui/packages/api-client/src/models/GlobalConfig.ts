@@ -223,7 +223,7 @@ export interface GlobalConfig {
      * @type {string}
      * @memberof GlobalConfig
      */
-    sshPubPath: string;
+    sshPubKey: string;
     /**
      * Storage plugin
      * @type {string}
@@ -319,7 +319,7 @@ export function instanceOfGlobalConfig(value: object): value is GlobalConfig {
     if (!('quayPassword' in value) || value['quayPassword'] === undefined) return false;
     if (!('quayUser' in value) || value['quayUser'] === undefined) return false;
     if (!('rendezvousIP' in value) || value['rendezvousIP'] === undefined) return false;
-    if (!('sshPubPath' in value) || value['sshPubPath'] === undefined) return false;
+    if (!('sshPubKey' in value) || value['sshPubKey'] === undefined) return false;
     if (!('workingDir' in value) || value['workingDir'] === undefined) return false;
     return true;
 }
@@ -360,7 +360,7 @@ export function GlobalConfigFromJSONTyped(json: any, ignoreDiscriminator: boolea
         'quayPassword': json['quayPassword'],
         'quayUser': json['quayUser'],
         'rendezvousIP': json['rendezvousIP'],
-        'sshPubPath': json['sshPubPath'],
+        'sshPubKey': json['sshPubKey'],
         'storagePlugin': json['storage_plugin'],
         'vastAdminPassword': json['vastAdminPassword'] == null ? undefined : json['vastAdminPassword'],
         'vastAdminUsername': json['vastAdminUsername'] == null ? undefined : json['vastAdminUsername'],
@@ -408,7 +408,7 @@ export function GlobalConfigToJSONTyped(value?: GlobalConfig | null, ignoreDiscr
         'quayPassword': value['quayPassword'],
         'quayUser': value['quayUser'],
         'rendezvousIP': value['rendezvousIP'],
-        'sshPubPath': value['sshPubPath'],
+        'sshPubKey': value['sshPubKey'],
         'storage_plugin': value['storagePlugin'],
         'vastAdminPassword': value['vastAdminPassword'],
         'vastAdminUsername': value['vastAdminUsername'],

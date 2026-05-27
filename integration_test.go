@@ -45,7 +45,7 @@ func testConfig() models.EnclaveConfig {
 				IngressVIP:     "192.168.2.11",
 				RendezvousIP:   "192.168.2.100",
 				PullSecret:     map[string]any{"auths": map[string]any{}},
-				SSHPubPath:     "/home/enclave/.ssh/id_rsa.pub",
+				SSHPubKey:     "ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAABAQ test@enclave",
 				AgentHosts: []models.HostEntry{
 					{
 						Name:            "cp-0",
@@ -153,7 +153,7 @@ func TestWriteConfig(t *testing.T) {
 		assertEqual(t, "defaultPrefix", cfg.Global.DefaultPrefix, got.DefaultPrefix)
 		assertEqual(t, "quayBackend", cfg.Global.QuayBackend, got.QuayBackend)
 		assertEqual(t, "storage_plugin", cfg.Global.StoragePlugin, got.StoragePlugin)
-		assertEqual(t, "sshPubPath", cfg.Global.SSHPubPath, got.SSHPubPath)
+		assertEqual(t, "sshPubKey", cfg.Global.SSHPubKey, got.SSHPubKey)
 		assertEqual(t, "agent_hosts count", len(cfg.Global.AgentHosts), len(got.AgentHosts))
 
 		for i, want := range cfg.Global.AgentHosts {
