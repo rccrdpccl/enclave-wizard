@@ -29,7 +29,6 @@ import { useOpenApiSchema } from "../schema/useOpenApiSchema.ts";
 import { STEP_REQUIRED_FIELDS } from "./stepFields.ts";
 import { CaasStep } from "./steps/CaasStep.tsx";
 import { DeployStep } from "./steps/DeployStep.tsx";
-import { GpuAiStep } from "./steps/GpuAiStep.tsx";
 import { HubClusterStep } from "./steps/HubClusterStep.tsx";
 import { LandingZoneStep } from "./steps/LandingZoneStep.tsx";
 import { ReviewStep } from "./steps/ReviewStep.tsx";
@@ -137,9 +136,6 @@ function buildConfigSubSteps(selectedFlavors: Set<string>): ConfigSubStep[] {
   if (selectedFlavors.has("cluster")) {
     subs.push({ id: "caas", label: "Cluster as a Service" });
   }
-  if (selectedFlavors.has("gpu-ai")) {
-    subs.push({ id: "gpu-ai", label: "GPU & AI" });
-  }
   return subs;
 }
 
@@ -153,8 +149,6 @@ function SubStepContent({ subStepId }: { subStepId: string }): React.ReactElemen
       return <HubClusterStep />;
     case "caas":
       return <CaasStep />;
-    case "gpu-ai":
-      return <GpuAiStep />;
     default:
       return <div>Unknown section</div>;
   }
@@ -281,7 +275,7 @@ function WizardContent(): React.ReactElement {
           dispatch({ type: "SET_FIELD", path: "global.storage_plugin", value: d.storagePlugin });
           dispatch({ type: "SET_FIELD", path: "global.defaultPrefix", value: 24 });
           dispatch({ type: "SET_FIELD", path: "global.quayBackend", value: "LocalStorage" });
-          dispatch({ type: "SET_FIELD", path: "global.enabled_plugins", value: ["lvms"] });
+          dispatch({ type: "SET_FIELD", path: "global.enabled_plugins", value: ["lvms", "nvidia-gpu", "openshift-ai"] });
         }
 
         if (pluginsResult.status === "fulfilled") {

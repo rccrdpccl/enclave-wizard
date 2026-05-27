@@ -1,4 +1,4 @@
-export type FlavorId = "cluster" | "gpu-ai";
+export type FlavorId = "cluster";
 
 export interface FlavorDefinition {
   id: FlavorId;
@@ -14,12 +14,5 @@ export const FLAVORS: FlavorDefinition[] = [
     description:
       "On-demand container clusters with built-in scalability, resilience, and lifecycle management.",
     plugins: [],
-  },
-  {
-    id: "gpu-ai",
-    title: "GPU & AI Workloads",
-    description:
-      "GPU-accelerated computing with NVIDIA GPU Operator and OpenShift AI platform.",
-    plugins: ["nvidia-gpu", "openshift-ai"],
   },
 ];

@@ -1,5 +1,5 @@
 import { Content, Flex, FlexItem, Title } from "@patternfly/react-core";
-import { ClusterIcon, CpuIcon } from "@patternfly/react-icons";
+import { ClusterIcon } from "@patternfly/react-icons";
 import type React from "react";
 import type { ReactNode } from "react";
 import { FlavorCard } from "../components/FlavorCard.tsx";
@@ -9,7 +9,6 @@ import { stepStyles } from "./stepStyles.ts";
 
 const FLAVOR_ICONS: Record<FlavorId, ReactNode> = {
   cluster: <ClusterIcon />,
-  "gpu-ai": <CpuIcon />,
 };
 
 export const SelectFlavorStep: React.FC = () => {
