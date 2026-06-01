@@ -2,6 +2,7 @@ import React, {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -35,6 +36,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     isAuthenticated: false,
     mustChangePassword: false,
   });
+
+  useEffect(() => {
+    fetch(`${getApiBasePath()}/api/v1/auth/mode`)
+      .then((res) => res.json())
+      .then((data: { noAuth?: boolean }) => {
+        if (data.noAuth) {
+          setState({
+            token: "no-auth",
+            isAuthenticated: true,
+            mustChangePassword: false,
+          });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const login = useCallback(async (password: string) => {
     const res = await fetch(`${getApiBasePath()}/api/v1/auth/login`, {

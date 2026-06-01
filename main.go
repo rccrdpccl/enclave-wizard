@@ -38,6 +38,7 @@ type Options struct {
 	EnclaveDir   string `help:"Path to the Enclave repository root" default:"../enclave"`
 	PasswordFile string `help:"Path to the password file" default:"/etc/enclave-wizard/password"`
 	LogLevel     string `help:"Log level (trace, debug, info, warn, error)" default:"info"`
+	NoAuth       bool   `help:"Disable authentication (local development only)" default:"false"`
 	DevOptions
 }
 
@@ -76,7 +77,7 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store, opts
 
 	validator := validation.NewValidator(enclaveDir, runner)
 
-	api.NewAuthHandler(authStore).Register(humaAPI)
+	api.NewAuthHandler(authStore, opts.NoAuth).Register(humaAPI)
 	api.NewConfigHandler(reader, writer, validator).Register(humaAPI)
 	api.NewDefaultsHandler(enclaveDir).Register(humaAPI)
 	api.NewPluginsHandler(registry).Register(humaAPI)
@@ -158,7 +159,7 @@ func main() {
 		}
 		setupUIHandler(mux)
 
-		handler := api.LoggingMiddleware(api.BearerAuthMiddleware(authStore)(mux))
+		handler := api.LoggingMiddleware(api.BearerAuthMiddleware(authStore, opts.NoAuth)(mux))
 
 		httpsServer := &http.Server{
 			Addr:    fmt.Sprintf(":%d", opts.HTTPSPort),
