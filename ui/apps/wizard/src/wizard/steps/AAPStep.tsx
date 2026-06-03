@@ -1,14 +1,15 @@
 import {
   Checkbox,
+  FileUpload,
   Form,
   FormGroup,
   FormHelperText,
   FormSelect,
   FormSelectOption,
-  TextInput,
   Title,
 } from "@patternfly/react-core";
 import type React from "react";
+import { useState } from "react";
 import { useWizard } from "../WizardContext.tsx";
 import { stepStyles } from "./stepStyles.ts";
 
@@ -24,15 +25,52 @@ function getValueByPath(obj: Record<string, unknown>, path: string): unknown {
 
 export const AAPStep: React.FC = () => {
   const { state, dispatch } = useWizard();
+  const [uploadFilename, setUploadFilename] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
   const onChange = (path: string, value: unknown) =>
     dispatch({ type: "SET_FIELD", path, value });
 
   const configData = state.configData as Record<string, unknown>;
   const aapDefaults = (getValueByPath(configData, "global.aapDefaults") ?? {}) as Record<string, unknown>;
+  const savedPath = (aapDefaults.aapLicenseFile as string) ?? "";
 
   const setAAP = (field: string, value: unknown) =>
     onChange(`global.aapDefaults.${field}`, value);
+
+  const handleFileChange = async (
+    _event: React.ChangeEvent<HTMLInputElement> | React.DragEvent<HTMLElement>,
+    file: File,
+  ) => {
+    setUploadFilename(file.name);
+    setUploadError("");
+    setUploading(true);
+
+    const form = new FormData();
+    form.append("file", file);
+    form.append("dest", "plugins/aap");
+
+    try {
+      const resp = await fetch("/api/v1/files", { method: "POST", body: form });
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(text || `Upload failed (${resp.status})`);
+      }
+      const data = await resp.json();
+      setAAP("aapLicenseFile", data.path);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleClear = () => {
+    setUploadFilename("");
+    setUploadError("");
+    setAAP("aapLicenseFile", undefined);
+  };
 
   return (
     <Form>
@@ -41,29 +79,39 @@ export const AAPStep: React.FC = () => {
       </Title>
 
       <Title headingLevel="h3" size="lg" className={stepStyles.firstSectionTitle}>
-        License
+        Subscription
       </Title>
 
       <FormGroup
-        label="License file path"
+        label="Subscription manifest"
         isRequired
-        fieldId="aap-license-file"
+        fieldId="aap-subscription-file"
       >
-        <TextInput
-          id="aap-license-file"
-          aria-label="AAP license file path"
-          value={(aapDefaults.aapLicenseFile as string) ?? ""}
-          onChange={(_e, v) => setAAP("aapLicenseFile", v)}
-          isRequired
+        <FileUpload
+          id="aap-subscription-file"
+          type="simple"
+          browseButtonText="Upload"
+          filename={uploadFilename || (savedPath ? savedPath.split("/").pop() ?? "" : "")}
+          isLoading={uploading}
+          onFileInputChange={handleFileChange}
+          onClearClick={handleClear}
           validated={
-            state.showValidation && !((aapDefaults.aapLicenseFile as string) ?? "").trim()
-              ? "error"
-              : "default"
+            state.showValidation && !savedPath.trim() ? "error" : "default"
           }
         />
-        <FormHelperText>
-          Path to the AAP license manifest.zip file on the Landing Zone.
-        </FormHelperText>
+        {uploadError && (
+          <FormHelperText>
+            <span className={stepStyles.validationError}>{uploadError}</span>
+          </FormHelperText>
+        )}
+        {!uploadError && savedPath && (
+          <FormHelperText>Uploaded to {savedPath}</FormHelperText>
+        )}
+        {!uploadError && !savedPath && (
+          <FormHelperText>
+            Upload the AAP subscription manifest.zip file.
+          </FormHelperText>
+        )}
       </FormGroup>
 
       <Title headingLevel="h3" size="lg" className={stepStyles.sectionTitle}>

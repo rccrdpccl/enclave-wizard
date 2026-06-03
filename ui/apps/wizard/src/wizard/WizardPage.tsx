@@ -383,7 +383,7 @@ function WizardContent(): React.ReactElement {
       const globalData = ((state.configData as Record<string, unknown>).global ?? {}) as Record<string, unknown>;
       const aapDefaults = (globalData.aapDefaults ?? {}) as Record<string, unknown>;
       if (!((aapDefaults.aapLicenseFile as string) ?? "").trim()) {
-        errors.push({ path: "global.aapDefaults.aapLicenseFile", label: "License file path", message: "AAP license file path is required" });
+        errors.push({ path: "global.aapDefaults.aapLicenseFile", label: "Subscription file path", message: "AAP subscription file path is required" });
       }
     }
 
