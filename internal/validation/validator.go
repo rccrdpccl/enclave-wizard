@@ -77,9 +77,16 @@ func writePluginValidationPlaybook(enclaveDir string) {
 	fmt.Println("Created plugin validation playbook wrapper")
 }
 
+func (v *Validator) Available() bool {
+	return v.available && v.runner != nil
+}
+
 func (v *Validator) Validate(cfg *models.EnclaveConfig) []models.ValidationError {
 	if !v.available {
 		return nil
+	}
+	if v.runner == nil {
+		return []models.ValidationError{{Message: "schema validation unavailable: ansible-runner not found"}}
 	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
