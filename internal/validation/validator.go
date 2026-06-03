@@ -85,6 +85,9 @@ func (v *Validator) Validate(cfg *models.EnclaveConfig) []models.ValidationError
 	if !v.Available() {
 		return []models.ValidationError{{Message: "schema validation unavailable: ansible-runner not found"}}
 	}
+	if v.runner == nil {
+		return []models.ValidationError{{Message: "schema validation unavailable: ansible-runner not found"}}
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 120*time.Second)
 	defer cancel()
