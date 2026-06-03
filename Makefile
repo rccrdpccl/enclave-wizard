@@ -2,7 +2,7 @@ BINARY := enclave-wizard
 GO := go
 CONTAINER_RUNTIME := $(shell command -v podman 2> /dev/null || echo docker)
 
-.PHONY: build build-linux build-ui run test lint clean tidy deploy teardown generate
+.PHONY: build build-linux build-ui run test lint clean tidy deploy teardown generate enclave-mock clean-enclave-mock run-mock
 
 build-ui:
 	$(CONTAINER_RUNTIME) run --rm -v $(PWD)/ui:/app:z -w /app node:22-alpine \
@@ -66,3 +66,18 @@ e2e-full: rpm
 	@test -n "$(TARGET)" || (echo "Usage: make e2e-full TARGET=root@host" && exit 1)
 	hack/e2e/run-e2e.sh --host $(TARGET)
 	$(MAKE) e2e-browser WIZARD_URL=https://$(shell echo $(TARGET) | cut -d@ -f2):3443
+
+ENCLAVE_MOCK_BRANCH ?= main
+ENCLAVE_MOCK_REPO ?= git@github.com:rccrdpccl/enclave.git
+
+enclave-mock:
+	python3 hack/generate-enclave-mock.py \
+		--branch $(ENCLAVE_MOCK_BRANCH) \
+		--repo $(ENCLAVE_MOCK_REPO)
+
+clean-enclave-mock:
+	rm -rf enclave-mock
+
+run-mock: build
+	./$(BINARY) --enclave-dir enclave-mock \
+		--tls-cert hack/tls/server.crt --tls-key hack/tls/server.key
