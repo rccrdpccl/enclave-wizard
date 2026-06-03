@@ -159,7 +159,15 @@ func main() {
 		}
 		setupUIHandler(mux)
 
-		handler := api.LoggingMiddleware(api.BearerAuthMiddleware(authStore, opts.NoAuth)(mux))
+		fileUpload := api.NewFileUploadHandler(opts.EnclaveDir)
+		var rootHandler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/api/v1/files" {
+				fileUpload.ServeHTTP(w, r)
+				return
+			}
+			mux.ServeHTTP(w, r)
+		})
+		handler := api.LoggingMiddleware(api.BearerAuthMiddleware(authStore, opts.NoAuth)(rootHandler))
 
 		httpsServer := &http.Server{
 			Addr:    fmt.Sprintf(":%d", opts.HTTPSPort),

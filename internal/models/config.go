@@ -66,6 +66,7 @@ type PluginsConfig struct {
 	LVMSConfig     *LVMSConfig `json:"lvmsDefaults,omitempty" yaml:"lvmsDefaults,omitempty" doc:"LVMS deployment configuration"`
 	ODFConfig      *ODFConfig  `json:"odfDefaults,omitempty" yaml:"odfDefaults,omitempty" doc:"ODF deployment configuration"`
 	VASTConfig     *VASTConfig `json:"vastDefaults,omitempty" yaml:"vastDefaults,omitempty" doc:"VAST CSI deployment defaults"`
+	AAPConfig      *AAPConfig  `json:"aapDefaults,omitempty" yaml:"aapDefaults,omitempty" doc:"AAP deployment configuration"`
 }
 
 type GlobalConfig struct {
