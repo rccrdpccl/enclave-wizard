@@ -2,7 +2,7 @@ BINARY := enclave-wizard
 GO := go
 CONTAINER_RUNTIME := $(shell command -v podman 2> /dev/null || echo docker)
 
-.PHONY: build build-linux build-ui run test lint clean tidy deploy teardown generate enclave-mock clean-enclave-mock run-mock
+.PHONY: build build-linux build-ui run test lint clean tidy deploy teardown generate enclave-mock clean-enclave-mock run-mock preview deploy-preview
 
 build-ui:
 	$(CONTAINER_RUNTIME) run --rm -v $(PWD)/ui:/app:z -w /app node:22-alpine \
@@ -23,6 +23,11 @@ run-demo: build-ui
 	$(GO) build -ldflags="-w -s" -tags dev -o $(BINARY) .
 	./$(BINARY) --demo-deploy --enclave-dir ../enclave --tls-cert hack/tls/server.crt --tls-key hack/tls/server.key
 
+preview: build-ui
+	$(CONTAINER_RUNTIME) run --rm -v $(PWD):/app:z -w /app golang:latest \
+		sh -c "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='-w -s' -tags dev -o $(BINARY) ."
+	hack/run-preview.sh $(PORT)
+
 test:
 	$(GO) test -cover ./...
 
@@ -41,6 +46,10 @@ generate:
 
 rpm: build-linux
 	hack/rpm/build-rpm.sh
+
+deploy-preview:
+	@test -n "$(TARGET)" || (echo "Usage: make deploy-preview TARGET=root@host [PORT=3443]" && exit 1)
+	hack/deploy-preview.sh $(TARGET) $(PORT)
 
 deploy: build-linux
 	@test -n "$(TARGET)" || (echo "Usage: make deploy TARGET=root@host" && exit 1)
