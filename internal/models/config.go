@@ -62,11 +62,12 @@ type StorageConfig struct {
 
 // Plugins
 type PluginsConfig struct {
-	EnabledPlugins []string    `json:"enabled_plugins,omitempty" yaml:"enabled_plugins,omitempty" doc:"Plugins to deploy"`
-	LVMSConfig     *LVMSConfig `json:"lvmsDefaults,omitempty" yaml:"lvmsDefaults,omitempty" doc:"LVMS deployment configuration"`
-	ODFConfig      *ODFConfig  `json:"odfDefaults,omitempty" yaml:"odfDefaults,omitempty" doc:"ODF deployment configuration"`
-	VASTConfig     *VASTConfig `json:"vastDefaults,omitempty" yaml:"vastDefaults,omitempty" doc:"VAST CSI deployment defaults"`
-	AAPConfig      *AAPConfig  `json:"aapDefaults,omitempty" yaml:"aapDefaults,omitempty" doc:"AAP deployment configuration"`
+	EnabledPlugins     []string            `json:"enabled_plugins,omitempty" yaml:"enabled_plugins,omitempty" doc:"Plugins to deploy"`
+	LVMSConfig         *LVMSConfig         `json:"lvmsDefaults,omitempty" yaml:"lvmsDefaults,omitempty" doc:"LVMS deployment configuration"`
+	ODFConfig          *ODFConfig          `json:"odfDefaults,omitempty" yaml:"odfDefaults,omitempty" doc:"ODF deployment configuration"`
+	VASTConfig         *VASTConfig         `json:"vastDefaults,omitempty" yaml:"vastDefaults,omitempty" doc:"VAST CSI deployment defaults"`
+	AAPConfig          *AAPConfig          `json:"aapDefaults,omitempty" yaml:"aapDefaults,omitempty" doc:"AAP deployment configuration"`
+	TrustManagerConfig *TrustManagerConfig `json:"trustManagerDefaults,omitempty" yaml:"trustManagerDefaults,omitempty" doc:"Trust-manager CA issuer configuration"`
 }
 
 type GlobalConfig struct {

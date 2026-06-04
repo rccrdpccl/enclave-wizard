@@ -51,6 +51,13 @@ type AAPConfig struct {
 	RouteTLSTermination  *string `json:"aap_route_tls_termination,omitempty" yaml:"aap_route_tls_termination,omitempty" doc:"TLS termination type for AAP routes" enum:"Edge,Passthrough,Reencrypt"`
 }
 
+// Trust-manager plugin configuration
+
+type TrustManagerConfig struct {
+	CAIssuerDuration    *string `json:"trust_manager_ca_issuer_duration,omitempty" yaml:"trust_manager_ca_issuer_duration,omitempty" doc:"CA certificate lifetime (e.g. 87600h for 10 years)"`
+	CAIssuerRenewBefore *string `json:"trust_manager_ca_issuer_renew_before,omitempty" yaml:"trust_manager_ca_issuer_renew_before,omitempty" doc:"How long before expiry to renew the CA (e.g. 8760h for 1 year)"`
+}
+
 // VAST CSI plugin configuration
 
 type VASTIPRange struct {
