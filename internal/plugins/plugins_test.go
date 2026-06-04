@@ -10,16 +10,20 @@ func testRegistry() *Registry {
 	return NewRegistry([]models.Plugin{
 		{Name: "lvms", Type: models.PluginTypeFoundation, Order: 10},
 		{Name: "odf", Type: models.PluginTypeFoundation, Order: 10},
-		{Name: "vast-csi", Type: models.PluginTypeFoundation, Order: 10},
+		{Name: "vast-csi", Type: models.PluginTypeAddon, Order: 10},
 		{Name: "nvidia-gpu", Type: models.PluginTypeAddon, Order: 110},
 		{Name: "openshift-ai", Type: models.PluginTypeAddon, Order: 100},
+		{Name: "aap", Type: models.PluginTypeAddon, Order: 103},
+		{Name: "authorino", Type: models.PluginTypeAddon, Order: 102},
+		{Name: "cnv", Type: models.PluginTypeAddon, Order: 104},
+		{Name: "trust-manager", Type: models.PluginTypeAddon, Order: 100},
 	})
 }
 
 func TestRegistryAll(t *testing.T) {
 	r := testRegistry()
-	if len(r.All()) != 5 {
-		t.Fatalf("expected 5 plugins, got %d", len(r.All()))
+	if len(r.All()) != 9 {
+		t.Fatalf("expected 9 plugins, got %d", len(r.All()))
 	}
 }
 
@@ -58,5 +62,21 @@ func TestValidateCombinationUnknown(t *testing.T) {
 	}
 	if errs[0].Message != "unknown plugin: bogus" {
 		t.Errorf("errs[0].Message = %s", errs[0].Message)
+	}
+}
+
+func TestValidateCombinationCNV(t *testing.T) {
+	r := testRegistry()
+	errs := r.ValidateCombination([]string{"lvms", "cnv"})
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for cnv, got %v", errs)
+	}
+}
+
+func TestValidateCombinationAuthorino(t *testing.T) {
+	r := testRegistry()
+	errs := r.ValidateCombination([]string{"lvms", "authorino"})
+	if len(errs) != 0 {
+		t.Errorf("expected no errors for authorino, got %v", errs)
 	}
 }
