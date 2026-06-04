@@ -30,6 +30,7 @@ import { STEP_REQUIRED_FIELDS } from "./stepFields.ts";
 import { AAPStep } from "./steps/AAPStep.tsx";
 import { CaasStep } from "./steps/CaasStep.tsx";
 import { DeployStep } from "./steps/DeployStep.tsx";
+import { TrustManagerStep } from "./steps/TrustManagerStep.tsx";
 import { HubClusterStep } from "./steps/HubClusterStep.tsx";
 import { LandingZoneStep } from "./steps/LandingZoneStep.tsx";
 import { ReviewStep } from "./steps/ReviewStep.tsx";
@@ -137,6 +138,9 @@ function buildConfigSubSteps(selectedFlavors: Set<string>, enabledPlugins: strin
   if (enabledPlugins.includes("aap")) {
     subs.push({ id: "aap", label: "AAP Config" });
   }
+  if (enabledPlugins.includes("trust-manager")) {
+    subs.push({ id: "trust-manager", label: "Trust Manager" });
+  }
   if (selectedFlavors.has("cluster")) {
     subs.push({ id: "caas", label: "Cluster as a Service" });
   }
@@ -153,6 +157,8 @@ function SubStepContent({ subStepId }: { subStepId: string }): React.ReactElemen
       return <HubClusterStep />;
     case "aap":
       return <AAPStep />;
+    case "trust-manager":
+      return <TrustManagerStep />;
     case "caas":
       return <CaasStep />;
     default:
