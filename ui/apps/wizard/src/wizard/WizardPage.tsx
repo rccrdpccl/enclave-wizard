@@ -148,7 +148,7 @@ function buildConfigSubSteps(selectedFlavors: Set<string>, enabledPlugins: strin
     subs.push({ id: "trust-manager", label: "Trust Manager" });
   }
   if (selectedFlavors.has("vmaas")) {
-    subs.push({ id: "gpu-ai", label: "GPU & AI" });
+    subs.push({ id: "gpu-ai", label: "GPU Compute" });
   }
   if (selectedFlavors.has("caas")) {
     subs.push({ id: "caas", label: "Cluster as a Service" });

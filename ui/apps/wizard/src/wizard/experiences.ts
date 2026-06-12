@@ -25,12 +25,11 @@ export const EXPERIENCES: Experience[] = [
     ],
   },
   {
-    id: "aiaas",
-    name: "AI as a Service",
-    description: "GPU-accelerated AI/ML workloads with OpenShift AI",
+    id: "gpu",
+    name: "GPU Compute",
+    description: "NVIDIA GPU Operator for GPU-accelerated workloads",
     plugins: [
       { name: "nvidia-gpu", order: 110, required: true },
-      { name: "openshift-ai", order: 100, required: true },
     ],
   },
 ];

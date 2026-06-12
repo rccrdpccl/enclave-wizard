@@ -10,7 +10,7 @@ import { getExperiencePlugins } from "../experiences.ts";
 import { useWizard } from "../WizardContext.tsx";
 import { stepStyles } from "./stepStyles.ts";
 
-const AI_PLUGINS = getExperiencePlugins("aiaas");
+const GPU_PLUGINS = getExperiencePlugins("gpu");
 
 export const GpuAiStep: React.FC = () => {
   const { state, dispatch } = useWizard();
@@ -21,11 +21,11 @@ export const GpuAiStep: React.FC = () => {
     ? (globalData.enabled_plugins as string[])
     : [];
 
-  const isEnabled = AI_PLUGINS.every((p) => enabledPlugins.includes(p));
+  const isEnabled = GPU_PLUGINS.every((p) => enabledPlugins.includes(p));
 
   const toggle = (checked: boolean) => {
     const current = new Set(enabledPlugins);
-    for (const p of AI_PLUGINS) {
+    for (const p of GPU_PLUGINS) {
       if (checked) current.add(p);
       else current.delete(p);
     }
@@ -40,41 +40,23 @@ export const GpuAiStep: React.FC = () => {
     <Flex direction={{ default: "column" }} gap={{ default: "gapLg" }}>
       <FlexItem>
         <Title headingLevel="h3" size="lg">
-          GPU & AI Workloads
+          GPU Compute
         </Title>
         <Content component="p" className={stepStyles.subtitle}>
-          Enable GPU-accelerated compute and AI/ML platform capabilities on
-          your virtual machine infrastructure.
+          Enable GPU-accelerated compute on your virtual machine
+          infrastructure.
         </Content>
       </FlexItem>
 
       <FlexItem>
         <Checkbox
-          id="enable-gpu-ai"
-          label="Enable GPU & AI support"
-          description="Installs the NVIDIA GPU Operator and OpenShift AI (RHOAI) for running ML/AI workloads on GPU-equipped nodes."
+          id="enable-gpu"
+          label="Enable NVIDIA GPU support"
+          description="Installs the NVIDIA GPU Operator for automatic driver and runtime provisioning on GPU-equipped nodes."
           isChecked={isEnabled}
           onChange={(_e, checked) => toggle(checked)}
         />
       </FlexItem>
-
-      {isEnabled && (
-        <FlexItem>
-          <Content component="p" className={stepStyles.subtitle}>
-            The following will be deployed:
-          </Content>
-          <Content component="ul" style={{ marginTop: "0.5rem" }}>
-            <Content component="li">
-              <strong>NVIDIA GPU Operator</strong> — automatic driver and
-              runtime provisioning for GPU nodes
-            </Content>
-            <Content component="li">
-              <strong>OpenShift AI</strong> — model serving, notebooks, and
-              data science pipelines
-            </Content>
-          </Content>
-        </FlexItem>
-      )}
     </Flex>
   );
 };
