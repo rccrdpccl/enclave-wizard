@@ -201,7 +201,19 @@ func (h *ConfigHandler) getConfig(_ context.Context, _ *struct{}) (*GetConfigOut
 
 func (h *ConfigHandler) writeConfig(_ context.Context, input *WriteConfigInput) (*struct{}, error) {
 	if h.validator.Available() {
-		if errs := h.validator.Validate(&input.Body); len(errs) > 0 {
+		// Strip OSAC plugin fields before validation — they go to config/plugins/osac.yaml,
+		// not global.yaml, and the enclave schema validator rejects unknown fields.
+		saved := input.Body.Global.PluginsConfig
+		input.Body.Global.PluginsConfig.OsacProfile = nil
+		input.Body.Global.PluginsConfig.OsacAapLicenseFile = nil
+		input.Body.Global.PluginsConfig.OsacBYODatabase = nil
+		input.Body.Global.PluginsConfig.OsacDatabaseUrl = nil
+
+		errs := h.validator.Validate(&input.Body)
+
+		input.Body.Global.PluginsConfig = saved
+
+		if len(errs) > 0 {
 			details := make([]error, len(errs))
 			for i, e := range errs {
 				details[i] = fmt.Errorf("%s: %s", e.Field, e.Message)

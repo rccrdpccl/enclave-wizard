@@ -63,6 +63,10 @@ type StorageConfig struct {
 // Plugins
 type PluginsConfig struct {
 	EnabledPlugins     []string            `json:"enabled_plugins,omitempty" yaml:"enabled_plugins,omitempty" doc:"Plugins to deploy"`
+	OsacProfile        *string             `json:"osacProfile,omitempty" yaml:"osacProfile,omitempty" doc:"OSAC deployment profile" enum:"development,caas,vmaas,bmaas"`
+	OsacAapLicenseFile *string             `json:"osacAapLicenseFile,omitempty" yaml:"osacAapLicenseFile,omitempty" doc:"Path to AAP license manifest.zip on the landing zone"`
+	OsacBYODatabase    *bool               `json:"osacBYODatabase,omitempty" yaml:"osacBYODatabase,omitempty" doc:"Use external PostgreSQL instead of built-in"`
+	OsacDatabaseUrl    *string             `json:"osacDatabaseUrl,omitempty" yaml:"osacDatabaseUrl,omitempty" doc:"PostgreSQL connection URL when using BYO database"`
 	LVMSConfig         *LVMSConfig         `json:"lvmsDefaults,omitempty" yaml:"lvmsDefaults,omitempty" doc:"LVMS deployment configuration"`
 	ODFConfig          *ODFConfig          `json:"odfDefaults,omitempty" yaml:"odfDefaults,omitempty" doc:"ODF deployment configuration"`
 	VASTConfig         *VASTConfig         `json:"vastDefaults,omitempty" yaml:"vastDefaults,omitempty" doc:"VAST CSI deployment defaults"`
