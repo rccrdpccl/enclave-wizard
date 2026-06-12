@@ -7,6 +7,7 @@ import {
 import {
   ClusterIcon,
   CubesIcon,
+  ServerIcon,
 } from "@patternfly/react-icons";
 import type React from "react";
 import type { ReactNode } from "react";
@@ -18,6 +19,7 @@ import { stepStyles } from "./stepStyles.ts";
 const FLAVOR_ICONS: Record<FlavorId, ReactNode> = {
   caas: <ClusterIcon />,
   vmaas: <CubesIcon />,
+  bmaas: <ServerIcon />,
 };
 
 export const SelectFlavorStep: React.FC = () => {

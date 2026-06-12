@@ -137,7 +137,7 @@ const BASE_CONFIG_SUBSTEPS: ConfigSubStep[] = [
 
 function buildConfigSubSteps(selectedFlavors: Set<string>, enabledPlugins: string[]): ConfigSubStep[] {
   const subs = [...BASE_CONFIG_SUBSTEPS];
-  const hasOsac = selectedFlavors.has("caas") || selectedFlavors.has("vmaas");
+  const hasOsac = selectedFlavors.has("caas") || selectedFlavors.has("vmaas") || selectedFlavors.has("bmaas");
   if (hasOsac) {
     subs.push({ id: "osac", label: "OSAC Platform" });
   }

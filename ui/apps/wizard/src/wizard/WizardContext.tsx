@@ -86,10 +86,10 @@ export function wizardReducer(
           else allPlugins.delete(p);
         }
       }
+      const selected = FLAVORS.filter((f) => nextFlavors.has(f.id));
       let osacProfile = "";
-      if (nextFlavors.has("caas") && nextFlavors.has("vmaas")) osacProfile = "development";
-      else if (nextFlavors.has("caas")) osacProfile = "caas";
-      else if (nextFlavors.has("vmaas")) osacProfile = "vmaas";
+      if (selected.length > 1) osacProfile = "development";
+      else if (selected.length === 1) osacProfile = selected[0].osacProfile;
 
       let updated = setNestedField(
         { ...state.configData } as Record<string, unknown>,

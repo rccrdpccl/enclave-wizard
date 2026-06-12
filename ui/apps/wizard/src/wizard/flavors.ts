@@ -1,6 +1,6 @@
 import { getExperiencePlugins } from "./experiences.ts";
 
-export type FlavorId = "caas" | "vmaas";
+export type FlavorId = "caas" | "vmaas" | "bmaas";
 
 export interface FlavorAddon {
   id: string;
@@ -41,6 +41,16 @@ export const FLAVORS: FlavorDefinition[] = [
     osacProfile: "vmaas",
     experienceId: "osac",
     extraPlugins: ["cnv"],
+  },
+  {
+    id: "bmaas",
+    title: "BMaaS",
+    subtitle: "Bare Metal as a Service",
+    description:
+      "Provision and manage bare metal servers on demand. Automated hardware lifecycle from discovery to decommissioning via Metal3 and Ironic.",
+    osacProfile: "bmaas",
+    experienceId: "osac",
+    extraPlugins: [],
   },
 ];
 
