@@ -90,3 +90,12 @@ clean-enclave-mock:
 run-mock: build
 	./$(BINARY) --enclave-dir enclave-mock \
 		--tls-cert hack/tls/server.crt --tls-key hack/tls/server.key
+
+dev: build-ui
+	@mkdir -p hack/tls
+	@test -f hack/tls/server.crt || openssl req -new -x509 -nodes -days 365 \
+		-subj "/CN=localhost" -keyout hack/tls/server.key -out hack/tls/server.crt 2>/dev/null
+	$(GO) build -ldflags="-w -s" -tags dev -o $(BINARY) .
+	./$(BINARY) --no-auth --enclave-dir enclave-mock \
+		--password-file /tmp/enclave-wizard-dev-pass \
+		--tls-cert hack/tls/server.crt --tls-key hack/tls/server.key
