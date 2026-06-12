@@ -31,6 +31,8 @@ tar xzf %{SOURCE0} --strip-components=1 -C %{buildroot}/opt/enclave
 ENCLAVE_DIR="/opt/enclave"
 export HOME="${ENCLAVE_DIR}"
 export PATH="${HOME}/.local/bin:${PATH}"
+export XDG_DATA_HOME="${HOME}/.local/share"
+export XDG_CACHE_HOME="${HOME}/.cache"
 
 # Create config from examples if not present
 for f in "${ENCLAVE_DIR}/config/"*.example.yaml; do
