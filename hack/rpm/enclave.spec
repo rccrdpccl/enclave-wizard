@@ -8,8 +8,6 @@ BuildArch:      noarch
 
 Source0:        enclave-repo.tar.gz
 
-Requires:       ansible-core
-Requires:       python3-pip
 Requires:       curl
 Requires:       openssl
 Requires:       jq
@@ -31,6 +29,8 @@ tar xzf %{SOURCE0} --strip-components=1 -C %{buildroot}/opt/enclave
 
 %post
 ENCLAVE_DIR="/opt/enclave"
+export HOME="${ENCLAVE_DIR}"
+export PATH="${HOME}/.local/bin:${PATH}"
 
 # Create config from examples if not present
 for f in "${ENCLAVE_DIR}/config/"*.example.yaml; do
@@ -39,26 +39,18 @@ for f in "${ENCLAVE_DIR}/config/"*.example.yaml; do
     [ -f "${target}" ] || cp "${f}" "${target}"
 done
 
-# Install ansible-runner and collections
-echo "Installing ansible-runner..."
-pip3 install ansible-runner 2>&1 | tail -3
+# Run enclave's ansible setup (installs uv, Python 3.12, all deps in isolation)
+# setup_env.sh is skipped — RPM Requires handles system packages
+echo "Running enclave ansible setup..."
+cd "${ENCLAVE_DIR}"
+bash ./setup_ansible.sh 2>&1 | tail -5
 
-echo "Installing Ansible collections..."
-ansible-galaxy collection install \
-    -p /usr/share/ansible/collections \
-    ansible.utils \
-    ansible.posix \
-    community.general \
-    community.crypto \
-    containers.podman \
-    kubernetes.core \
-    2>&1 | tail -5
-
-echo "Installing Python dependencies..."
-pip3 install kubernetes 2>&1 | tail -3
-if [ -f "${ENCLAVE_DIR}/requirements.txt" ]; then
-    pip3 install -r "${ENCLAVE_DIR}/requirements.txt" 2>&1 | tail -3
-fi
+# Re-install with ansible-runner in the same venv so it shares all deps (kubernetes, etc.)
+echo "Adding ansible-runner to enclave environment..."
+"${HOME}/.local/bin/uv" tool install --force . \
+    --with-executables-from ansible-core \
+    --with-executables-from ansible-runner \
+    --with ansible-runner 2>&1 | tail -3
 
 echo "Enclave installed at ${ENCLAVE_DIR}"
 

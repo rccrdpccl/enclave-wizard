@@ -5,6 +5,7 @@ After=network-online.target
 [Service]
 Environment=HOME=/opt/enclave
 Environment=XDG_CACHE_HOME=/opt/enclave/.cache
+Environment=PATH=/opt/enclave/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/usr/local/bin/enclave-wizard --enclave-dir /opt/enclave --password-file /etc/enclave-wizard/password
 Restart=on-failure
 RestartSec=5
