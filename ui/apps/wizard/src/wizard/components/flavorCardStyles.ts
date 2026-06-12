@@ -6,6 +6,7 @@ export const flavorCardStyles = {
     cursor: pointer;
     transition: border-color 0.15s ease, box-shadow 0.15s ease;
     box-shadow: ${isSelected ? "0 0 0 1px var(--pf-t--global--color--brand--default)" : "none"};
+    height: 100%;
   `,
 
   body: css`

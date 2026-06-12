@@ -38,9 +38,9 @@ export const SelectFlavorStep: React.FC = () => {
         </Content>
       </FlexItem>
       <FlexItem>
-        <Flex gap={{ default: "gapMd" }} flexWrap={{ default: "wrap" }}>
+        <Flex gap={{ default: "gapMd" }} flexWrap={{ default: "wrap" }} alignItems={{ default: "alignItemsStretch" }}>
           {FLAVORS.map((flavor) => (
-            <FlexItem key={flavor.id} style={{ minWidth: 280, flex: 1 }}>
+            <FlexItem key={flavor.id} style={{ minWidth: 240, flex: "1 1 0" }}>
               <FlavorCard
                 title={flavor.title}
                 subtitle={flavor.subtitle}
