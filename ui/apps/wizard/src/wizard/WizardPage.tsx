@@ -141,7 +141,7 @@ function buildConfigSubSteps(selectedFlavors: Set<string>, enabledPlugins: strin
   if (enabledPlugins.includes("trust-manager")) {
     subs.push({ id: "trust-manager", label: "Trust Manager" });
   }
-  if (selectedFlavors.has("cluster")) {
+  if (selectedFlavors.has("caas")) {
     subs.push({ id: "caas", label: "Cluster as a Service" });
   }
   return subs;
@@ -292,7 +292,7 @@ function WizardContent(): React.ReactElement {
           dispatch({ type: "SET_FIELD", path: "global.storage_plugin", value: d.storagePlugin });
           dispatch({ type: "SET_FIELD", path: "global.defaultPrefix", value: 24 });
           dispatch({ type: "SET_FIELD", path: "global.quayBackend", value: "LocalStorage" });
-          dispatch({ type: "SET_FIELD", path: "global.enabled_plugins", value: ["lvms", "nvidia-gpu", "openshift-ai"] });
+          dispatch({ type: "SET_FIELD", path: "global.enabled_plugins", value: ["lvms"] });
         }
 
         if (pluginsResult.status === "fulfilled") {

@@ -1,6 +1,6 @@
 import type React from "react";
 import { createContext, useContext, useReducer } from "react";
-import type { FlavorId } from "./flavors.ts";
+import { FLAVORS, type FlavorId } from "./flavors.ts";
 
 export interface ValidationError {
   field: string;
@@ -74,8 +74,26 @@ export function wizardReducer(
   switch (action.type) {
     case "SET_STEP":
       return { ...state, currentStep: action.step };
-    case "TOGGLE_FLAVOR":
-      return { ...state, selectedFlavors: toggleFlavor(state.selectedFlavors, action.flavor) };
+    case "TOGGLE_FLAVOR": {
+      const nextFlavors = toggleFlavor(state.selectedFlavors, action.flavor);
+      const flavorDef = FLAVORS.find((f) => f.id === action.flavor);
+      const currentPlugins = new Set(
+        ((state.configData as Record<string, unknown>).global as Record<string, unknown> | undefined)
+          ?.enabled_plugins as string[] ?? [],
+      );
+      if (flavorDef) {
+        for (const p of flavorDef.plugins) {
+          if (nextFlavors.has(action.flavor)) currentPlugins.add(p);
+          else currentPlugins.delete(p);
+        }
+      }
+      const configData = setNestedField(
+        { ...state.configData } as Record<string, unknown>,
+        ["global", "enabled_plugins"],
+        [...currentPlugins],
+      ) as ConfigData;
+      return { ...state, selectedFlavors: nextFlavors, configData };
+    }
     case "SET_FIELD": {
       const keys = action.path.split(".");
       const configData = setNestedField(
