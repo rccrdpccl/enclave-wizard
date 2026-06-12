@@ -169,6 +169,7 @@ for i in $(seq 0 $((NUM_MASTERS - 1))); do
     --ram=${VM_RAM} --vcpus=${VM_CPUS} \
     --network network="${NET_NAME}",mac="${VM_MAC}" \
     --disk size=${VM_DISK_GB},bus=scsi,sparse=yes \
+    --disk size=${VM_DISK_GB},bus=scsi,sparse=yes \
     --check disk_size=off --noautoconsole 2>&1 | tail -1
 
   # Stop VM — Ironic will boot it via Redfish
