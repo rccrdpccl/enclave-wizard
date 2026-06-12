@@ -28,7 +28,7 @@ SUSHY_DIR="/root/sushy-enclave"
 
 VM_PREFIX="enclave-cp"
 VM_RAM=32768
-VM_CPUS=8
+VM_CPUS=16
 VM_DISK_GB=120
 VM_MAC_PREFIX="00:60:2f:e0:c1"
 
