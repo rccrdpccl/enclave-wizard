@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Set up bare metal emulation on a hypervisor host for enclave deployment testing.
-# Creates a libvirt network, sushy-tools (Redfish BMC emulator), and UEFI VMs.
+# Creates a libvirt network, sushy-tools (Redfish BMC emulator), and VMs.
 # Idempotent — safe to re-run.
 #
 # Usage: ./setup-bm-emulation.sh [options]
@@ -116,6 +116,7 @@ SUSHY_EMULATOR_LISTEN_IP = "${NET_GATEWAY}"
 SUSHY_EMULATOR_LISTEN_PORT = ${BMC_PORT}
 SUSHY_EMULATOR_SSL_CERT = "/etc/sushy/sushy.crt"
 SUSHY_EMULATOR_SSL_KEY = "/etc/sushy/sushy.key"
+SUSHY_EMULATOR_IGNORE_BOOT_DEVICE = True
 EOF
 
 podman stop "${SUSHY_CONTAINER}" 2>/dev/null || true
@@ -152,7 +153,7 @@ nft insert rule ip filter LIBVIRT_FWO iifname "${NET_BRIDGE}" accept 2>/dev/null
 info "nftables rules added for ${NET_BRIDGE}"
 
 # --- Step 4: Create VMs ---
-info "Creating ${NUM_MASTERS} UEFI VMs..."
+info "Creating ${NUM_MASTERS} VMs..."
 
 for i in $(seq 0 $((NUM_MASTERS - 1))); do
   VM_NAME="${VM_PREFIX}-${i}"
@@ -164,11 +165,10 @@ for i in $(seq 0 $((NUM_MASTERS - 1))); do
   fi
 
   virt-install -n "${VM_NAME}" \
-    --os-variant=rhel8.0 \
+    --pxe --os-variant=rhel8.0 \
     --ram=${VM_RAM} --vcpus=${VM_CPUS} \
     --network network="${NET_NAME}",mac="${VM_MAC}" \
     --disk size=${VM_DISK_GB},bus=scsi,sparse=yes \
-    --boot uefi,hd,cdrom,network \
     --check disk_size=off --noautoconsole 2>&1 | tail -1
 
   # Stop VM — Ironic will boot it via Redfish
