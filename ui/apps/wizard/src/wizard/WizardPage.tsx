@@ -30,6 +30,7 @@ import { STEP_REQUIRED_FIELDS } from "./stepFields.ts";
 import { AAPStep } from "./steps/AAPStep.tsx";
 import { CaasStep } from "./steps/CaasStep.tsx";
 import { DeployStep } from "./steps/DeployStep.tsx";
+import { GpuAiStep } from "./steps/GpuAiStep.tsx";
 import { OsacStep } from "./steps/OsacStep.tsx";
 import { TrustManagerStep } from "./steps/TrustManagerStep.tsx";
 import { HubClusterStep } from "./steps/HubClusterStep.tsx";
@@ -146,6 +147,9 @@ function buildConfigSubSteps(selectedFlavors: Set<string>, enabledPlugins: strin
   if (enabledPlugins.includes("trust-manager") && !hasOsac) {
     subs.push({ id: "trust-manager", label: "Trust Manager" });
   }
+  if (selectedFlavors.has("vmaas")) {
+    subs.push({ id: "gpu-ai", label: "GPU & AI" });
+  }
   if (selectedFlavors.has("caas")) {
     subs.push({ id: "caas", label: "Cluster as a Service" });
   }
@@ -162,6 +166,8 @@ function SubStepContent({ subStepId }: { subStepId: string }): React.ReactElemen
       return <HubClusterStep />;
     case "osac":
       return <OsacStep />;
+    case "gpu-ai":
+      return <GpuAiStep />;
     case "aap":
       return <AAPStep />;
     case "trust-manager":

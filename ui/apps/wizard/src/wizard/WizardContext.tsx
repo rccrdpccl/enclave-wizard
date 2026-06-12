@@ -1,6 +1,6 @@
 import type React from "react";
 import { createContext, useContext, useReducer } from "react";
-import { FLAVORS, type FlavorId } from "./flavors.ts";
+import { FLAVORS, getFlavorPlugins, type FlavorId } from "./flavors.ts";
 
 export interface ValidationError {
   field: string;
@@ -81,7 +81,7 @@ export function wizardReducer(
           ?.enabled_plugins as string[] ?? [],
       );
       for (const f of FLAVORS) {
-        for (const p of f.plugins) {
+        for (const p of getFlavorPlugins(f)) {
           if (nextFlavors.has(f.id)) allPlugins.add(p);
           else allPlugins.delete(p);
         }

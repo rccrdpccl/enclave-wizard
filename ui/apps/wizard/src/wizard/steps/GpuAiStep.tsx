@@ -1,93 +1,80 @@
 import {
   Checkbox,
   Content,
-  Form,
+  Flex,
+  FlexItem,
   Title,
 } from "@patternfly/react-core";
 import type React from "react";
+import { getExperiencePlugins } from "../experiences.ts";
 import { useWizard } from "../WizardContext.tsx";
 import { stepStyles } from "./stepStyles.ts";
 
-const GPU_AI_PLUGINS = [
-  {
-    id: "nvidia-gpu",
-    label: "NVIDIA GPU Operator",
-    description:
-      "Manages NVIDIA GPU drivers, device plugins, and monitoring on OpenShift nodes.",
-    required: true,
-  },
-  {
-    id: "openshift-ai",
-    label: "OpenShift AI (RHOAI)",
-    description:
-      "AI/ML platform for model training, serving, and inference workflows.",
-    required: false,
-  },
-];
+const AI_PLUGINS = getExperiencePlugins("aiaas");
 
 export const GpuAiStep: React.FC = () => {
   const { state, dispatch } = useWizard();
 
-  const configData = state.configData as Record<string, unknown>;
-  const globalData = (configData.global ?? {}) as Record<string, unknown>;
-  const enabledPlugins: string[] = Array.isArray(globalData.enabled_plugins)
+  const globalData = ((state.configData as Record<string, unknown>).global ??
+    {}) as Record<string, unknown>;
+  const enabledPlugins = Array.isArray(globalData.enabled_plugins)
     ? (globalData.enabled_plugins as string[])
-    : ["lvms"];
+    : [];
 
-  const enabledSet = new Set(enabledPlugins);
+  const isEnabled = AI_PLUGINS.every((p) => enabledPlugins.includes(p));
 
-  const togglePlugin = (pluginId: string) => {
-    const next = new Set(enabledSet);
-    if (next.has(pluginId)) {
-      next.delete(pluginId);
-      if (pluginId === "nvidia-gpu") {
-        next.delete("openshift-ai");
-      }
-    } else {
-      next.add(pluginId);
-      if (pluginId === "openshift-ai") {
-        next.add("nvidia-gpu");
-      }
+  const toggle = (checked: boolean) => {
+    const current = new Set(enabledPlugins);
+    for (const p of AI_PLUGINS) {
+      if (checked) current.add(p);
+      else current.delete(p);
     }
     dispatch({
       type: "SET_FIELD",
       path: "global.enabled_plugins",
-      value: [...next],
+      value: [...current],
     });
   };
 
   return (
-    <Form>
-      <Title headingLevel="h2" size="xl">
-        GPU & AI Configuration
-      </Title>
-      <Content component="p" className={stepStyles.subtitle}>
-        Select which GPU and AI components to deploy on the hub cluster.
-      </Content>
+    <Flex direction={{ default: "column" }} gap={{ default: "gapLg" }}>
+      <FlexItem>
+        <Title headingLevel="h3" size="lg">
+          GPU & AI Workloads
+        </Title>
+        <Content component="p" className={stepStyles.subtitle}>
+          Enable GPU-accelerated compute and AI/ML platform capabilities on
+          your virtual machine infrastructure.
+        </Content>
+      </FlexItem>
 
-      <div style={{ marginTop: "1rem" }}>
-        {GPU_AI_PLUGINS.map((plugin) => {
-          const checked = enabledSet.has(plugin.id);
-          const autoSelected =
-            plugin.id === "nvidia-gpu" && enabledSet.has("openshift-ai");
-          return (
-            <Checkbox
-              key={plugin.id}
-              id={`gpu-ai-${plugin.id}`}
-              label={plugin.label}
-              description={
-                autoSelected
-                  ? `${plugin.description} (required by OpenShift AI)`
-                  : plugin.description
-              }
-              isChecked={checked || autoSelected}
-              isDisabled={autoSelected}
-              onChange={() => togglePlugin(plugin.id)}
-              style={{ marginBottom: "0.75rem" }}
-            />
-          );
-        })}
-      </div>
-    </Form>
+      <FlexItem>
+        <Checkbox
+          id="enable-gpu-ai"
+          label="Enable GPU & AI support"
+          description="Installs the NVIDIA GPU Operator and OpenShift AI (RHOAI) for running ML/AI workloads on GPU-equipped nodes."
+          isChecked={isEnabled}
+          onChange={(_e, checked) => toggle(checked)}
+        />
+      </FlexItem>
+
+      {isEnabled && (
+        <FlexItem>
+          <Content component="p" className={stepStyles.subtitle}>
+            The following will be deployed:
+          </Content>
+          <Content component="ul" style={{ marginTop: "0.5rem" }}>
+            <Content component="li">
+              <strong>NVIDIA GPU Operator</strong> — automatic driver and
+              runtime provisioning for GPU nodes
+            </Content>
+            <Content component="li">
+              <strong>OpenShift AI</strong> — model serving, notebooks, and
+              data science pipelines
+            </Content>
+          </Content>
+        </FlexItem>
+      )}
+    </Flex>
   );
 };

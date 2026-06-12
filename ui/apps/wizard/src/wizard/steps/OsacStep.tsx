@@ -1,13 +1,17 @@
 import {
   Content,
+  FileUpload,
   Flex,
   FlexItem,
   FormGroup,
+  HelperText,
+  HelperTextItem,
   Radio,
   TextInput,
   Title,
 } from "@patternfly/react-core";
 import type React from "react";
+import { useCallback, useState } from "react";
 import { useWizard } from "../WizardContext.tsx";
 import { stepStyles } from "./stepStyles.ts";
 
@@ -21,8 +25,46 @@ export const OsacStep: React.FC = () => {
   const byoDatabase = (globalData.osacBYODatabase as boolean) ?? false;
   const databaseUrl = (globalData.osacDatabaseUrl as string) ?? "";
 
+  const [uploadFilename, setUploadFilename] = useState("");
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+
   const setField = (field: string, value: unknown) =>
     dispatch({ type: "SET_FIELD", path: `global.${field}`, value });
+
+  const handleFileUpload = useCallback(
+    async (_e: unknown, file: File) => {
+      setUploadError("");
+      setUploading(true);
+      setUploadFilename(file.name);
+      try {
+        const formData = new FormData();
+        formData.append("file", file);
+        formData.append("dest", "plugins");
+        const resp = await fetch("/api/v1/files", {
+          method: "POST",
+          body: formData,
+        });
+        if (!resp.ok) {
+          throw new Error(await resp.text());
+        }
+        const { path } = (await resp.json()) as { path: string };
+        setField("osacAapLicenseFile", path);
+      } catch (err) {
+        setUploadError(
+          err instanceof Error ? err.message : "Upload failed",
+        );
+      } finally {
+        setUploading(false);
+      }
+    },
+    [setField],
+  );
+
+  const handleFileClear = useCallback(() => {
+    setUploadFilename("");
+    setField("osacAapLicenseFile", "");
+  }, [setField]);
 
   return (
     <Flex direction={{ default: "column" }} gap={{ default: "gapLg" }}>
@@ -36,7 +78,7 @@ export const OsacStep: React.FC = () => {
       </FlexItem>
 
       <FlexItem>
-        <FormGroup label="Deployment profile" isRequired fieldId="osac-profile">
+        <FormGroup label="Deployment profile" fieldId="osac-profile">
           <Flex direction={{ default: "column" }} gap={{ default: "gapSm" }}>
             <Radio
               id="profile-development"
@@ -44,7 +86,7 @@ export const OsacStep: React.FC = () => {
               label="Development (CaaS + VMaaS)"
               description="Full stack with cluster and VM management"
               isChecked={osacProfile === "development"}
-              onChange={() => setField("osacProfile", "development")}
+              onChange={() => {}}
               isDisabled
             />
             <Radio
@@ -53,7 +95,7 @@ export const OsacStep: React.FC = () => {
               label="CaaS"
               description="Cluster ordering and lifecycle management"
               isChecked={osacProfile === "caas"}
-              onChange={() => setField("osacProfile", "caas")}
+              onChange={() => {}}
               isDisabled
             />
             <Radio
@@ -62,13 +104,15 @@ export const OsacStep: React.FC = () => {
               label="VMaaS"
               description="Virtual machine provisioning and management"
               isChecked={osacProfile === "vmaas"}
-              onChange={() => setField("osacProfile", "vmaas")}
+              onChange={() => {}}
               isDisabled
             />
           </Flex>
-          <Content component="small" className={stepStyles.subtitle}>
-            Profile is set automatically based on selected services.
-          </Content>
+          <HelperText>
+            <HelperTextItem>
+              Profile is set automatically based on selected services.
+            </HelperTextItem>
+          </HelperText>
         </FormGroup>
       </FlexItem>
 
@@ -77,27 +121,48 @@ export const OsacStep: React.FC = () => {
           label="AAP subscription file"
           isRequired
           fieldId="aap-license"
-          helperText="Path to the AAP license manifest.zip on the landing zone. Obtain from access.redhat.com/management/subscription_allocations"
         >
-          <TextInput
-            id="aap-license"
-            value={aapLicenseFile}
-            onChange={(_e, val) => setField("osacAapLicenseFile", val)}
-            placeholder="/path/to/aap-license.zip"
+          <FileUpload
+            id="aap-license-upload"
+            type="dataURL"
+            filename={uploadFilename || (aapLicenseFile ? aapLicenseFile.split("/").pop() : "")}
+            filenamePlaceholder="Upload your AAP license manifest.zip"
+            onFileInputChange={(_e, file) => handleFileUpload(_e, file)}
+            onClearClick={handleFileClear}
+            isLoading={uploading}
+            browseButtonText="Upload"
             validated={
               state.showValidation && !aapLicenseFile.trim()
                 ? "error"
-                : "default"
+                : uploadError
+                  ? "error"
+                  : "default"
             }
           />
+          {uploadError && (
+            <HelperText>
+              <HelperTextItem variant="error">{uploadError}</HelperTextItem>
+            </HelperText>
+          )}
+          {aapLicenseFile && !uploadError && (
+            <HelperText>
+              <HelperTextItem variant="success">
+                Saved to: {aapLicenseFile}
+              </HelperTextItem>
+            </HelperText>
+          )}
+          {!aapLicenseFile && !uploadError && (
+            <HelperText>
+              <HelperTextItem>
+                Obtain from access.redhat.com/management/subscription_allocations
+              </HelperTextItem>
+            </HelperText>
+          )}
         </FormGroup>
       </FlexItem>
 
       <FlexItem>
-        <FormGroup
-          label="Database"
-          fieldId="byo-database"
-        >
+        <FormGroup label="Database" fieldId="byo-database">
           <Flex direction={{ default: "column" }} gap={{ default: "gapSm" }}>
             <Radio
               id="db-builtin"
@@ -125,7 +190,6 @@ export const OsacStep: React.FC = () => {
             label="Database URL"
             isRequired
             fieldId="database-url"
-            helperText="PostgreSQL connection string"
           >
             <TextInput
               id="database-url"

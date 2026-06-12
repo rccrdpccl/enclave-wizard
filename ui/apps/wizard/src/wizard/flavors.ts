@@ -1,4 +1,14 @@
+import { getExperiencePlugins } from "./experiences.ts";
+
 export type FlavorId = "caas" | "vmaas";
+
+export interface FlavorAddon {
+  id: string;
+  label: string;
+  description: string;
+  experienceId?: string;
+  plugins: string[];
+}
 
 export interface FlavorDefinition {
   id: FlavorId;
@@ -6,11 +16,10 @@ export interface FlavorDefinition {
   subtitle: string;
   description: string;
   osacProfile: string;
-  plugins: string[];
-  addons?: { id: string; label: string; description: string; plugins: string[] }[];
+  experienceId: string;
+  extraPlugins: string[];
+  addons?: FlavorAddon[];
 }
-
-const OSAC_PLUGINS = ["trust-manager", "rhbk", "authorino", "aap", "osac"];
 
 export const FLAVORS: FlavorDefinition[] = [
   {
@@ -20,15 +29,8 @@ export const FLAVORS: FlavorDefinition[] = [
     description:
       "On-demand container clusters with built-in scalability, resilience, and lifecycle management. Provision and manage OpenShift spoke clusters from the hub.",
     osacProfile: "caas",
-    plugins: [...OSAC_PLUGINS],
-    addons: [
-      {
-        id: "gpu-ai",
-        label: "GPU & AI",
-        description: "NVIDIA GPU Operator and OpenShift AI for ML/AI workloads",
-        plugins: ["nvidia-gpu", "openshift-ai"],
-      },
-    ],
+    experienceId: "osac",
+    extraPlugins: [],
   },
   {
     id: "vmaas",
@@ -37,6 +39,11 @@ export const FLAVORS: FlavorDefinition[] = [
     description:
       "Run and manage virtual machines alongside containers using OpenShift Virtualization. Migrate existing VM workloads to a cloud-native platform.",
     osacProfile: "vmaas",
-    plugins: [...OSAC_PLUGINS, "cnv"],
+    experienceId: "osac",
+    extraPlugins: ["cnv"],
   },
 ];
+
+export function getFlavorPlugins(flavor: FlavorDefinition): string[] {
+  return [...getExperiencePlugins(flavor.experienceId), ...flavor.extraPlugins];
+}
