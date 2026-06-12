@@ -20,7 +20,6 @@ export const OsacStep: React.FC = () => {
   const globalData = ((state.configData as Record<string, unknown>).global ??
     {}) as Record<string, unknown>;
 
-  const osacProfile = (globalData.osacProfile as string) ?? "development";
   const aapLicenseFile = (globalData.osacAapLicenseFile as string) ?? "";
   const byoDatabase = (globalData.osacBYODatabase as boolean) ?? false;
   const databaseUrl = (globalData.osacDatabaseUrl as string) ?? "";
@@ -75,45 +74,6 @@ export const OsacStep: React.FC = () => {
         <Content component="p" className={stepStyles.subtitle}>
           Configure the Open Sovereign AI Cloud platform settings.
         </Content>
-      </FlexItem>
-
-      <FlexItem>
-        <FormGroup label="Deployment profile" fieldId="osac-profile">
-          <Flex direction={{ default: "column" }} gap={{ default: "gapSm" }}>
-            <Radio
-              id="profile-development"
-              name="osac-profile"
-              label="Development (CaaS + VMaaS)"
-              description="Full stack with cluster and VM management"
-              isChecked={osacProfile === "development"}
-              onChange={() => {}}
-              isDisabled
-            />
-            <Radio
-              id="profile-caas"
-              name="osac-profile"
-              label="CaaS"
-              description="Cluster ordering and lifecycle management"
-              isChecked={osacProfile === "caas"}
-              onChange={() => {}}
-              isDisabled
-            />
-            <Radio
-              id="profile-vmaas"
-              name="osac-profile"
-              label="VMaaS"
-              description="Virtual machine provisioning and management"
-              isChecked={osacProfile === "vmaas"}
-              onChange={() => {}}
-              isDisabled
-            />
-          </Flex>
-          <HelperText>
-            <HelperTextItem>
-              Profile is set automatically based on selected services.
-            </HelperTextItem>
-          </HelperText>
-        </FormGroup>
       </FlexItem>
 
       <FlexItem>
