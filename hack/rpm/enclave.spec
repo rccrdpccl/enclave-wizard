@@ -47,10 +47,10 @@ bash ./setup_ansible.sh 2>&1 | tail -5
 
 # Re-install with ansible-runner in the same venv so it shares all deps (kubernetes, etc.)
 echo "Adding ansible-runner to enclave environment..."
-"${HOME}/.local/bin/uv" tool install --force . \
+"${HOME}/.local/bin/uv" tool install --force "${ENCLAVE_DIR}" \
     --with-executables-from ansible-core \
     --with-executables-from ansible-runner \
-    --with ansible-runner 2>&1 | tail -3
+    --with ansible-runner 2>&1 | tail -5
 
 echo "Enclave installed at ${ENCLAVE_DIR}"
 

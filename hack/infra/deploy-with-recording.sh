@@ -125,10 +125,8 @@ info "  Wizard VM BMC IP: ${BMC_VM_IP:-unknown}"
 # =============================================================================
 # Step 5: Install extra deps on wizard VM
 # =============================================================================
-info "[5/8] Installing deployment dependencies on wizard VM..."
+info "[5/8] Verifying deployment dependencies on wizard VM..."
 ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
-  sudo dnf install -y nmstate podman httpd 2>&1 | tail -3
-  sudo ansible-galaxy collection install -p /usr/share/ansible/collections containers.podman 2>&1 | tail -2
   sudo systemctl enable --now httpd 2>/dev/null || true
 " 2>/dev/null
 
