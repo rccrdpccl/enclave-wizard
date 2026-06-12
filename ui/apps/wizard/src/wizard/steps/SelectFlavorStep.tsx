@@ -8,7 +8,6 @@ import {
 import {
   ClusterIcon,
   CubesIcon,
-  ServerIcon,
 } from "@patternfly/react-icons";
 import type React from "react";
 import type { ReactNode } from "react";
@@ -21,7 +20,6 @@ import { css } from "@emotion/css";
 const FLAVOR_ICONS: Record<FlavorId, ReactNode> = {
   caas: <ClusterIcon />,
   vmaas: <CubesIcon />,
-  bmaas: <ServerIcon />,
 };
 
 const addonArea = css`
@@ -63,8 +61,8 @@ export const SelectFlavorStep: React.FC = () => {
         </Title>
         <Content component="p" className={stepStyles.subtitle}>
           Choose which services to deploy on your sovereign cloud. You can
-          combine multiple services. The landing zone and hub cluster are always
-          included.
+          enable both for a full-stack deployment. The landing zone, hub
+          cluster, and OSAC platform are always included.
         </Content>
       </FlexItem>
       <FlexItem>

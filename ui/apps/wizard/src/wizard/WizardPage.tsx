@@ -30,6 +30,7 @@ import { STEP_REQUIRED_FIELDS } from "./stepFields.ts";
 import { AAPStep } from "./steps/AAPStep.tsx";
 import { CaasStep } from "./steps/CaasStep.tsx";
 import { DeployStep } from "./steps/DeployStep.tsx";
+import { OsacStep } from "./steps/OsacStep.tsx";
 import { TrustManagerStep } from "./steps/TrustManagerStep.tsx";
 import { HubClusterStep } from "./steps/HubClusterStep.tsx";
 import { LandingZoneStep } from "./steps/LandingZoneStep.tsx";
@@ -135,10 +136,14 @@ const BASE_CONFIG_SUBSTEPS: ConfigSubStep[] = [
 
 function buildConfigSubSteps(selectedFlavors: Set<string>, enabledPlugins: string[]): ConfigSubStep[] {
   const subs = [...BASE_CONFIG_SUBSTEPS];
-  if (enabledPlugins.includes("aap")) {
+  const hasOsac = selectedFlavors.has("caas") || selectedFlavors.has("vmaas");
+  if (hasOsac) {
+    subs.push({ id: "osac", label: "OSAC Platform" });
+  }
+  if (enabledPlugins.includes("aap") && !hasOsac) {
     subs.push({ id: "aap", label: "AAP Config" });
   }
-  if (enabledPlugins.includes("trust-manager")) {
+  if (enabledPlugins.includes("trust-manager") && !hasOsac) {
     subs.push({ id: "trust-manager", label: "Trust Manager" });
   }
   if (selectedFlavors.has("caas")) {
@@ -155,6 +160,8 @@ function SubStepContent({ subStepId }: { subStepId: string }): React.ReactElemen
       return <StorageStep />;
     case "hub-cluster":
       return <HubClusterStep />;
+    case "osac":
+      return <OsacStep />;
     case "aap":
       return <AAPStep />;
     case "trust-manager":

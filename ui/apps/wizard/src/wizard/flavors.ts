@@ -1,13 +1,16 @@
-export type FlavorId = "caas" | "vmaas" | "bmaas";
+export type FlavorId = "caas" | "vmaas";
 
 export interface FlavorDefinition {
   id: FlavorId;
   title: string;
   subtitle: string;
   description: string;
+  osacProfile: string;
   plugins: string[];
   addons?: { id: string; label: string; description: string; plugins: string[] }[];
 }
+
+const OSAC_PLUGINS = ["trust-manager", "rhbk", "authorino", "aap", "osac"];
 
 export const FLAVORS: FlavorDefinition[] = [
   {
@@ -16,7 +19,8 @@ export const FLAVORS: FlavorDefinition[] = [
     subtitle: "Containers as a Service",
     description:
       "On-demand container clusters with built-in scalability, resilience, and lifecycle management. Provision and manage OpenShift spoke clusters from the hub.",
-    plugins: [],
+    osacProfile: "caas",
+    plugins: [...OSAC_PLUGINS],
     addons: [
       {
         id: "gpu-ai",
@@ -32,14 +36,7 @@ export const FLAVORS: FlavorDefinition[] = [
     subtitle: "VMs as a Service",
     description:
       "Run and manage virtual machines alongside containers using OpenShift Virtualization. Migrate existing VM workloads to a cloud-native platform.",
-    plugins: ["cnv"],
-  },
-  {
-    id: "bmaas",
-    title: "BMaaS",
-    subtitle: "Bare Metal as a Service",
-    description:
-      "Provision and manage bare metal servers on demand using Metal3 and Ironic. Automated hardware lifecycle from discovery to decommissioning.",
-    plugins: [],
+    osacProfile: "vmaas",
+    plugins: [...OSAC_PLUGINS, "cnv"],
   },
 ];

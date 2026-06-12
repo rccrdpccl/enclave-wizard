@@ -76,23 +76,30 @@ export function wizardReducer(
       return { ...state, currentStep: action.step };
     case "TOGGLE_FLAVOR": {
       const nextFlavors = toggleFlavor(state.selectedFlavors, action.flavor);
-      const flavorDef = FLAVORS.find((f) => f.id === action.flavor);
-      const currentPlugins = new Set(
+      const allPlugins = new Set(
         ((state.configData as Record<string, unknown>).global as Record<string, unknown> | undefined)
           ?.enabled_plugins as string[] ?? [],
       );
-      if (flavorDef) {
-        for (const p of flavorDef.plugins) {
-          if (nextFlavors.has(action.flavor)) currentPlugins.add(p);
-          else currentPlugins.delete(p);
+      for (const f of FLAVORS) {
+        for (const p of f.plugins) {
+          if (nextFlavors.has(f.id)) allPlugins.add(p);
+          else allPlugins.delete(p);
         }
       }
-      const configData = setNestedField(
+      let osacProfile = "";
+      if (nextFlavors.has("caas") && nextFlavors.has("vmaas")) osacProfile = "development";
+      else if (nextFlavors.has("caas")) osacProfile = "caas";
+      else if (nextFlavors.has("vmaas")) osacProfile = "vmaas";
+
+      let updated = setNestedField(
         { ...state.configData } as Record<string, unknown>,
         ["global", "enabled_plugins"],
-        [...currentPlugins],
-      ) as ConfigData;
-      return { ...state, selectedFlavors: nextFlavors, configData };
+        [...allPlugins],
+      );
+      if (osacProfile) {
+        updated = setNestedField(updated, ["global", "osacProfile"], osacProfile);
+      }
+      return { ...state, selectedFlavors: nextFlavors, configData: updated as ConfigData };
     }
     case "SET_FIELD": {
       const keys = action.path.split(".");
