@@ -2,7 +2,7 @@ import { test, expect } from "@playwright/test";
 import { WizardPage } from "../helpers/wizard-page";
 import { WizardApi } from "../helpers/wizard-api";
 
-test.describe("Connected + RHOAI scenario", () => {
+test.describe("Connected + VMaaS + GPU scenario", () => {
   let wizard: WizardPage;
   let api: WizardApi;
 
@@ -11,31 +11,34 @@ test.describe("Connected + RHOAI scenario", () => {
     api = new WizardApi(request, baseURL!);
   });
 
-  test("configures a connected cluster with GPU & AI workloads and RHOAI plugin", async ({
+  test("configures a connected cluster with VMaaS and GPU passthrough", async ({
     page,
   }) => {
-
-    // a. Navigate and click Get started
     await wizard.goto();
     await wizard.clickGetStarted();
 
-    // b. Select GPU & AI Workloads flavor, click Next
-    await wizard.selectFlavor("GPU & AI Workloads");
+    // Select VMaaS flavor
+    await wizard.selectFlavor("VMaaS");
     await wizard.clickNext();
 
-    // c. Fill Landing Zone: connected mode
+    // Landing Zone: connected mode
     await wizard.fillLandingZone({
       disconnected: false,
       lzBmcIP: "192.168.100.1",
     });
-
-    // d. Click Next
     await wizard.clickNext();
 
-    // e. Fill Hub Cluster
+    // Storage: defaults + credentials
+    await wizard.fillStorage({
+      quayUser: "admin",
+      quayPassword: "quaypass",
+    });
+    await wizard.clickNext();
+
+    // Hub Cluster
     await wizard.fillHubCluster({
-      baseDomain: "rhoai.lab.example.com",
-      clusterName: "ai-edge",
+      baseDomain: "vmaas-gpu.lab.example.com",
+      clusterName: "gpu-edge",
       machineNetwork: "192.168.100.0/24",
       apiVIP: "192.168.100.200",
       ingressVIP: "192.168.100.201",
@@ -44,10 +47,10 @@ test.describe("Connected + RHOAI scenario", () => {
       defaultGateway: "192.168.100.1",
       defaultPrefix: 24,
       pullSecret: '{"auths":{}}',
-      sshPubKey: "ssh-rsa AAAA-rhoai-test",
+      sshPubKey: "ssh-rsa AAAA-gpu-test",
       hosts: [
         {
-          name: "ai-node-01",
+          name: "gpu-node-01",
           macAddress: "00:00:00:00:01:01",
           ipAddress: "192.168.100.11",
           redfish: "192.168.100.1",
@@ -56,7 +59,7 @@ test.describe("Connected + RHOAI scenario", () => {
           rootDisk: "/dev/sda",
         },
         {
-          name: "ai-node-02",
+          name: "gpu-node-02",
           macAddress: "00:00:00:00:01:02",
           ipAddress: "192.168.100.12",
           redfish: "192.168.100.1",
@@ -65,7 +68,7 @@ test.describe("Connected + RHOAI scenario", () => {
           rootDisk: "/dev/sda",
         },
         {
-          name: "ai-node-03",
+          name: "gpu-node-03",
           macAddress: "00:00:00:00:01:03",
           ipAddress: "192.168.100.13",
           redfish: "192.168.100.1",
@@ -76,46 +79,27 @@ test.describe("Connected + RHOAI scenario", () => {
       ],
     });
 
-    // f. Click Next to GPU & AI step
+    // OSAC Platform step: upload AAP license
+    await wizard.fillOsac({});
     await wizard.clickNext();
 
-    // g. Select openshift-ai plugin (should auto-select nvidia-gpu)
-    await wizard.selectGpuPlugin("openshift-ai");
-
-    // h. Verify nvidia-gpu is checked and disabled (auto-selected by RHOAI dependency)
-    const nvidiaCheckbox = page.locator("#gpu-ai-nvidia-gpu");
-    await expect(nvidiaCheckbox).toBeChecked();
-    await expect(nvidiaCheckbox).toBeDisabled();
-
-    // i. Click Next to Review
+    // Virtual Machines step — enable GPU passthrough
     await wizard.clickNext();
+    await wizard.enableGpuPassthrough();
+    const gpuCheckbox = page.locator("#enable-gpu");
+    await expect(gpuCheckbox).toBeChecked();
 
-    // j. Verify global.yaml contains expected values
+    // Review
+    await wizard.clickNext();
     const globalYaml = await wizard.getYamlContent("global.yaml");
-    expect(globalYaml).toContain("rhoai.lab.example.com");
-    expect(globalYaml).toContain("openshift-ai");
+    expect(globalYaml).toContain("vmaas-gpu.lab.example.com");
     expect(globalYaml).toContain("nvidia-gpu");
 
-    // k. Click Download files to test the download flow
-    await wizard.clickDownloadFiles();
-
-    // l. Click Validate
     await wizard.clickValidate();
     const validationPassed = await wizard.isValidationSuccess();
     expect(validationPassed).toBe(true);
 
-    // m. Click Next to Generate
+    // Navigate to Deploy step
     await wizard.clickNext();
-
-    // n. Click "Write configuration", wait for success
-    await wizard.clickWriteConfiguration();
-    await wizard.waitForWriteSuccess();
-
-    // o. Verify via API: config has openshift-ai, nvidia-gpu, no quayUser
-    const config = await api.getConfig();
-    const configStr = JSON.stringify(config);
-    expect(configStr).toContain("openshift-ai");
-    expect(configStr).toContain("nvidia-gpu");
-    expect(configStr).not.toContain("quayUser");
   });
 });

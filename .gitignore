@@ -1,5 +1,6 @@
 enclave-wizard
 out/
 wizard-ui.tar
+enclave-mock/
 .superpowers/
 docs/superpowers/

@@ -5,12 +5,17 @@ import {
   Form,
   FormGroup,
   FormHelperText,
+  Popover,
   Radio,
   TextArea,
   TextInput,
   Title,
 } from "@patternfly/react-core";
-import { MinusCircleIcon, PlusCircleIcon } from "@patternfly/react-icons";
+import {
+  MinusCircleIcon,
+  OutlinedQuestionCircleIcon,
+  PlusCircleIcon,
+} from "@patternfly/react-icons";
 import type React from "react";
 import { useWizard } from "../WizardContext.tsx";
 import { stepStyles } from "./stepStyles.ts";
@@ -114,8 +119,6 @@ export const StorageStep: React.FC = () => {
 
   const configData = state.configData as Record<string, unknown>;
   const globalData = (configData.global ?? {}) as Record<string, unknown>;
-  const disconnected = globalData.disconnected !== false;
-
   const enabledPlugins: string[] = Array.isArray(globalData.enabled_plugins)
     ? (globalData.enabled_plugins as string[])
     : ["lvms"];
@@ -167,8 +170,11 @@ export const StorageStep: React.FC = () => {
       </Title>
 
       <Title headingLevel="h3" size="lg" className={stepStyles.firstSectionTitle}>
-        Storage Backend
+        Hub Cluster Storage
       </Title>
+      <p className={stepStyles.subtitle}>
+        Block storage provisioner for the OpenShift cluster.
+      </p>
 
       <Radio
         id="storage-lvms"
@@ -267,72 +273,81 @@ export const StorageStep: React.FC = () => {
         </Flex>
       )}
 
-      {disconnected && (
-        <>
-          <Title headingLevel="h3" size="lg" className={stepStyles.sectionTitle}>
-            Image Registry Storage
-          </Title>
-          <p className={stepStyles.subtitle}>
-            Where Quay stores container image layers.
-          </p>
+      <Title headingLevel="h3" size="lg" className={stepStyles.sectionTitle}>
+        Image Registry
+      </Title>
+      <p className={stepStyles.subtitle}>
+        Storage backend for the hub cluster's Quay image registry.
+      </p>
 
-          <Radio
-            id="quay-local"
-            name="quay-backend"
-            label={quayLocalLabel}
-            description={quayLocalDescription}
-            isChecked={quayBackend === "LocalStorage"}
-            onChange={() => onChange("global.quayBackend", "LocalStorage")}
-          />
-          <Radio
-            id="quay-rgw"
-            name="quay-backend"
-            label="External S3 / RadosGW"
-            description="Quay images are stored in an independent S3-compatible object store. Requires bucket credentials below."
-            isChecked={quayBackend === "RadosGWStorage"}
-            onChange={() => onChange("global.quayBackend", "RadosGWStorage")}
-            style={{ marginTop: "0.5rem" }}
-          />
-          {quayBackend === "RadosGWStorage" && (
-            <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }} style={subFormStyle}>
-              {RGW_FIELDS.map(({ key, label }) => (
-                <FlexItem key={key}>
-                  <FormGroup label={label} isRequired fieldId={`rgw-${key}`}>
-                    <TextInput
-                      id={`rgw-${key}`}
-                      value={(rgwConfig[key] as string) ?? ""}
-                      onChange={(_e, v) => updateRgwField(key, v)}
-                      isRequired
-                      type={key === "secret_key" ? "password" : "text"}
-                    />
-                  </FormGroup>
-                </FlexItem>
-              ))}
-            </Flex>
-          )}
-
-          <Title headingLevel="h3" size="lg" className={stepStyles.sectionTitle}>
-            Quay Registry Credentials
-          </Title>
-          <FormGroup label="Admin username" isRequired fieldId="quay-user">
-            <TextInput
-              id="quay-user"
-              value={quayUser}
-              onChange={(_e, v) => onChange("global.quayUser", v)}
-              isRequired
-            />
-          </FormGroup>
-          <FormGroup label="Admin password" isRequired fieldId="quay-password">
-            <TextInput
-              id="quay-password"
-              type="password"
-              value={quayPassword}
-              onChange={(_e, v) => onChange("global.quayPassword", v)}
-              isRequired
-            />
-          </FormGroup>
-        </>
+      <Radio
+        id="quay-local"
+        name="quay-backend"
+        label={quayLocalLabel}
+        description={quayLocalDescription}
+        isChecked={quayBackend === "LocalStorage"}
+        onChange={() => onChange("global.quayBackend", "LocalStorage")}
+      />
+      <Radio
+        id="quay-rgw"
+        name="quay-backend"
+        label={
+          <span>
+            External object storage{" "}
+            <Popover
+              bodyContent="Any S3-compatible object store such as Ceph RadosGW, AWS S3, or MinIO. Requires access credentials and a pre-created bucket."
+            >
+              <OutlinedQuestionCircleIcon style={{ cursor: "pointer", color: "#6a6e73" }} />
+            </Popover>
+          </span>
+        }
+        description="Quay images are stored in an independent S3-compatible object store."
+        isChecked={quayBackend === "RadosGWStorage"}
+        onChange={() => onChange("global.quayBackend", "RadosGWStorage")}
+        style={{ marginTop: "0.5rem" }}
+      />
+      {quayBackend === "RadosGWStorage" && (
+        <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }} style={subFormStyle}>
+          {RGW_FIELDS.map(({ key, label }) => (
+            <FlexItem key={key}>
+              <FormGroup label={label} isRequired fieldId={`rgw-${key}`}>
+                <TextInput
+                  id={`rgw-${key}`}
+                  value={(rgwConfig[key] as string) ?? ""}
+                  onChange={(_e, v) => updateRgwField(key, v)}
+                  isRequired
+                  type={key === "secret_key" ? "password" : "text"}
+                />
+              </FormGroup>
+            </FlexItem>
+          ))}
+        </Flex>
       )}
+
+      <Title headingLevel="h3" size="lg" className={stepStyles.sectionTitle}>
+        Registry Credentials
+      </Title>
+      <p className={stepStyles.subtitle}>
+        Admin credentials for the landing zone mirror registry and the hub
+        cluster's Quay registry.
+      </p>
+      <FormGroup label="Admin username" isRequired fieldId="quay-user">
+        <TextInput
+          id="quay-user"
+          value={quayUser}
+          onChange={(_e, v) => onChange("global.quayUser", v)}
+          isRequired
+        />
+      </FormGroup>
+      <FormGroup label="Admin password" isRequired fieldId="quay-password">
+        <TextInput
+          id="quay-password"
+          type="password"
+          value={quayPassword}
+          onChange={(_e, v) => onChange("global.quayPassword", v)}
+          isRequired
+        />
+      </FormGroup>
     </Form>
   );
 };

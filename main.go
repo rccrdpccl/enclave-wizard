@@ -38,6 +38,7 @@ type Options struct {
 	EnclaveDir   string `help:"Path to the Enclave repository root" default:"../enclave"`
 	PasswordFile string `help:"Path to the password file" default:"/etc/enclave-wizard/password"`
 	LogLevel     string `help:"Log level (trace, debug, info, warn, error)" default:"info"`
+	NoAuth       bool   `help:"Disable authentication (local development only)" default:"false"`
 	DevOptions
 }
 
@@ -71,12 +72,12 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store, opts
 	}
 
 	if runner != nil {
-		api.NewTasksHandler(runner, registry, enclaveDir).Register(humaAPI)
+		api.NewTasksHandler(runner, registry, reader, enclaveDir).Register(humaAPI)
 	}
 
 	validator := validation.NewValidator(enclaveDir, runner)
 
-	api.NewAuthHandler(authStore).Register(humaAPI)
+	api.NewAuthHandler(authStore, opts.NoAuth).Register(humaAPI)
 	api.NewConfigHandler(reader, writer, validator).Register(humaAPI)
 	api.NewDefaultsHandler(enclaveDir).Register(humaAPI)
 	api.NewPluginsHandler(registry).Register(humaAPI)
@@ -158,7 +159,15 @@ func main() {
 		}
 		setupUIHandler(mux)
 
-		handler := api.LoggingMiddleware(api.BearerAuthMiddleware(authStore)(mux))
+		fileUpload := api.NewFileUploadHandler(opts.EnclaveDir)
+		var rootHandler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			if r.URL.Path == "/api/v1/files" {
+				fileUpload.ServeHTTP(w, r)
+				return
+			}
+			mux.ServeHTTP(w, r)
+		})
+		handler := api.LoggingMiddleware(api.BearerAuthMiddleware(authStore, opts.NoAuth)(rootHandler))
 
 		httpsServer := &http.Server{
 			Addr:    fmt.Sprintf(":%d", opts.HTTPSPort),

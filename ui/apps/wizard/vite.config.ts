@@ -9,10 +9,12 @@ export default defineConfig((_env) => {
         "/api/v1": {
           target: process.env.API_PROXY_TARGET || "http://localhost:8080",
           changeOrigin: true,
+          secure: false,
         },
         "/openapi.json": {
           target: process.env.API_PROXY_TARGET || "http://localhost:8080",
           changeOrigin: true,
+          secure: false,
         },
       },
     },

@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"reflect"
+	"strings"
 
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
 	"gopkg.in/yaml.v3"
@@ -48,11 +50,13 @@ func (r *Reader) ReadAll() (*models.EnclaveConfig, error) {
 		infra.DiscoveryHosts = globalRaw.DiscoveryHosts
 	}
 
-	return &models.EnclaveConfig{
+	cfg := &models.EnclaveConfig{
 		Global:       globalRaw.GlobalConfig,
 		Certificates: *certs,
 		CloudInfra:   *infra,
-	}, nil
+	}
+	clearTemplatePlaceholders(cfg)
+	return cfg, nil
 }
 
 func (r *Reader) readGlobalRaw() (*globalWithDiscoveryHosts, error) {
@@ -65,6 +69,33 @@ func (r *Reader) readCertificates() (*models.CertificatesConfig, error) {
 
 func (r *Reader) readCloudInfra() (*models.CloudInfraConfig, error) {
 	return readYAMLFile[models.CloudInfraConfig](filepath.Join(r.enclaveDir, "config", "cloud_infra.yaml"))
+}
+
+func clearTemplatePlaceholders(cfg *models.EnclaveConfig) {
+	clearStringFields(&cfg.Global)
+	for i := range cfg.Global.AgentHosts {
+		clearStringFields(&cfg.Global.AgentHosts[i])
+	}
+	for i := range cfg.CloudInfra.DiscoveryHosts {
+		clearStringFields(&cfg.CloudInfra.DiscoveryHosts[i])
+	}
+}
+
+func clearStringFields(ptr any) {
+	v := reflect.ValueOf(ptr).Elem()
+	for i := 0; i < v.NumField(); i++ {
+		f := v.Field(i)
+		switch f.Kind() {
+		case reflect.String:
+			if f.CanSet() && strings.HasPrefix(f.String(), "YOUR_") {
+				f.SetString("")
+			}
+		case reflect.Struct:
+			if f.CanAddr() {
+				clearStringFields(f.Addr().Interface())
+			}
+		}
+	}
 }
 
 func readYAMLFile[T any](path string) (*T, error) {

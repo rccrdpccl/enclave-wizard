@@ -1,5 +1,14 @@
-import { Content, Flex, FlexItem, Title } from "@patternfly/react-core";
-import { ClusterIcon } from "@patternfly/react-icons";
+import {
+  Content,
+  Flex,
+  FlexItem,
+  Title,
+} from "@patternfly/react-core";
+import {
+  ClusterIcon,
+  CubesIcon,
+  ServerIcon,
+} from "@patternfly/react-icons";
 import type React from "react";
 import type { ReactNode } from "react";
 import { FlavorCard } from "../components/FlavorCard.tsx";
@@ -8,7 +17,9 @@ import { useWizard } from "../WizardContext.tsx";
 import { stepStyles } from "./stepStyles.ts";
 
 const FLAVOR_ICONS: Record<FlavorId, ReactNode> = {
-  cluster: <ClusterIcon />,
+  caas: <ClusterIcon />,
+  vmaas: <CubesIcon />,
+  bmaas: <ServerIcon />,
 };
 
 export const SelectFlavorStep: React.FC = () => {
@@ -18,19 +29,21 @@ export const SelectFlavorStep: React.FC = () => {
     <Flex direction={{ default: "column" }} gap={{ default: "gapLg" }}>
       <FlexItem>
         <Title headingLevel="h2" size="xl">
-          Select your sovereign cloud setup
+          Select your services
         </Title>
         <Content component="p" className={stepStyles.subtitle}>
-          Choose additional services to deploy, or skip this step to set up
-          only the landing zone and hub cluster.
+          Choose which services to deploy on your sovereign cloud. You can
+          enable both for a full-stack deployment. The landing zone, hub
+          cluster, and OSAC platform are always included.
         </Content>
       </FlexItem>
       <FlexItem>
-        <Flex gap={{ default: "gapMd" }} flexWrap={{ default: "wrap" }}>
+        <Flex gap={{ default: "gapMd" }} flexWrap={{ default: "wrap" }} alignItems={{ default: "alignItemsStretch" }}>
           {FLAVORS.map((flavor) => (
-            <FlexItem key={flavor.id} style={{ minWidth: 280, flex: 1 }}>
+            <FlexItem key={flavor.id} style={{ minWidth: 240, flex: "1 1 0" }}>
               <FlavorCard
                 title={flavor.title}
+                subtitle={flavor.subtitle}
                 description={flavor.description}
                 icon={FLAVOR_ICONS[flavor.id]}
                 isSelected={state.selectedFlavors.has(flavor.id)}

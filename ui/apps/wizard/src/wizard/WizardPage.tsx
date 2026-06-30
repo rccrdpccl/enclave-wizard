@@ -27,8 +27,12 @@ import {
 } from "../schema/schemaUtils.ts";
 import { useOpenApiSchema } from "../schema/useOpenApiSchema.ts";
 import { STEP_REQUIRED_FIELDS } from "./stepFields.ts";
+import { AAPStep } from "./steps/AAPStep.tsx";
 import { CaasStep } from "./steps/CaasStep.tsx";
 import { DeployStep } from "./steps/DeployStep.tsx";
+import { GpuAiStep } from "./steps/GpuAiStep.tsx";
+import { OsacStep } from "./steps/OsacStep.tsx";
+import { TrustManagerStep } from "./steps/TrustManagerStep.tsx";
 import { HubClusterStep } from "./steps/HubClusterStep.tsx";
 import { LandingZoneStep } from "./steps/LandingZoneStep.tsx";
 import { ReviewStep } from "./steps/ReviewStep.tsx";
@@ -131,10 +135,23 @@ const BASE_CONFIG_SUBSTEPS: ConfigSubStep[] = [
   { id: "hub-cluster", label: "Hub Cluster" },
 ];
 
-function buildConfigSubSteps(selectedFlavors: Set<string>): ConfigSubStep[] {
+function buildConfigSubSteps(selectedFlavors: Set<string>, enabledPlugins: string[]): ConfigSubStep[] {
   const subs = [...BASE_CONFIG_SUBSTEPS];
-  if (selectedFlavors.has("cluster")) {
-    subs.push({ id: "caas", label: "Cluster as a Service" });
+  const hasOsac = selectedFlavors.has("caas") || selectedFlavors.has("vmaas") || selectedFlavors.has("bmaas");
+  if (hasOsac) {
+    subs.push({ id: "osac", label: "OSAC Platform" });
+  }
+  if (enabledPlugins.includes("aap") && !hasOsac) {
+    subs.push({ id: "aap", label: "AAP Config" });
+  }
+  if (enabledPlugins.includes("trust-manager") && !hasOsac) {
+    subs.push({ id: "trust-manager", label: "Trust Manager" });
+  }
+  if (selectedFlavors.has("vmaas")) {
+    subs.push({ id: "gpu-ai", label: "Virtual Machines" });
+  }
+  if (selectedFlavors.has("caas")) {
+    subs.push({ id: "caas", label: "Bare Metal Hosts" });
   }
   return subs;
 }
@@ -147,6 +164,14 @@ function SubStepContent({ subStepId }: { subStepId: string }): React.ReactElemen
       return <StorageStep />;
     case "hub-cluster":
       return <HubClusterStep />;
+    case "osac":
+      return <OsacStep />;
+    case "gpu-ai":
+      return <GpuAiStep />;
+    case "aap":
+      return <AAPStep />;
+    case "trust-manager":
+      return <TrustManagerStep />;
     case "caas":
       return <CaasStep />;
     default:
@@ -247,9 +272,14 @@ function WizardContent(): React.ReactElement {
   const [stepErrors, setStepErrors] = useState<StepValidationError[]>([]);
   const [activeSubStep, setActiveSubStep] = useState(0);
 
+  const globalData = (state.configData as Record<string, unknown>).global as Record<string, unknown> | undefined;
+  const enabledPlugins = Array.isArray(globalData?.enabled_plugins)
+    ? (globalData.enabled_plugins as string[])
+    : [];
+
   const configSubSteps = useMemo(
-    () => buildConfigSubSteps(state.selectedFlavors),
-    [state.selectedFlavors],
+    () => buildConfigSubSteps(state.selectedFlavors, enabledPlugins),
+    [state.selectedFlavors, enabledPlugins],
   );
 
   useEffect(() => {
@@ -275,7 +305,7 @@ function WizardContent(): React.ReactElement {
           dispatch({ type: "SET_FIELD", path: "global.storage_plugin", value: d.storagePlugin });
           dispatch({ type: "SET_FIELD", path: "global.defaultPrefix", value: 24 });
           dispatch({ type: "SET_FIELD", path: "global.quayBackend", value: "LocalStorage" });
-          dispatch({ type: "SET_FIELD", path: "global.enabled_plugins", value: ["lvms", "nvidia-gpu", "openshift-ai"] });
+          dispatch({ type: "SET_FIELD", path: "global.enabled_plugins", value: ["lvms"] });
         }
 
         if (pluginsResult.status === "fulfilled") {
@@ -365,6 +395,21 @@ function WizardContent(): React.ReactElement {
             }
           }
         }
+      }
+    }
+
+    if (currentSubStepId === "osac") {
+      const globalData = ((state.configData as Record<string, unknown>).global ?? {}) as Record<string, unknown>;
+      if (!((globalData.osacAapLicenseFile as string) ?? "").trim()) {
+        errors.push({ path: "global.osacAapLicenseFile", label: "AAP subscription manifest", message: "AAP subscription manifest is required for OSAC" });
+      }
+    }
+
+    if (currentSubStepId === "aap") {
+      const globalData = ((state.configData as Record<string, unknown>).global ?? {}) as Record<string, unknown>;
+      const aapDefaults = (globalData.aapDefaults ?? {}) as Record<string, unknown>;
+      if (!((aapDefaults.aapLicenseFile as string) ?? "").trim()) {
+        errors.push({ path: "global.aapDefaults.aapLicenseFile", label: "Subscription file path", message: "AAP subscription file path is required" });
       }
     }
 

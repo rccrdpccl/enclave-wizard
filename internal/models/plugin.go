@@ -34,6 +34,30 @@ type ODFConfig struct {
 	DefaultStorageClass bool `json:"defaultStorageClass" yaml:"defaultStorageClass" doc:"Set as default StorageClass"`
 }
 
+// AAP plugin configuration
+
+type AAPConfig struct {
+	LicenseFile          string  `json:"aapLicenseFile" yaml:"aapLicenseFile" doc:"Path to AAP license manifest.zip on the Landing Zone" minLength:"1"`
+	Name                 *string `json:"aap_name,omitempty" yaml:"aap_name,omitempty" doc:"Name of the AAP instance"`
+	Namespace            *string `json:"aap_ns,omitempty" yaml:"aap_ns,omitempty" doc:"Namespace for the AAP deployment"`
+	LicenseSecret        *string `json:"aap_license_secret,omitempty" yaml:"aap_license_secret,omitempty" doc:"Name of the Kubernetes secret holding the AAP license"`
+	ControllerDisabled   *bool   `json:"aap_controller_disabled,omitempty" yaml:"aap_controller_disabled,omitempty" doc:"Disable the Automation Controller component"`
+	EDADisabled          *bool   `json:"aap_eda_disabled,omitempty" yaml:"aap_eda_disabled,omitempty" doc:"Disable the Event-Driven Ansible component"`
+	HubDisabled          *bool   `json:"aap_hub_disabled,omitempty" yaml:"aap_hub_disabled,omitempty" doc:"Disable the Automation Hub component"`
+	ImagePullPolicy      *string `json:"aap_image_pull_policy,omitempty" yaml:"aap_image_pull_policy,omitempty" doc:"Image pull policy for AAP pods" enum:"Always,IfNotPresent,Never"`
+	LightspeedDisabled   *bool   `json:"aap_lightspeed_disabled,omitempty" yaml:"aap_lightspeed_disabled,omitempty" doc:"Disable the Ansible Lightspeed component"`
+	NoLog                *bool   `json:"aap_no_log,omitempty" yaml:"aap_no_log,omitempty" doc:"Suppress sensitive log output"`
+	RedisMode            *string `json:"aap_redis_mode,omitempty" yaml:"aap_redis_mode,omitempty" doc:"Redis deployment mode" enum:"standalone,cluster"`
+	RouteTLSTermination  *string `json:"aap_route_tls_termination,omitempty" yaml:"aap_route_tls_termination,omitempty" doc:"TLS termination type for AAP routes" enum:"Edge,Passthrough,Reencrypt"`
+}
+
+// Trust-manager plugin configuration
+
+type TrustManagerConfig struct {
+	CAIssuerDuration    *string `json:"trust_manager_ca_issuer_duration,omitempty" yaml:"trust_manager_ca_issuer_duration,omitempty" doc:"CA certificate lifetime (e.g. 87600h for 10 years)"`
+	CAIssuerRenewBefore *string `json:"trust_manager_ca_issuer_renew_before,omitempty" yaml:"trust_manager_ca_issuer_renew_before,omitempty" doc:"How long before expiry to renew the CA (e.g. 8760h for 1 year)"`
+}
+
 // VAST CSI plugin configuration
 
 type VASTIPRange struct {

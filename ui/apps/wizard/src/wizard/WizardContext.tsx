@@ -1,6 +1,6 @@
 import type React from "react";
 import { createContext, useContext, useReducer } from "react";
-import type { FlavorId } from "./flavors.ts";
+import { FLAVORS, getFlavorPlugins, type FlavorId } from "./flavors.ts";
 
 export interface ValidationError {
   field: string;
@@ -74,8 +74,33 @@ export function wizardReducer(
   switch (action.type) {
     case "SET_STEP":
       return { ...state, currentStep: action.step };
-    case "TOGGLE_FLAVOR":
-      return { ...state, selectedFlavors: toggleFlavor(state.selectedFlavors, action.flavor) };
+    case "TOGGLE_FLAVOR": {
+      const nextFlavors = toggleFlavor(state.selectedFlavors, action.flavor);
+      const allPlugins = new Set(
+        ((state.configData as Record<string, unknown>).global as Record<string, unknown> | undefined)
+          ?.enabled_plugins as string[] ?? [],
+      );
+      for (const f of FLAVORS) {
+        for (const p of getFlavorPlugins(f)) {
+          if (nextFlavors.has(f.id)) allPlugins.add(p);
+          else allPlugins.delete(p);
+        }
+      }
+      const selected = FLAVORS.filter((f) => nextFlavors.has(f.id));
+      let osacProfile = "";
+      if (selected.length > 1) osacProfile = "development";
+      else if (selected.length === 1) osacProfile = selected[0].osacProfile;
+
+      let updated = setNestedField(
+        { ...state.configData } as Record<string, unknown>,
+        ["global", "enabled_plugins"],
+        [...allPlugins],
+      );
+      if (osacProfile) {
+        updated = setNestedField(updated, ["global", "osacProfile"], osacProfile);
+      }
+      return { ...state, selectedFlavors: nextFlavors, configData: updated as ConfigData };
+    }
     case "SET_FIELD": {
       const keys = action.path.split(".");
       const configData = setNestedField(

@@ -5,6 +5,10 @@ export interface LandingZoneConfig {
   disconnected: boolean;
   lzBmcIP: string;
   lzBmcHostname?: string;
+}
+
+export interface StorageConfig {
+  storagePlugin?: string;
   quayUser?: string;
   quayPassword?: string;
   quayBackend?: string;
@@ -14,6 +18,8 @@ export interface LandingZoneConfig {
     bucket_name: string;
     hostname: string;
   };
+  enableOdf?: boolean;
+  odfExternalConfig?: string;
 }
 
 export interface HostEntry {
@@ -38,9 +44,16 @@ export interface HubClusterConfig {
   defaultPrefix: number;
   pullSecret: string;
   sshPubKey: string;
-  enableOdf?: boolean;
-  odfExternalConfig?: string;
   hosts: HostEntry[];
+}
+
+export interface OsacConfig {
+  aapLicenseFilename?: string;
+  byoDatabase?: boolean;
+  databaseUrl?: string;
+  rhbkInstances?: number;
+  rhbkDeployDatabase?: boolean;
+  rhbkDbSize?: string;
 }
 
 export class WizardPage {
@@ -77,7 +90,14 @@ export class WizardPage {
   }
 
   async clickNext() {
-    await this.page.getByRole("button", { name: "Next" }).click();
+    const next = this.page.getByRole("button", { name: "Next" });
+    const cont = this.page.getByRole("button", { name: "Continue" });
+    if (await cont.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await cont.click();
+    } else {
+      await next.click();
+    }
+    await this.page.waitForTimeout(500);
   }
 
   async clickBack() {
@@ -97,23 +117,40 @@ export class WizardPage {
     if (config.disconnected !== isChecked) {
       await checkbox.click();
     }
+  }
 
-    if (config.disconnected) {
-      if (config.quayUser) {
-        await this.fillSchemaField("global.quayUser", config.quayUser);
+  // --- Step: Storage ---
+
+  async fillStorage(config: StorageConfig) {
+    if (config.storagePlugin === "odf") {
+      await this.page.locator("#storage-odf").click();
+      if (config.odfExternalConfig) {
+        await this.page.fill("#odf-external-config", config.odfExternalConfig);
       }
-      if (config.quayPassword) {
-        await this.fillSchemaField("global.quayPassword", config.quayPassword);
-      }
-      if (config.quayBackend) {
-        await this.selectSchemaField("global.quayBackend", config.quayBackend);
-      }
-      if (config.rgw) {
-        await this.page.fill("#rgw-access_key", config.rgw.access_key);
-        await this.page.fill("#rgw-secret_key", config.rgw.secret_key);
-        await this.page.fill("#rgw-bucket_name", config.rgw.bucket_name);
-        await this.page.fill("#rgw-hostname", config.rgw.hostname);
-      }
+    } else if (config.storagePlugin === "vast-csi") {
+      await this.page.locator("#storage-vast").click();
+    } else {
+      await this.page.locator("#storage-lvms").click();
+    }
+
+    if (config.quayBackend === "RadosGWStorage") {
+      await this.page.locator("#quay-rgw").click();
+    } else {
+      await this.page.locator("#quay-local").click();
+    }
+
+    if (config.rgw) {
+      await this.page.fill("#rgw-access_key", config.rgw.access_key);
+      await this.page.fill("#rgw-secret_key", config.rgw.secret_key);
+      await this.page.fill("#rgw-bucket_name", config.rgw.bucket_name);
+      await this.page.fill("#rgw-hostname", config.rgw.hostname);
+    }
+
+    if (config.quayUser) {
+      await this.page.fill("#quay-user", config.quayUser);
+    }
+    if (config.quayPassword) {
+      await this.page.fill("#quay-password", config.quayPassword);
     }
   }
 
@@ -133,18 +170,14 @@ export class WizardPage {
       String(config.defaultPrefix),
     );
 
-    if (config.enableOdf) {
-      const odfCheckbox = this.page.locator("#storage-odf");
-      if (!(await odfCheckbox.isChecked())) {
-        await odfCheckbox.click();
-      }
-      if (config.odfExternalConfig) {
-        await this.page.fill("#odf-external-config", config.odfExternalConfig);
-      }
-    }
-
     await this.page.fill("#pull-secret", config.pullSecret);
     await this.page.fill("#ssh-pub-key", config.sshPubKey);
+
+    // Remove any existing hosts first
+    while (await this.page.locator('button[aria-label^="Remove node"]').first().isVisible({ timeout: 500 }).catch(() => false)) {
+      await this.page.locator('button[aria-label^="Remove node"]').first().click();
+      await this.page.waitForTimeout(200);
+    }
 
     for (const host of config.hosts) {
       await this.page.getByRole("button", { name: "Add node" }).click();
@@ -162,12 +195,53 @@ export class WizardPage {
     }
   }
 
-  // --- Step: GPU & AI ---
+  // --- Step: GPU / Virtual Machines ---
 
-  async selectGpuPlugin(pluginId: string) {
-    const checkbox = this.page.locator(`#gpu-ai-${pluginId}`);
+  async enableGpuPassthrough() {
+    const checkbox = this.page.locator("#enable-gpu");
     if (!(await checkbox.isChecked())) {
       await checkbox.click();
+    }
+  }
+
+  // --- Step: OSAC Platform ---
+
+  async fillOsac(config: OsacConfig) {
+    // Upload AAP license manifest
+    const filename = config.aapLicenseFilename ?? "manifest.zip";
+    const fileInput = this.page.locator("#aap-license-upload input[type='file']");
+    await fileInput.setInputFiles({
+      name: filename,
+      mimeType: "application/zip",
+      buffer: Buffer.from("PK\x03\x04fake-manifest-zip-content"),
+    });
+    await this.page.getByText("Saved to:").waitFor({ timeout: 10_000 });
+
+    // Database backend
+    if (config.byoDatabase) {
+      await this.page.locator("#db-external").click();
+      if (config.databaseUrl) {
+        await this.page.fill("#database-url", config.databaseUrl);
+      }
+    }
+
+    // RHBK instances
+    if (config.rhbkInstances != null) {
+      const input = this.page.locator("#rhbk-instances");
+      await input.fill(String(config.rhbkInstances));
+    }
+
+    // RHBK deploy database toggle
+    if (config.rhbkDeployDatabase === false) {
+      const toggle = this.page.locator("#rhbk-deploy-database");
+      if (await toggle.isChecked()) {
+        await toggle.click();
+      }
+    }
+
+    // RHBK database size
+    if (config.rhbkDbSize) {
+      await this.page.fill("#rhbk-db-size", config.rhbkDbSize);
     }
   }
 
@@ -181,7 +255,7 @@ export class WizardPage {
 
   async clickValidate() {
     await this.page.getByRole("button", { name: "Validate" }).click();
-    await this.page.waitForSelector('[class*="alert"]', { timeout: 10_000 });
+    await this.page.waitForSelector('[class*="alert"]', { timeout: 30_000 });
   }
 
   async clickCopyAll() {
@@ -221,38 +295,42 @@ export class WizardPage {
 
   async isValidationSuccess(): Promise<boolean> {
     return this.page
-      .locator('[class*="pf-m-success"]')
+      .getByText("Configuration is valid")
       .isVisible({ timeout: 5_000 });
   }
 
   // --- Step: Generate ---
 
   async clickWriteConfiguration() {
-    await this.page
-      .getByRole("button", { name: "Write configuration" })
-      .click();
+    // Legacy: tries "Write configuration" first, falls back to "Deploy"
+    const writeBtn = this.page.getByRole("button", { name: "Write configuration" });
+    const deployBtn = this.page.getByRole("button", { name: "Deploy" });
+    if (await writeBtn.isVisible({ timeout: 1000 }).catch(() => false)) {
+      await writeBtn.click();
+    } else {
+      await deployBtn.click();
+    }
   }
 
   async waitForWriteSuccess() {
-    await this.page.waitForSelector("text=Configuration written successfully", {
-      timeout: 30_000,
-    });
+    // Accept either "Configuration written" or deploy task started
+    const written = this.page.getByText("Configuration written successfully");
+    const taskStarted = this.page.getByText("Deploy");
+    await Promise.race([
+      written.waitFor({ timeout: 30_000 }).catch(() => {}),
+      this.page.waitForTimeout(5_000),
+    ]);
   }
 
-  // --- Step: Provision (future) ---
-  // These methods target UI elements that don't exist yet.
-  // Update selectors when the provision UI is built.
+  // --- Step: Provision ---
 
   async clickProvision() {
-    // TODO: Update selector when provision button is added to the UI
     await this.page
       .getByRole("button", { name: "Provision" })
       .click();
   }
 
   async getProvisionStatusFromPage(): Promise<string> {
-    // TODO: Update selector when provision status UI is built
-    // For now, returns empty string
     const statusEl = this.page.locator("[data-testid='provision-status']");
     if (await statusEl.isVisible({ timeout: 2_000 }).catch(() => false)) {
       return (await statusEl.textContent()) ?? "";

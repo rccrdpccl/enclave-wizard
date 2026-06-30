@@ -113,9 +113,11 @@ if [ "${DISK_AVAIL:-0}" -lt 20000000 ]; then
   ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "sudo growpart /dev/vda 1 2>/dev/null; sudo xfs_growfs / 2>/dev/null || sudo resize2fs /dev/vda1 2>/dev/null" || true
 fi
 
-# Configure DNS on the BMC interface
+# Configure DNS on the BMC interface (priority -10 so enclave-bmc DNS
+# resolves *.apps routes before the default network's NXDOMAIN)
 ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
-  sudo nmcli con mod 'Wired connection 2' ipv4.dns '192.168.223.1' 2>/dev/null || true
+  sudo nmcli con mod 'Wired connection 2' ipv4.dns '192.168.223.1' ipv4.dns-priority -10 2>/dev/null || true
+  sudo nmcli con up 'Wired connection 2' 2>/dev/null || true
 " 2>/dev/null || true
 
 # Get the VM's IP on the BMC network
@@ -125,10 +127,8 @@ info "  Wizard VM BMC IP: ${BMC_VM_IP:-unknown}"
 # =============================================================================
 # Step 5: Install extra deps on wizard VM
 # =============================================================================
-info "[5/8] Installing deployment dependencies on wizard VM..."
+info "[5/8] Verifying deployment dependencies on wizard VM..."
 ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
-  sudo dnf install -y nmstate podman httpd 2>&1 | tail -3
-  sudo ansible-galaxy collection install -p /usr/share/ansible/collections containers.podman 2>&1 | tail -2
   sudo systemctl enable --now httpd 2>/dev/null || true
 " 2>/dev/null
 

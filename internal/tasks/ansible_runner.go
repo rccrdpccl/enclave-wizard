@@ -171,8 +171,15 @@ func (r *AnsibleRunner) runAsync(req StartRequest) (*models.TaskRun, <-chan stru
 
 	cmd := exec.Command("ansible-runner", args...)
 	cmd.Dir = r.enclaveDir
+
+	uvBinDir := filepath.Join(r.enclaveDir, ".local", "bin")
+	currentPath := os.Getenv("PATH")
+	if !strings.Contains(currentPath, uvBinDir) {
+		currentPath = uvBinDir + ":" + currentPath
+	}
 	cmd.Env = append(os.Environ(),
 		"ANSIBLE_CONFIG="+filepath.Join(r.enclaveDir, "ansible.cfg"),
+		"PATH="+currentPath,
 	)
 	for k, v := range req.Env {
 		cmd.Env = append(cmd.Env, k+"="+v)

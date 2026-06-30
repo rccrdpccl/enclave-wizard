@@ -43,12 +43,13 @@ export const CaasStep: React.FC = () => {
   return (
     <Form>
       <Title headingLevel="h2" size="xl">
-        Cluster as a Service
+        Bare Metal Hosts
       </Title>
       <Content component="p">
-        Add nodes to the discovery pool. These nodes will be available for
-        provisioning managed clusters. You can add nodes later through the
-        management interface.
+        Register bare metal hosts that will be available for provisioning
+        managed clusters. Each host is enrolled via its BMC (Redfish)
+        interface and added to the resource pool. You can add hosts later
+        through the management interface.
       </Content>
 
       <Flex
@@ -58,7 +59,7 @@ export const CaasStep: React.FC = () => {
       >
         <FlexItem>
           <Title headingLevel="h3" size="lg">
-            Discovery Pool ({discoveryHosts.length} node{discoveryHosts.length !== 1 ? "s" : ""})
+            Available Hosts ({discoveryHosts.length})
           </Title>
         </FlexItem>
         <FlexItem>
@@ -67,15 +68,15 @@ export const CaasStep: React.FC = () => {
             icon={<PlusCircleIcon />}
             onClick={() => setDiscoveryHosts([...discoveryHosts, { ...EMPTY_HOST }])}
           >
-            Add node
+            Add host
           </Button>
         </FlexItem>
       </Flex>
 
       {discoveryHosts.length === 0 && (
         <p className={stepStyles.emptyHint}>
-          No nodes in the discovery pool. Click &quot;Add node&quot; to add
-          nodes, or skip this step to add them later.
+          No hosts registered yet. Click &quot;Add host&quot; to register
+          bare metal hosts, or skip this step to add them later.
         </p>
       )}
 
@@ -92,13 +93,13 @@ export const CaasStep: React.FC = () => {
                     updated[i] = h;
                     setDiscoveryHosts(updated);
                   }}
-                  label="Discovery node"
+                  label="Host"
                 />
               </FlexItem>
               <FlexItem>
                 <Button
                   variant="plain"
-                  aria-label={`Remove discovery node ${i + 1}`}
+                  aria-label={`Remove host ${i + 1}`}
                   onClick={() =>
                     setDiscoveryHosts(discoveryHosts.filter((_, idx) => idx !== i))
                   }

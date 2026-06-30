@@ -5,9 +5,13 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
+	"sort"
+	"time"
 
 	"github.com/danielgtaylor/huma/v2"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/config"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tasks"
@@ -24,13 +28,14 @@ var phasePlaybooks = map[int]string{
 }
 
 type TasksHandler struct {
-	runner     tasks.Runner
-	registry   *plugins.Registry
-	enclaveDir string
+	runner       tasks.Runner
+	registry     *plugins.Registry
+	configReader *config.Reader
+	enclaveDir   string
 }
 
-func NewTasksHandler(runner tasks.Runner, registry *plugins.Registry, enclaveDir string) *TasksHandler {
-	return &TasksHandler{runner: runner, registry: registry, enclaveDir: enclaveDir}
+func NewTasksHandler(runner tasks.Runner, registry *plugins.Registry, configReader *config.Reader, enclaveDir string) *TasksHandler {
+	return &TasksHandler{runner: runner, registry: registry, configReader: configReader, enclaveDir: enclaveDir}
 }
 
 // --- Request / Response types ---
@@ -173,6 +178,8 @@ func (h *TasksHandler) Register(api huma.API) {
 // --- Handlers ---
 
 func (h *TasksHandler) startDeploy(ctx context.Context, _ *StartDeployInput) (*StartTaskOutput, error) {
+	addonPlugins := h.addonPluginsFromConfig()
+
 	run, err := h.runner.Start(tasks.StartRequest{
 		Type:     models.TaskTypeDeploy,
 		Playbook: "playbooks/main.yaml",
@@ -183,7 +190,95 @@ func (h *TasksHandler) startDeploy(ctx context.Context, _ *StartDeployInput) (*S
 	if err != nil {
 		return nil, mapTaskError(err)
 	}
+
+	if len(addonPlugins) > 0 {
+		slog.Info("deploy with addon plugins queued", "plugins", addonPlugins)
+		go h.chainAddonPlugins(run.ID, addonPlugins)
+	}
+
 	return &StartTaskOutput{Body: *run}, nil
+}
+
+func (h *TasksHandler) addonPluginsFromConfig() []string {
+	if h.configReader == nil {
+		return nil
+	}
+	cfg, err := h.configReader.ReadAll()
+	if err != nil {
+		return nil
+	}
+	type addonInfo struct {
+		name  string
+		order int
+	}
+	var addons []addonInfo
+	for _, name := range cfg.Global.EnabledPlugins {
+		p, ok := h.registry.Get(name)
+		if !ok {
+			continue
+		}
+		if p.Type == models.PluginTypeAddon {
+			addons = append(addons, addonInfo{name: p.Name, order: p.Order})
+		}
+	}
+	sort.Slice(addons, func(i, j int) bool { return addons[i].order < addons[j].order })
+	result := make([]string, len(addons))
+	for i, a := range addons {
+		result[i] = a.name
+	}
+	return result
+}
+
+func (h *TasksHandler) chainAddonPlugins(mainRunID string, pluginNames []string) {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("addon plugin chain panicked", "error", r)
+		}
+	}()
+
+	slog.Info("waiting for main deploy to complete before addon plugins", "plugins", pluginNames)
+
+	for {
+		time.Sleep(10 * time.Second)
+		mainRun, err := h.runner.Get(mainRunID)
+		if err != nil {
+			continue
+		}
+		if mainRun.Status == models.TaskStatusRunning {
+			continue
+		}
+		if mainRun.Status != models.TaskStatusSuccessful {
+			slog.Warn("skipping addon plugins — main deploy did not succeed",
+				"run_id", mainRunID, "status", mainRun.Status)
+			return
+		}
+		break
+	}
+
+	slog.Info("main deploy completed, deploying addon plugins", "plugins", pluginNames)
+
+	for _, name := range pluginNames {
+		slog.Info("deploying addon plugin", "plugin", name)
+		run, _, err := h.runner.RunSync(context.Background(), tasks.StartRequest{
+			Type:     models.TaskTypeDeployPlugin,
+			Playbook: "playbooks/deploy-plugin.yaml",
+			ExtraVars: map[string]string{
+				"plugin_name": name,
+				"workingDir":  h.enclaveDir,
+			},
+		})
+		if err != nil {
+			slog.Error("addon plugin deploy failed to start", "plugin", name, "error", err)
+			return
+		}
+		if run.Status != models.TaskStatusSuccessful {
+			slog.Error("addon plugin deploy failed", "plugin", name, "status", run.Status)
+			return
+		}
+		slog.Info("addon plugin deployed successfully", "plugin", name)
+	}
+
+	slog.Info("all addon plugins deployed successfully")
 }
 
 func (h *TasksHandler) startDeployPhase(ctx context.Context, input *StartDeployPhaseInput) (*StartTaskOutput, error) {

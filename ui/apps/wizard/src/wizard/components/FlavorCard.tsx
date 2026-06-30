@@ -14,6 +14,7 @@ import { flavorCardStyles as styles } from "./flavorCardStyles.ts";
 
 interface FlavorCardProps {
   title: string;
+  subtitle?: string;
   description: string;
   icon?: ReactNode;
   isSelected: boolean;
@@ -22,6 +23,7 @@ interface FlavorCardProps {
 
 export const FlavorCard: React.FC<FlavorCardProps> = ({
   title,
+  subtitle,
   description,
   icon,
   isSelected,
@@ -64,6 +66,11 @@ export const FlavorCard: React.FC<FlavorCardProps> = ({
           </Flex>
           <FlexItem>
             <Title headingLevel="h3" size="xl">{title}</Title>
+            {subtitle && (
+              <Content component="p" style={{ fontSize: "0.875rem", color: "#6a6e73", marginTop: "0.25rem" }}>
+                {subtitle}
+              </Content>
+            )}
           </FlexItem>
           <FlexItem>
             <Content component="p" className={styles.description}>{description}</Content>

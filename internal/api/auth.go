@@ -10,11 +10,12 @@ import (
 )
 
 type AuthHandler struct {
-	store *auth.Store
+	store  *auth.Store
+	noAuth bool
 }
 
-func NewAuthHandler(store *auth.Store) *AuthHandler {
-	return &AuthHandler{store: store}
+func NewAuthHandler(store *auth.Store, noAuth bool) *AuthHandler {
+	return &AuthHandler{store: store, noAuth: noAuth}
 }
 
 type LoginInput struct {
@@ -82,7 +83,27 @@ func (h *AuthHandler) changePassword(_ context.Context, input *ChangePasswordInp
 	return out, nil
 }
 
+type AuthModeOutput struct {
+	Body struct {
+		NoAuth bool `json:"noAuth" doc:"True if authentication is disabled"`
+	}
+}
+
+func (h *AuthHandler) authMode(_ context.Context, _ *struct{}) (*AuthModeOutput, error) {
+	out := &AuthModeOutput{}
+	out.Body.NoAuth = h.noAuth
+	return out, nil
+}
+
 func (h *AuthHandler) Register(api huma.API) {
+	huma.Register(api, huma.Operation{
+		OperationID: "authMode",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/auth/mode",
+		Summary:     "Check authentication mode",
+		Tags:        []string{"auth"},
+	}, h.authMode)
+
 	huma.Register(api, huma.Operation{
 		OperationID: "login",
 		Method:      http.MethodPost,
@@ -105,10 +126,16 @@ func (h *AuthHandler) Register(api huma.API) {
 
 // BearerAuthMiddleware returns an HTTP middleware that requires a valid
 // bearer token for all paths except the login endpoint.
-func BearerAuthMiddleware(store *auth.Store) func(http.Handler) http.Handler {
+// When noAuth is true, all requests are passed through without checking tokens.
+func BearerAuthMiddleware(store *auth.Store, noAuth bool) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == "/api/v1/auth/login" {
+			if noAuth {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			if r.URL.Path == "/api/v1/auth/login" || r.URL.Path == "/api/v1/auth/mode" {
 				next.ServeHTTP(w, r)
 				return
 			}

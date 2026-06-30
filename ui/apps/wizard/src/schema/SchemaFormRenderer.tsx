@@ -12,6 +12,19 @@ import { StringArrayField } from "../wizard/components/StringArrayField.tsx";
 import { extractFieldMeta, type FieldMeta } from "./schemaUtils.ts";
 import { stepStyles } from "../wizard/steps/stepStyles.ts";
 
+const PLACEHOLDER_HINTS: Record<string, string> = {
+  baseDomain: "example.com",
+  clusterName: "mgmt",
+  machineNetwork: "192.168.1.0/24",
+  apiVIP: "192.168.1.200",
+  ingressVIP: "192.168.1.201",
+  rendezvousIP: "192.168.1.10",
+  defaultDNS: "192.168.1.1",
+  defaultGateway: "192.168.1.1",
+  lzBmcIP: "192.168.1.100",
+  lzBmcHostname: "lz.example.com",
+};
+
 function isFieldEmpty(value: unknown): boolean {
   if (value == null) return true;
   if (typeof value === "string" && value.trim() === "") return true;
@@ -174,6 +187,7 @@ function renderField(
         aria-label={meta.label}
         value={(value as string) ?? ""}
         onChange={(_e, v) => onChange(meta.path, v)}
+        placeholder={PLACEHOLDER_HINTS[meta.path.split(".").pop() ?? ""]}
         isRequired={meta.required}
         validated={validated}
       />
