@@ -9,9 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"io/fs"
+
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/config"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tasks"
-	"gopkg.in/yaml.v3"
 )
 
 type Validator struct {
@@ -108,15 +110,12 @@ func (v *Validator) runPlaybook(ctx context.Context, cfg *models.EnclaveConfig, 
 	}
 	defer os.RemoveAll(backupDir)
 
-	configFiles := []string{"global.yaml", "certificates.yaml", "cloud_infra.yaml"}
-	for _, name := range configFiles {
-		src := filepath.Join(configDir, name)
-		if data, err := os.ReadFile(src); err == nil {
-			os.WriteFile(filepath.Join(backupDir, name), data, 0640)
-		}
-	}
+	backupConfigDir(configDir, backupDir)
 
-	if err := writeConfigToDir(configDir, cfg); err != nil {
+	savedPlugins := cfg.Global.PluginsConfig
+	writer := config.NewWriter(v.enclaveDir)
+	if err := writer.WriteAll(cfg); err != nil {
+		restoreConfigDir(backupDir, configDir)
 		return []models.ValidationError{{Message: fmt.Sprintf("failed to write config: %v", err)}}
 	}
 
@@ -126,7 +125,8 @@ func (v *Validator) runPlaybook(ctx context.Context, cfg *models.EnclaveConfig, 
 		Tags:     tags,
 	})
 
-	rollbackConfig(backupDir, configDir, configFiles)
+	restoreConfigDir(backupDir, configDir)
+	cfg.Global.PluginsConfig = savedPlugins
 
 	if err != nil {
 		return []models.ValidationError{{Message: fmt.Sprintf("validation error: %v", err)}}
@@ -214,49 +214,45 @@ func parseFailedEvents(events []json.RawMessage) []models.ValidationError {
 	return result
 }
 
-func rollbackConfig(backupDir, configDir string, files []string) {
-	for _, name := range files {
-		backup := filepath.Join(backupDir, name)
-		if data, err := os.ReadFile(backup); err == nil {
-			os.WriteFile(filepath.Join(configDir, name), data, 0640)
+func backupConfigDir(configDir, backupDir string) {
+	filepath.WalkDir(configDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
 		}
-	}
-}
-
-// --- Config serialization ---
-
-func writeConfigToDir(dir string, cfg *models.EnclaveConfig) error {
-	globalMap := structToMap(cfg.Global)
-
-	if err := writeYAMLMap(filepath.Join(dir, "global.yaml"), globalMap); err != nil {
-		return err
-	}
-
-	certsMap := structToMap(cfg.Certificates)
-	if err := writeYAMLMap(filepath.Join(dir, "certificates.yaml"), certsMap); err != nil {
-		return err
-	}
-
-	cloudInfraMap := structToMap(cfg.CloudInfra)
-	return writeYAMLMap(filepath.Join(dir, "cloud_infra.yaml"), cloudInfraMap)
-}
-
-func structToMap(v any) map[string]any {
-	data, _ := json.Marshal(v)
-	var m map[string]any
-	json.Unmarshal(data, &m)
-	for k, val := range m {
-		if val == nil {
-			delete(m, k)
+		rel, _ := filepath.Rel(configDir, path)
+		dest := filepath.Join(backupDir, rel)
+		if d.IsDir() {
+			os.MkdirAll(dest, 0750)
+			return nil
 		}
-	}
-	return m
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		os.WriteFile(dest, data, 0640)
+		return nil
+	})
 }
 
-func writeYAMLMap(path string, m map[string]any) error {
-	data, err := yaml.Marshal(m)
-	if err != nil {
-		return fmt.Errorf("marshal %s: %w", filepath.Base(path), err)
-	}
-	return os.WriteFile(path, data, 0640)
+func restoreConfigDir(backupDir, configDir string) {
+	pluginsDir := filepath.Join(configDir, "plugins")
+	os.RemoveAll(pluginsDir)
+
+	filepath.WalkDir(backupDir, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+		rel, _ := filepath.Rel(backupDir, path)
+		dest := filepath.Join(configDir, rel)
+		if d.IsDir() {
+			os.MkdirAll(dest, 0750)
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+		os.WriteFile(dest, data, 0640)
+		return nil
+	})
 }

@@ -148,10 +148,10 @@ function buildConfigSubSteps(selectedFlavors: Set<string>, enabledPlugins: strin
     subs.push({ id: "trust-manager", label: "Trust Manager" });
   }
   if (selectedFlavors.has("vmaas")) {
-    subs.push({ id: "gpu-ai", label: "GPU Compute" });
+    subs.push({ id: "gpu-ai", label: "Virtual Machines" });
   }
   if (selectedFlavors.has("caas")) {
-    subs.push({ id: "caas", label: "Cluster as a Service" });
+    subs.push({ id: "caas", label: "Bare Metal Hosts" });
   }
   return subs;
 }
@@ -395,6 +395,13 @@ function WizardContent(): React.ReactElement {
             }
           }
         }
+      }
+    }
+
+    if (currentSubStepId === "osac") {
+      const globalData = ((state.configData as Record<string, unknown>).global ?? {}) as Record<string, unknown>;
+      if (!((globalData.osacAapLicenseFile as string) ?? "").trim()) {
+        errors.push({ path: "global.osacAapLicenseFile", label: "AAP subscription manifest", message: "AAP subscription manifest is required for OSAC" });
       }
     }
 

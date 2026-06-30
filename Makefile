@@ -2,7 +2,7 @@ BINARY := enclave-wizard
 GO := go
 CONTAINER_RUNTIME := $(shell command -v podman 2> /dev/null || echo docker)
 
-.PHONY: build build-linux build-ui run test lint clean tidy deploy teardown generate enclave-mock clean-enclave-mock run-mock preview deploy-preview
+.PHONY: build build-linux build-ui run test lint clean tidy deploy teardown generate enclave-mock clean-enclave-mock run-mock preview deploy-preview bm-emulation bm-emulation-cleanup
 
 build-ui:
 	$(CONTAINER_RUNTIME) run --rm -v $(PWD)/ui:/app:z -w /app node:22-alpine \
@@ -52,8 +52,8 @@ deploy-preview:
 	hack/deploy-preview.sh $(TARGET) $(PORT)
 
 deploy: build-linux
-	@test -n "$(TARGET)" || (echo "Usage: make deploy TARGET=root@host" && exit 1)
-	hack/deploy-wizard $(TARGET)
+	@test -n "$(TARGET)" || (echo "Usage: make deploy TARGET=root@host [AUTH=none]" && exit 1)
+	AUTH=$(AUTH) hack/deploy-wizard $(TARGET)
 
 teardown:
 	@test -n "$(TARGET)" || (echo "Usage: make teardown TARGET=root@host" && exit 1)
@@ -75,6 +75,14 @@ e2e-full: rpm
 	@test -n "$(TARGET)" || (echo "Usage: make e2e-full TARGET=root@host" && exit 1)
 	hack/e2e/run-e2e.sh --host $(TARGET)
 	$(MAKE) e2e-browser WIZARD_URL=https://$(shell echo $(TARGET) | cut -d@ -f2):3443
+
+bm-emulation:
+	@test -n "$(TARGET)" || (echo "Usage: make bm-emulation TARGET=root@host" && exit 1)
+	hack/infra/bm-emulation.sh --host $(TARGET)
+
+bm-emulation-cleanup:
+	@test -n "$(TARGET)" || (echo "Usage: make bm-emulation-cleanup TARGET=root@host" && exit 1)
+	hack/infra/bm-emulation-cleanup.sh --host $(TARGET)
 
 ENCLAVE_MOCK_BRANCH ?= main
 ENCLAVE_MOCK_REPO ?= git@github.com:rccrdpccl/enclave.git

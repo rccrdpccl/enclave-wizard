@@ -69,8 +69,9 @@ type PluginsConfig struct {
 	OsacDatabaseUrl    *string             `json:"osacDatabaseUrl,omitempty" yaml:"osacDatabaseUrl,omitempty" doc:"PostgreSQL connection URL when using BYO database"`
 	RhbkInstances      *int                `json:"rhbk_instances,omitempty" yaml:"rhbk_instances,omitempty" doc:"Number of Keycloak replicas" minimum:"1"`
 	RhbkDeployDatabase *bool               `json:"rhbk_deploy_database,omitempty" yaml:"rhbk_deploy_database,omitempty" doc:"Deploy PostgreSQL alongside Keycloak"`
-	RhbkDbSize         *string             `json:"rhbk_db_size,omitempty" yaml:"rhbk_db_size,omitempty" doc:"PVC size for Keycloak PostgreSQL"`
-	LVMSConfig         *LVMSConfig         `json:"lvmsDefaults,omitempty" yaml:"lvmsDefaults,omitempty" doc:"LVMS deployment configuration"`
+	RhbkDbSize                   *string             `json:"rhbk_db_size,omitempty" yaml:"rhbk_db_size,omitempty" doc:"PVC size for Keycloak PostgreSQL"`
+	ClusterFulfillmentConfig     map[string]string   `json:"clusterFulfillmentConfig,omitempty" yaml:"clusterFulfillmentConfig,omitempty" doc:"Cluster fulfillment configuration (passed through to osac-installer Helm values)"`
+	LVMSConfig                   *LVMSConfig         `json:"lvmsDefaults,omitempty" yaml:"lvmsDefaults,omitempty" doc:"LVMS deployment configuration"`
 	ODFConfig          *ODFConfig          `json:"odfDefaults,omitempty" yaml:"odfDefaults,omitempty" doc:"ODF deployment configuration"`
 	VASTConfig         *VASTConfig         `json:"vastDefaults,omitempty" yaml:"vastDefaults,omitempty" doc:"VAST CSI deployment defaults"`
 	AAPConfig          *AAPConfig          `json:"aapDefaults,omitempty" yaml:"aapDefaults,omitempty" doc:"AAP deployment configuration"`

@@ -11,6 +11,7 @@ if [ $# -lt 1 ]; then
 fi
 
 TARGET="$1"
+AUTH="${AUTH:-}"
 SSH="ssh -o StrictHostKeyChecking=no"
 SCP="scp -o StrictHostKeyChecking=no -q"
 
@@ -150,6 +151,36 @@ ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
   sudo dnf install -y /tmp/enclave-wizard.rpm 2>&1 | tail -5
 " 2>&1 | grep -v "^$"
 
+# Attach BMC network if bm-emulation was set up
+BMC_VM_IP=""
+if ${SSH} "${TARGET}" "virsh net-info enclave-bmc" &>/dev/null; then
+  HAS_BMC=$(${SSH} "${TARGET}" "virsh domiflist ${VM_NAME} | grep -c enclave-bmc" 2>/dev/null || echo "0")
+  if [ "${HAS_BMC}" = "0" ]; then
+    ${SSH} "${TARGET}" "virsh attach-interface ${VM_NAME} network enclave-bmc --model virtio --config --live"
+    sleep 5
+  fi
+  ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
+    sudo nmcli con mod 'Wired connection 2' ipv4.dns '192.168.223.1' ipv4.dns-priority -10 2>/dev/null || true
+    sudo nmcli con up 'Wired connection 2' 2>/dev/null || true
+  " 2>/dev/null || true
+  for _attempt in 1 2 3 4 5; do
+    BMC_VM_IP=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "ip -4 addr show eth1 2>/dev/null | grep -oP 'inet \K[0-9.]+'" 2>/dev/null || echo "")
+    [ -n "${BMC_VM_IP}" ] && break
+    sleep 3
+  done
+fi
+
+# Disable auth if requested
+if [ "${AUTH}" = "none" ]; then
+  ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
+    sudo sed -i 's|ExecStart=.*|& --no-auth|' /etc/systemd/system/enclave-wizard.service
+    sudo systemctl daemon-reload
+    sudo systemctl restart enclave-wizard
+  " 2>/dev/null
+  echo "  Auth disabled (--no-auth)"
+  sleep 2
+fi
+
 # --- Step 6: Set up port forwarding and verify ---
 echo "[6/6] Setting up port forwarding and verifying..."
 
@@ -217,8 +248,11 @@ echo "  HTTPS (external):   $( $EXT_OK && echo 'OK' || echo 'FAIL - check port f
 echo ""
 
 if $HTTPS_OK; then
-    echo "Wizard URL: https://${TARGET_HOST}:${HTTPS_PORT}/wizard"
-    echo "VM SSH:     ssh -J ${TARGET} wizard@${VM_IP}"
+    WIZARD_PASS=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "sudo cat /tmp/enclave-wizard-init-pass 2>/dev/null" 2>/dev/null || echo "(could not retrieve)")
+    echo "Wizard URL:     https://${TARGET_HOST}:${HTTPS_PORT}/wizard"
+    echo "Password:       ${WIZARD_PASS}"
+    [ -n "${BMC_VM_IP}" ] && echo "Landing Zone IP: ${BMC_VM_IP}  (on BMC network)"
+    echo "VM SSH:         ssh -J ${TARGET} wizard@${VM_IP}"
     echo ""
     echo "  (Self-signed cert — accept the browser warning)"
     echo ""

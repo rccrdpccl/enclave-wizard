@@ -49,11 +49,50 @@ interface ConfigFile {
   path: string;
 }
 
-const CONFIG_FILES: ConfigFile[] = [
+const BASE_CONFIG_FILES: ConfigFile[] = [
   { key: "global", label: "global.yaml", path: "global" },
   { key: "cloudInfra", label: "cloud_infra.yaml", path: "cloudInfra" },
   { key: "certificates", label: "certificates.yaml", path: "certificates" },
 ];
+
+const OSAC_PLUGIN_KEYS = [
+  "osacProfile",
+  "osacAapLicenseFile",
+  "osacBYODatabase",
+  "osacDatabaseUrl",
+  "clusterFulfillmentConfig",
+];
+
+const RHBK_PLUGIN_KEYS = [
+  "rhbk_instances",
+  "rhbk_deploy_database",
+  "rhbk_db_size",
+];
+
+function extractPluginConfig(
+  globalData: Record<string, unknown>,
+  keys: string[],
+): Record<string, unknown> | null {
+  const result: Record<string, unknown> = {};
+  let hasValue = false;
+  for (const key of keys) {
+    if (globalData[key] != null && globalData[key] !== "" && globalData[key] !== false) {
+      result[key] = globalData[key];
+      hasValue = true;
+    }
+  }
+  return hasValue ? result : null;
+}
+
+function stripPluginKeys(
+  globalData: Record<string, unknown>,
+): Record<string, unknown> {
+  const result = { ...globalData };
+  for (const key of [...OSAC_PLUGIN_KEYS, ...RHBK_PLUGIN_KEYS]) {
+    delete result[key];
+  }
+  return result;
+}
 
 function configToYaml(data: unknown): string {
   if (data == null || (typeof data === "object" && Object.keys(data as object).length === 0)) {
@@ -86,12 +125,29 @@ export const ReviewStep: React.FC = () => {
   const finalConfig = useMemo(() => buildFinalConfig(state), [state]);
   const wireConfig = useMemo(() => EnclaveConfigToJSON(finalConfig) as Record<string, unknown>, [finalConfig]);
 
-  const yamlContents = useMemo(() => {
-    const result: Record<string, string> = {};
-    for (const file of CONFIG_FILES) {
-      result[file.key] = configToYaml(wireConfig[file.path]);
+  const { configFiles, yamlContents } = useMemo(() => {
+    const globalData = (wireConfig.global ?? {}) as Record<string, unknown>;
+    const osacPlugin = extractPluginConfig(globalData, OSAC_PLUGIN_KEYS);
+    const rhbkPlugin = extractPluginConfig(globalData, RHBK_PLUGIN_KEYS);
+    const strippedGlobal = stripPluginKeys(globalData);
+
+    const files: ConfigFile[] = [...BASE_CONFIG_FILES];
+    if (osacPlugin) {
+      files.push({ key: "osac", label: "plugins/osac.yaml", path: "osac" });
     }
-    return result;
+    if (rhbkPlugin) {
+      files.push({ key: "rhbk", label: "plugins/rhbk.yaml", path: "rhbk" });
+    }
+
+    const contents: Record<string, string> = {};
+    for (const file of BASE_CONFIG_FILES) {
+      const data = file.key === "global" ? strippedGlobal : wireConfig[file.path];
+      contents[file.key] = configToYaml(data);
+    }
+    if (osacPlugin) contents.osac = configToYaml(osacPlugin);
+    if (rhbkPlugin) contents.rhbk = configToYaml(rhbkPlugin);
+
+    return { configFiles: files, yamlContents: contents };
   }, [wireConfig]);
 
   const handleYamlChange = useCallback(
@@ -154,7 +210,7 @@ export const ReviewStep: React.FC = () => {
   }, [api, finalConfig, dispatch]);
 
   const handleCopyAll = useCallback(() => {
-    const allYaml = CONFIG_FILES.map(
+    const allYaml = configFiles.map(
       (f) => `# --- ${f.label} ---\n${yamlContents[f.key]}`,
     ).join("\n");
     navigator.clipboard.writeText(allYaml);
@@ -248,7 +304,7 @@ export const ReviewStep: React.FC = () => {
         onSelect={(_e, key) => setActiveTab(key as string)}
         aria-label="Configuration files"
       >
-        {CONFIG_FILES.map((file) => (
+        {configFiles.map((file) => (
           <Tab
             key={file.key}
             eventKey={file.key}
@@ -274,6 +330,7 @@ export const ReviewStep: React.FC = () => {
         <YamlEditor
           value={yamlContents[activeTab]}
           onChange={(v) => handleYamlChange(activeTab, v)}
+          readOnly={activeTab === "osac" || activeTab === "rhbk"}
         />
         <div className={styles.statusBar}>
           <span>

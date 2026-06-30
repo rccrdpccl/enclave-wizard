@@ -14,27 +14,31 @@ test.describe("Disconnected + ODF + GPU scenario", () => {
   test("completes full wizard flow with disconnected, ODF, and GPU enabled", async ({
     page,
   }) => {
-    // a. Navigate and click Get started
     await wizard.goto();
     await wizard.clickGetStarted();
 
-    // b. Select GPU & AI Workloads flavor and proceed
-    await wizard.selectFlavor("GPU & AI Workloads");
+    // Select VMaaS flavor (includes GPU passthrough option)
+    await wizard.selectFlavor("VMaaS");
     await wizard.clickNext();
 
-    // c. Fill Landing Zone for disconnected mode
+    // Landing Zone: disconnected mode
     await wizard.fillLandingZone({
       disconnected: true,
       lzBmcIP: "172.20.0.1",
+    });
+    await wizard.clickNext();
+
+    // Storage: ODF + quay credentials
+    await wizard.fillStorage({
+      storagePlugin: "odf",
+      odfExternalConfig: '{"clusterID":"e2e-ceph"}',
       quayUser: "registry-admin",
       quayPassword: "odf-gpu-secret",
       quayBackend: "LocalStorage",
     });
-
-    // d. Proceed to Hub Cluster
     await wizard.clickNext();
 
-    // e. Fill Hub Cluster details with ODF and 3 hosts
+    // Hub Cluster
     await wizard.fillHubCluster({
       baseDomain: "odf-gpu.enclave.io",
       clusterName: "gpu-mgmt",
@@ -45,8 +49,6 @@ test.describe("Disconnected + ODF + GPU scenario", () => {
       defaultDNS: "172.20.0.1",
       defaultGateway: "172.20.0.1",
       defaultPrefix: 24,
-      enableOdf: true,
-      odfExternalConfig: '{"clusterID":"e2e-ceph"}',
       pullSecret: '{"auths":{}}',
       sshPubKey: "ssh-rsa AAAA-gpu-test",
       hosts: [
@@ -54,7 +56,7 @@ test.describe("Disconnected + ODF + GPU scenario", () => {
           name: "gpu-node-01",
           macAddress: "AA:BB:CC:DD:01:01",
           ipAddress: "172.20.0.11",
-          redfish: "https://172.20.0.1:8443/redfish/v1/Systems/1",
+          redfish: "172.20.0.100",
           redfishUser: "admin",
           redfishPassword: "redfish01",
           rootDisk: "/dev/sda",
@@ -63,7 +65,7 @@ test.describe("Disconnected + ODF + GPU scenario", () => {
           name: "gpu-node-02",
           macAddress: "AA:BB:CC:DD:01:02",
           ipAddress: "172.20.0.12",
-          redfish: "https://172.20.0.1:8443/redfish/v1/Systems/2",
+          redfish: "172.20.0.101",
           redfishUser: "admin",
           redfishPassword: "redfish02",
           rootDisk: "/dev/sda",
@@ -72,7 +74,7 @@ test.describe("Disconnected + ODF + GPU scenario", () => {
           name: "gpu-node-03",
           macAddress: "AA:BB:CC:DD:01:03",
           ipAddress: "172.20.0.13",
-          redfish: "https://172.20.0.1:8443/redfish/v1/Systems/3",
+          redfish: "172.20.0.102",
           redfishUser: "admin",
           redfishPassword: "redfish03",
           rootDisk: "/dev/sda",
@@ -80,36 +82,25 @@ test.describe("Disconnected + ODF + GPU scenario", () => {
       ],
     });
 
-    // f. Click Next — should land on GPU & AI step (flavor-specific)
+    // OSAC Platform step: upload AAP license
+    await wizard.fillOsac({});
     await wizard.clickNext();
 
-    // g. Verify nvidia-gpu checkbox is auto-selected by the GPU flavor
-    const nvidiaCheckbox = page.locator("#gpu-ai-nvidia-gpu");
-    await expect(nvidiaCheckbox).toBeChecked();
-
-    // h. Click Next to Review
+    // Virtual Machines step — enable GPU passthrough
     await wizard.clickNext();
+    await wizard.enableGpuPassthrough();
+    const gpuCheckbox = page.locator("#enable-gpu");
+    await expect(gpuCheckbox).toBeChecked();
 
-    // i. Verify global.yaml tab contains expected values
+    // Review
+    await wizard.clickNext();
     const globalYaml = await wizard.getYamlContent("global.yaml");
     expect(globalYaml).toContain("odf-gpu.enclave.io");
     expect(globalYaml).toContain("nvidia-gpu");
 
-    // j. Click Validate
     await wizard.clickValidate();
 
-    // k. Click Next to Generate
+    // Navigate to Deploy step
     await wizard.clickNext();
-
-    // l. Write configuration and wait for success
-    await wizard.clickWriteConfiguration();
-    await wizard.waitForWriteSuccess();
-
-    // m. Verify via API that the written config includes odf, nvidia-gpu, and quayUser
-    const config = await api.getConfig();
-    const configStr = JSON.stringify(config);
-    expect(configStr).toContain("odf");
-    expect(configStr).toContain("nvidia-gpu");
-    expect(configStr).toContain("registry-admin");
   });
 });

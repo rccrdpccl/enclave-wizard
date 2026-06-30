@@ -7,11 +7,13 @@ import {
   HelperText,
   HelperTextItem,
   NumberInput,
+  Popover,
   Radio,
   Switch,
   TextInput,
   Title,
 } from "@patternfly/react-core";
+import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
 import type React from "react";
 import { useCallback, useState } from "react";
 import { useWizard } from "../WizardContext.tsx";
@@ -87,7 +89,16 @@ export const OsacStep: React.FC = () => {
       {/* AAP License */}
       <FlexItem>
         <FormGroup
-          label="AAP subscription file"
+          label={
+            <span>
+              AAP subscription manifest{" "}
+              <Popover
+                bodyContent="The OSAC platform uses Ansible Automation Platform (AAP) as its automation engine. AAP requires a Red Hat subscription manifest (manifest.zip) to operate. Download it from access.redhat.com under Subscription Allocations."
+              >
+                <OutlinedQuestionCircleIcon style={{ cursor: "pointer", color: "#6a6e73" }} />
+              </Popover>
+            </span>
+          }
           isRequired
           fieldId="aap-license"
         >
@@ -126,8 +137,8 @@ export const OsacStep: React.FC = () => {
           {!aapLicenseFile && !uploadError && (
             <HelperText>
               <HelperTextItem>
-                Obtain from
-                access.redhat.com/management/subscription_allocations
+                Download manifest.zip from Red Hat Subscription
+                Allocations (access.redhat.com)
               </HelperTextItem>
             </HelperText>
           )}
@@ -256,6 +267,7 @@ export const OsacStep: React.FC = () => {
           </FormGroup>
         </FlexItem>
       )}
+
     </Flex>
   );
 };

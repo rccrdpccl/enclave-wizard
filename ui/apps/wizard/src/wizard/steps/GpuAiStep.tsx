@@ -40,19 +40,18 @@ export const GpuAiStep: React.FC = () => {
     <Flex direction={{ default: "column" }} gap={{ default: "gapLg" }}>
       <FlexItem>
         <Title headingLevel="h3" size="lg">
-          GPU Compute
+          VMaaS GPU Passthrough
         </Title>
         <Content component="p" className={stepStyles.subtitle}>
-          Enable GPU-accelerated compute on your virtual machine
-          infrastructure.
+          Allow virtual machines to use physical GPUs on the host nodes.
         </Content>
       </FlexItem>
 
       <FlexItem>
         <Checkbox
           id="enable-gpu"
-          label="Enable NVIDIA GPU support"
-          description="Installs the NVIDIA GPU Operator for automatic driver and runtime provisioning on GPU-equipped nodes."
+          label="Enable GPU passthrough"
+          description="Installs the NVIDIA GPU Operator to expose host GPUs to virtual machines via PCI passthrough."
           isChecked={isEnabled}
           onChange={(_e, checked) => toggle(checked)}
         />
