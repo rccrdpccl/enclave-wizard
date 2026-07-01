@@ -46,10 +46,10 @@ export const CaasStep: React.FC = () => {
         Bare Metal Hosts
       </Title>
       <Content component="p">
-        Register bare metal hosts that will be available for provisioning
-        managed clusters. Each host is enrolled via its BMC (Redfish)
-        interface and added to the resource pool. You can add hosts later
-        through the management interface.
+        Register bare metal machines that form the resource pool for CaaS.
+        The platform draws from this pool when provisioning managed clusters.
+        Each machine is enrolled via its BMC (Redfish/IPMI) interface.
+        You can add machines later through the management interface.
       </Content>
 
       <Flex

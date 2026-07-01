@@ -2,7 +2,7 @@ BINARY := enclave-wizard
 GO := go
 CONTAINER_RUNTIME := $(shell command -v podman 2> /dev/null || echo docker)
 
-.PHONY: build build-linux build-ui run test lint clean tidy deploy teardown generate enclave-mock clean-enclave-mock run-mock preview deploy-preview bm-emulation bm-emulation-cleanup
+.PHONY: build build-linux build-ui run test lint clean tidy deploy teardown generate enclave-mock clean-enclave-mock run-mock preview deploy-preview bm-emulation bm-emulation-config bm-emulation-cleanup
 
 build-ui:
 	$(CONTAINER_RUNTIME) run --rm -v $(PWD)/ui:/app:z -w /app node:22-alpine \
@@ -51,9 +51,9 @@ deploy-preview:
 	@test -n "$(TARGET)" || (echo "Usage: make deploy-preview TARGET=root@host [PORT=3443]" && exit 1)
 	hack/deploy-preview.sh $(TARGET) $(PORT)
 
-deploy: build-linux
-	@test -n "$(TARGET)" || (echo "Usage: make deploy TARGET=root@host [AUTH=none]" && exit 1)
-	AUTH=$(AUTH) hack/deploy-wizard $(TARGET)
+deploy: rpm
+	@test -n '$(TARGET)' || (echo "Usage: make deploy TARGET=root@host [AUTH=none]" && exit 1)
+	AUTH='$(AUTH)' hack/deploy-wizard '$(TARGET)'
 
 teardown:
 	@test -n "$(TARGET)" || (echo "Usage: make teardown TARGET=root@host" && exit 1)
@@ -79,6 +79,11 @@ e2e-full: rpm
 bm-emulation:
 	@test -n "$(TARGET)" || (echo "Usage: make bm-emulation TARGET=root@host" && exit 1)
 	hack/infra/bm-emulation.sh --host $(TARGET)
+
+bm-emulation-config:
+	@test -n '$(TARGET)' || (echo "Usage: make bm-emulation-config TARGET=root@host PULL_SECRET=/path/to/pull-secret.json" && exit 1)
+	@test -n '$(PULL_SECRET)' || (echo "Usage: make bm-emulation-config TARGET=root@host PULL_SECRET=/path/to/pull-secret.json" && exit 1)
+	hack/infra/bm-emulation-config.sh --host '$(TARGET)' --pull-secret '$(PULL_SECRET)'
 
 bm-emulation-cleanup:
 	@test -n "$(TARGET)" || (echo "Usage: make bm-emulation-cleanup TARGET=root@host" && exit 1)

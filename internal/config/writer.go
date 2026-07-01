@@ -29,6 +29,7 @@ func (w *Writer) WriteAll(cfg *models.EnclaveConfig) error {
 	if err := writeYAMLFile(filepath.Join(configDir, "global.yaml"), &cfg.Global); err != nil {
 		return fmt.Errorf("writing global.yaml: %w", err)
 	}
+	nilEmptyCertFields(&cfg.Certificates)
 	if err := writeYAMLFile(filepath.Join(configDir, "certificates.yaml"), &cfg.Certificates); err != nil {
 		return fmt.Errorf("writing certificates.yaml: %w", err)
 	}
@@ -126,6 +127,22 @@ func extractRhbkConfig(pc *models.PluginsConfig) *rhbkPluginConfig {
 		pc.RhbkDbSize = nil
 	}
 	return cfg
+}
+
+func nilIfEmpty(s **string) {
+	if *s != nil && **s == "" {
+		*s = nil
+	}
+}
+
+func nilEmptyCertFields(c *models.CertificatesConfig) {
+	nilIfEmpty(&c.SSLAPICertificateFullChain)
+	nilIfEmpty(&c.SSLAPICertificateKey)
+	nilIfEmpty(&c.SSLIngressCertificateFullChain)
+	nilIfEmpty(&c.SSLIngressCertificateKey)
+	nilIfEmpty(&c.SSLCACertificate)
+	nilIfEmpty(&c.IronicHTTPSCertificate)
+	nilIfEmpty(&c.IronicHTTPSKey)
 }
 
 func writeYAMLFile[T any](path string, data *T) error {
