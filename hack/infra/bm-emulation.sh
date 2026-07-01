@@ -14,7 +14,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 TARGET=""
-CLUSTER_NAME="${CLUSTER_NAME:-mgmt}"
+CLUSTER_NAME="${CLUSTER_NAME:-edge}"
 BASE_DOMAIN="${BASE_DOMAIN:-enclave-test.lab.local}"
 API_VIP="${API_VIP:-192.168.223.200}"
 INGRESS_VIP="${INGRESS_VIP:-192.168.223.201}"
@@ -33,7 +33,7 @@ done
 if [ -z "${TARGET}" ]; then
   echo "Usage: $0 --host root@hypervisor"
   echo "  --host           SSH target (e.g. root@my-hypervisor)"
-  echo "  --cluster-name   Cluster name (default: mgmt)"
+  echo "  --cluster-name   Cluster name (default: edge)"
   echo "  --base-domain    Base domain (default: enclave-test.lab.local)"
   exit 1
 fi
@@ -99,15 +99,15 @@ echo "╠═══════════════════════�
 echo "║  Control Plane VMs                                                         ║"
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 echo ""
-printf "  %-15s %-20s %-38s %s\n" "Name" "MAC" "BMC System ID (UUID)" "IP"
-printf "  %-15s %-20s %-38s %s\n" "───────────────" "────────────────────" "──────────────────────────────────────" "───────────────"
+printf "  %-15s %-20s %-17s %-38s %-15s %s\n" "Name" "MAC" "IP" "BMC System ID" "BMC Address" "Disk"
+printf "  %-15s %-20s %-17s %-38s %-15s %s\n" "───────────────" "────────────────────" "─────────────────" "──────────────────────────────────────" "───────────────" "────────"
 
 for i in 0 1 2; do
   VM_NAME="enclave-cp-${i}"
   VM_MAC="00:60:2f:e0:c1:$(printf '%02x' "$i")"
   VM_IP_ADDR="192.168.223.$((10 + i))"
   UUID=$(echo "${VM_UUIDS}" | grep "^${VM_NAME}|" | cut -d'|' -f2 | tr -d '[:space:]')
-  printf "  %-15s %-20s %-38s %s\n" "${VM_NAME}" "${VM_MAC}" "${UUID}" "${VM_IP_ADDR}"
+  printf "  %-15s %-20s %-17s %-38s %-15s %s\n" "${VM_NAME}" "${VM_MAC}" "${VM_IP_ADDR}" "${UUID}" "192.168.223.1:8100" "/dev/sda"
 done
 
 echo ""

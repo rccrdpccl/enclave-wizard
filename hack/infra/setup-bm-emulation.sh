@@ -4,7 +4,7 @@
 # Idempotent — safe to re-run.
 #
 # Usage: ./setup-bm-emulation.sh [options]
-#   --cluster-name NAME    Cluster name (default: mgmt)
+#   --cluster-name NAME    Cluster name (default: edge)
 #   --base-domain DOMAIN   Base domain (default: enclave-test.lab.local)
 #   --api-vip IP           API VIP (default: 192.168.223.200)
 #   --ingress-vip IP       Ingress VIP (default: 192.168.223.201)
@@ -12,7 +12,7 @@
 #   --teardown             Tear down everything instead of setting up
 set -euo pipefail
 
-CLUSTER_NAME="${CLUSTER_NAME:-mgmt}"
+CLUSTER_NAME="${CLUSTER_NAME:-edge}"
 BASE_DOMAIN="${BASE_DOMAIN:-enclave-test.lab.local}"
 API_VIP="${API_VIP:-192.168.223.200}"
 INGRESS_VIP="${INGRESS_VIP:-192.168.223.201}"

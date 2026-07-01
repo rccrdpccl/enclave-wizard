@@ -31,11 +31,12 @@ type TasksHandler struct {
 	runner       tasks.Runner
 	registry     *plugins.Registry
 	configReader *config.Reader
+	configWriter *config.Writer
 	enclaveDir   string
 }
 
-func NewTasksHandler(runner tasks.Runner, registry *plugins.Registry, configReader *config.Reader, enclaveDir string) *TasksHandler {
-	return &TasksHandler{runner: runner, registry: registry, configReader: configReader, enclaveDir: enclaveDir}
+func NewTasksHandler(runner tasks.Runner, registry *plugins.Registry, configReader *config.Reader, configWriter *config.Writer, enclaveDir string) *TasksHandler {
+	return &TasksHandler{runner: runner, registry: registry, configReader: configReader, configWriter: configWriter, enclaveDir: enclaveDir}
 }
 
 // --- Request / Response types ---
