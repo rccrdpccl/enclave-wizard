@@ -182,10 +182,21 @@ for host in root.findall('.//dns/host'):
     fi
   " 2>/dev/null || true
   for _attempt in 1 2 3 4 5; do
-    BMC_VM_IP=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "ip -4 addr show eth1 2>/dev/null | grep -oP 'inet \K[0-9.]+'" 2>/dev/null || echo "")
-    [ -n "${BMC_VM_IP}" ] && break
+    BMC_VM_IP=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "ip -4 addr 2>/dev/null | grep -oP 'inet 192\.168\.223\.\K[0-9]+'" 2>/dev/null || echo "")
+    [ -n "${BMC_VM_IP}" ] && BMC_VM_IP="192.168.223.${BMC_VM_IP}" && break
     sleep 3
   done
+
+  # Add mirror DNS entry to BMC network pointing to wizard VM
+  if [ -n "${BMC_VM_IP}" ]; then
+    ${SSH} "${TARGET}" "
+      virsh net-update enclave-bmc add dns-host '<host ip=\"${BMC_VM_IP}\"><hostname>mirror.enclave-test.lab.local</hostname></host>' --live --config 2>/dev/null || true
+    "
+    # Also add to /etc/hosts on wizard VM
+    ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
+      echo '${BMC_VM_IP} mirror.enclave-test.lab.local' | sudo tee -a /etc/hosts > /dev/null
+    " 2>/dev/null || true
+  fi
 fi
 
 # Disable auth if requested

@@ -45,19 +45,7 @@ export const LandingZoneStep: React.FC = () => {
 
   const configData = state.configData as Record<string, unknown>;
   const globalData = (configData.global ?? {}) as Record<string, unknown>;
-  const disconnected = globalData.disconnected !== false;
-
-  const toggleDisconnected = (checked: boolean) => {
-    onChange("global.disconnected", checked);
-    if (!checked) {
-      onChange("global.quayUser", "");
-      onChange("global.quayPassword", "");
-      onChange("global.quayBackend", "");
-      onChange("global.quayBackendRGWConfiguration", undefined);
-    } else if (!globalData.quayBackend) {
-      onChange("global.quayBackend", "LocalStorage");
-    }
-  };
+  const disconnected = true;
 
   return (
     <Form>
@@ -83,8 +71,8 @@ export const LandingZoneStep: React.FC = () => {
         id="disconnected-toggle"
         label="Disconnected (air-gapped) deployment"
         isChecked={disconnected}
-        onChange={(_e, checked) => toggleDisconnected(checked)}
-        description="When enabled, a local Quay mirror registry is configured for image distribution."
+        isDisabled
+        description="Disconnected mode is always enabled. Connected mode will be available in a future release."
       />
 
       <ExpandableSection

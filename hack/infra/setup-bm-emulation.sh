@@ -77,6 +77,7 @@ cat > "${NET_XML}" <<EOF
       <hostname>console-openshift-console.apps.${FQDN}</hostname>
       <hostname>oauth-openshift.apps.${FQDN}</hostname>
     </host>
+    <!-- mirror entry added dynamically by deploy-wizard when LZ BMC IP is known -->
   </dns>
   <ip address='${NET_GATEWAY}' netmask='255.255.255.0'>
     <dhcp>

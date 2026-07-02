@@ -413,19 +413,19 @@ func TestWriteAll_NoPluginFiles_WhenFieldsEmpty(t *testing.T) {
 	}
 }
 
-func TestWriteAll_PreservesExistingPluginFiles(t *testing.T) {
+func TestWriteAll_RemovesPluginFilesWhenFieldsCleared(t *testing.T) {
 	root := t.TempDir()
 	pluginsDir := filepath.Join(root, "config", "plugins")
 	os.MkdirAll(pluginsDir, 0755)
 	os.WriteFile(filepath.Join(pluginsDir, "osac.yaml"), []byte("osacProfile: caas\n"), 0644)
 
-	// Write config WITHOUT osac fields — should NOT delete osac.yaml
+	// Write config WITHOUT osac fields — should remove osac.yaml
 	if err := NewWriter(root).WriteAll(&models.EnclaveConfig{}); err != nil {
 		t.Fatalf("WriteAll: %v", err)
 	}
 
-	if _, err := os.Stat(filepath.Join(pluginsDir, "osac.yaml")); os.IsNotExist(err) {
-		t.Error("osac.yaml was deleted — WriteAll should preserve existing plugin files")
+	if _, err := os.Stat(filepath.Join(pluginsDir, "osac.yaml")); !os.IsNotExist(err) {
+		t.Error("osac.yaml should be removed when no OSAC fields are set")
 	}
 }
 
