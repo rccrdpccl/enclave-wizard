@@ -179,6 +179,14 @@ func (h *TasksHandler) Register(api huma.API) {
 // --- Handlers ---
 
 func (h *TasksHandler) startDeploy(ctx context.Context, _ *StartDeployInput) (*StartTaskOutput, error) {
+	cfg, err := h.configReader.ReadAll()
+	if err != nil {
+		return nil, huma.Error500InternalServerError("failed to read config", err)
+	}
+	if err := h.configWriter.WriteAll(cfg); err != nil {
+		return nil, huma.Error500InternalServerError("failed to write config before deploy", err)
+	}
+
 	addonPlugins := h.addonPluginsFromConfig()
 
 	run, err := h.runner.Start(tasks.StartRequest{

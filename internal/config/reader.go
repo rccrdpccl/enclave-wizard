@@ -56,7 +56,60 @@ func (r *Reader) ReadAll() (*models.EnclaveConfig, error) {
 		CloudInfra:   *infra,
 	}
 	clearTemplatePlaceholders(cfg)
+
+	r.mergePluginConfigs(cfg)
+
 	return cfg, nil
+}
+
+func (r *Reader) mergePluginConfigs(cfg *models.EnclaveConfig) {
+	pluginsDir := filepath.Join(r.enclaveDir, "config", "plugins")
+
+	osac, _ := readYAMLFile[osacPluginConfig](filepath.Join(pluginsDir, "osac.yaml"))
+	if osac != nil {
+		if osac.OsacProfile != "" {
+			cfg.Global.OsacProfile = &osac.OsacProfile
+		}
+		if osac.OsacAapLicenseFile != "" {
+			cfg.Global.OsacAapLicenseFile = &osac.OsacAapLicenseFile
+		}
+		if osac.OsacBYODatabase {
+			cfg.Global.OsacBYODatabase = &osac.OsacBYODatabase
+		}
+		if osac.OsacDatabaseUrl != "" {
+			cfg.Global.OsacDatabaseUrl = &osac.OsacDatabaseUrl
+		}
+		if len(osac.ClusterFulfillmentConfig) > 0 {
+			cfg.Global.ClusterFulfillmentConfig = osac.ClusterFulfillmentConfig
+		}
+	}
+
+	rhbk, _ := readYAMLFile[rhbkPluginConfig](filepath.Join(pluginsDir, "rhbk.yaml"))
+	if rhbk != nil {
+		if rhbk.RhbkInstances > 0 {
+			cfg.Global.RhbkInstances = &rhbk.RhbkInstances
+		}
+		if rhbk.RhbkDeployDatabase != nil {
+			cfg.Global.RhbkDeployDatabase = rhbk.RhbkDeployDatabase
+		}
+		if rhbk.RhbkDbSize != "" {
+			cfg.Global.RhbkDbSize = &rhbk.RhbkDbSize
+		}
+	}
+}
+
+type osacPluginConfig struct {
+	OsacProfile              string            `yaml:"osacProfile,omitempty"`
+	OsacAapLicenseFile       string            `yaml:"osacAapLicenseFile,omitempty"`
+	OsacBYODatabase          bool              `yaml:"osacBYODatabase,omitempty"`
+	OsacDatabaseUrl          string            `yaml:"osacDatabaseUrl,omitempty"`
+	ClusterFulfillmentConfig map[string]string `yaml:"clusterFulfillmentConfig,omitempty"`
+}
+
+type rhbkPluginConfig struct {
+	RhbkInstances      int    `yaml:"rhbk_instances,omitempty"`
+	RhbkDeployDatabase *bool  `yaml:"rhbk_deploy_database,omitempty"`
+	RhbkDbSize         string `yaml:"rhbk_db_size,omitempty"`
 }
 
 func (r *Reader) readGlobalRaw() (*globalWithDiscoveryHosts, error) {

@@ -4,16 +4,21 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/config"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tasks"
 	"go.uber.org/mock/gomock"
 )
+
+const testEnclaveDir = "/opt/enclave"
 
 func setupTasksAPI(runner tasks.Runner) *httptest.Server {
 	mux := http.NewServeMux()
@@ -21,7 +26,13 @@ func setupTasksAPI(runner tasks.Runner) *httptest.Server {
 	registry := plugins.NewRegistry([]models.Plugin{
 		{Name: "lvms", Type: models.PluginTypeFoundation},
 	})
-	NewTasksHandler(runner, registry, nil, nil, "/opt/enclave").Register(api)
+	// Create a real temp dir for config read/write but use the fixed path for ExtraVars
+	tmpDir, _ := os.MkdirTemp("", "enclave-test-*")
+	os.MkdirAll(filepath.Join(tmpDir, "config"), 0755)
+	os.WriteFile(filepath.Join(tmpDir, "config", "global.yaml"), []byte("baseDomain: test\n"), 0644)
+	reader := config.NewReader(tmpDir)
+	writer := config.NewWriter(tmpDir)
+	NewTasksHandler(runner, registry, reader, writer, testEnclaveDir).Register(api)
 	return httptest.NewServer(mux)
 }
 

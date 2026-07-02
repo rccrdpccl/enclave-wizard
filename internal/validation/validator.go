@@ -9,8 +9,6 @@ import (
 	"strings"
 	"time"
 
-	"io/fs"
-
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/config"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tasks"
@@ -102,20 +100,8 @@ func (v *Validator) Validate(cfg *models.EnclaveConfig) []models.ValidationError
 }
 
 func (v *Validator) runPlaybook(ctx context.Context, cfg *models.EnclaveConfig, playbook string, tags []string) []models.ValidationError {
-	configDir := filepath.Join(v.enclaveDir, "config")
-
-	backupDir, err := os.MkdirTemp("", "enclave-wizard-backup-")
-	if err != nil {
-		return []models.ValidationError{{Message: fmt.Sprintf("failed to create backup dir: %v", err)}}
-	}
-	defer os.RemoveAll(backupDir)
-
-	backupConfigDir(configDir, backupDir)
-
-	savedPlugins := cfg.Global.PluginsConfig
 	writer := config.NewWriter(v.enclaveDir)
 	if err := writer.WriteAll(cfg); err != nil {
-		restoreConfigDir(backupDir, configDir)
 		return []models.ValidationError{{Message: fmt.Sprintf("failed to write config: %v", err)}}
 	}
 
@@ -124,9 +110,6 @@ func (v *Validator) runPlaybook(ctx context.Context, cfg *models.EnclaveConfig, 
 		Playbook: playbook,
 		Tags:     tags,
 	})
-
-	restoreConfigDir(backupDir, configDir)
-	cfg.Global.PluginsConfig = savedPlugins
 
 	if err != nil {
 		return []models.ValidationError{{Message: fmt.Sprintf("validation error: %v", err)}}
@@ -214,45 +197,3 @@ func parseFailedEvents(events []json.RawMessage) []models.ValidationError {
 	return result
 }
 
-func backupConfigDir(configDir, backupDir string) {
-	filepath.WalkDir(configDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		rel, _ := filepath.Rel(configDir, path)
-		dest := filepath.Join(backupDir, rel)
-		if d.IsDir() {
-			os.MkdirAll(dest, 0750)
-			return nil
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
-		os.WriteFile(dest, data, 0640)
-		return nil
-	})
-}
-
-func restoreConfigDir(backupDir, configDir string) {
-	pluginsDir := filepath.Join(configDir, "plugins")
-	os.RemoveAll(pluginsDir)
-
-	filepath.WalkDir(backupDir, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
-		rel, _ := filepath.Rel(backupDir, path)
-		dest := filepath.Join(configDir, rel)
-		if d.IsDir() {
-			os.MkdirAll(dest, 0750)
-			return nil
-		}
-		data, err := os.ReadFile(path)
-		if err != nil {
-			return nil
-		}
-		os.WriteFile(dest, data, 0640)
-		return nil
-	})
-}

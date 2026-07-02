@@ -47,33 +47,16 @@ func (w *Writer) WriteAll(cfg *models.EnclaveConfig) error {
 		if err := writeYAMLFile(filepath.Join(pluginsDir, "osac.yaml"), osacConfig); err != nil {
 			return fmt.Errorf("writing osac.yaml: %w", err)
 		}
-	} else {
-		removeIfExists(filepath.Join(pluginsDir, "osac.yaml"))
 	}
 	if rhbkConfig != nil {
 		if err := writeYAMLFile(filepath.Join(pluginsDir, "rhbk.yaml"), rhbkConfig); err != nil {
 			return fmt.Errorf("writing rhbk.yaml: %w", err)
 		}
-	} else {
-		removeIfExists(filepath.Join(pluginsDir, "rhbk.yaml"))
 	}
 
 	return nil
 }
 
-func removeIfExists(path string) {
-	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		fmt.Printf("WARNING: failed to remove %s: %v\n", filepath.Base(path), err)
-	}
-}
-
-type osacPluginConfig struct {
-	OsacProfile              string            `yaml:"osacProfile,omitempty"`
-	OsacAapLicenseFile       string            `yaml:"osacAapLicenseFile,omitempty"`
-	OsacBYODatabase          bool              `yaml:"osacBYODatabase,omitempty"`
-	OsacDatabaseUrl          string            `yaml:"osacDatabaseUrl,omitempty"`
-	ClusterFulfillmentConfig map[string]string `yaml:"clusterFulfillmentConfig,omitempty"`
-}
 
 func extractOsacConfig(pc *models.PluginsConfig) *osacPluginConfig {
 	if pc.OsacProfile == nil && pc.OsacAapLicenseFile == nil && len(pc.ClusterFulfillmentConfig) == 0 {
@@ -101,12 +84,6 @@ func extractOsacConfig(pc *models.PluginsConfig) *osacPluginConfig {
 		pc.ClusterFulfillmentConfig = nil
 	}
 	return cfg
-}
-
-type rhbkPluginConfig struct {
-	RhbkInstances      int    `yaml:"rhbk_instances,omitempty"`
-	RhbkDeployDatabase *bool  `yaml:"rhbk_deploy_database,omitempty"`
-	RhbkDbSize         string `yaml:"rhbk_db_size,omitempty"`
 }
 
 func extractRhbkConfig(pc *models.PluginsConfig) *rhbkPluginConfig {

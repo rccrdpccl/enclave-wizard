@@ -2,7 +2,7 @@ BINARY := enclave-wizard
 GO := go
 CONTAINER_RUNTIME := $(shell command -v podman 2> /dev/null || echo docker)
 
-.PHONY: build build-linux build-ui run test lint clean tidy deploy teardown generate enclave-mock clean-enclave-mock run-mock preview deploy-preview bm-emulation bm-emulation-config bm-emulation-cleanup
+.PHONY: build build-linux build-ui run test lint clean tidy deploy teardown generate enclave-mock clean-enclave-mock run-mock preview deploy-preview bm-emulation bm-emulation-config bm-emulation-cleanup test-config
 
 build-ui:
 	$(CONTAINER_RUNTIME) run --rm -v $(PWD)/ui:/app:z -w /app node:22-alpine \
@@ -79,6 +79,12 @@ e2e-full: rpm
 bm-emulation:
 	@test -n "$(TARGET)" || (echo "Usage: make bm-emulation TARGET=root@host" && exit 1)
 	hack/infra/bm-emulation.sh --host $(TARGET)
+
+test-config:
+	@test -n '$(TARGET)' || (echo "Usage: make test-config TARGET=root@host PULL_SECRET=/path/to/pull-secret.json MANIFEST=/path/to/manifest.zip" && exit 1)
+	@test -n '$(PULL_SECRET)' || (echo "Usage: make test-config TARGET=root@host PULL_SECRET=/path/to/pull-secret.json MANIFEST=/path/to/manifest.zip" && exit 1)
+	@test -n '$(MANIFEST)' || (echo "Usage: make test-config TARGET=root@host PULL_SECRET=/path/to/pull-secret.json MANIFEST=/path/to/manifest.zip" && exit 1)
+	hack/infra/test-config.sh --host '$(TARGET)' --pull-secret '$(PULL_SECRET)' --manifest '$(MANIFEST)'
 
 bm-emulation-config:
 	@test -n '$(TARGET)' || (echo "Usage: make bm-emulation-config TARGET=root@host PULL_SECRET=/path/to/pull-secret.json" && exit 1)

@@ -2,7 +2,6 @@ package api
 
 import (
 	"context"
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -173,15 +172,6 @@ func registerSection[T any](
 			return nil, huma.Error500InternalServerError("failed to read config", err)
 		}
 		set(cfg, input.Body)
-		if h.validator.Available() {
-			if errs := h.validator.Validate(cfg); len(errs) > 0 {
-				details := make([]error, len(errs))
-				for i, e := range errs {
-					details[i] = fmt.Errorf("%s: %s", e.Field, e.Message)
-				}
-				return nil, huma.Error422UnprocessableEntity("config validation failed", details...)
-			}
-		}
 		if err := h.writer.WriteAll(cfg); err != nil {
 			return nil, huma.Error500InternalServerError("failed to write config", err)
 		}
@@ -200,16 +190,6 @@ func (h *ConfigHandler) getConfig(_ context.Context, _ *struct{}) (*GetConfigOut
 }
 
 func (h *ConfigHandler) writeConfig(_ context.Context, input *WriteConfigInput) (*struct{}, error) {
-	if h.validator.Available() {
-		errs := h.validator.Validate(&input.Body)
-		if len(errs) > 0 {
-			details := make([]error, len(errs))
-			for i, e := range errs {
-				details[i] = fmt.Errorf("%s: %s", e.Field, e.Message)
-			}
-			return nil, huma.Error422UnprocessableEntity("config validation failed", details...)
-		}
-	}
 	if err := h.writer.WriteAll(&input.Body); err != nil {
 		return nil, huma.Error500InternalServerError("failed to write config", err)
 	}
