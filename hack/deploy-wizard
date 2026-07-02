@@ -146,9 +146,17 @@ ${SSH} "${TARGET}" "
 "
 
 ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
+  echo '  Waiting for cloud-init...'
   sudo cloud-init status --wait 2>/dev/null || sleep 10
-  ls /tmp/enclave.rpm &>/dev/null && sudo dnf install -y /tmp/enclave.rpm 2>&1 | tail -5
+  echo '  cloud-init done.'
+  if ls /tmp/enclave.rpm &>/dev/null; then
+    echo '  Installing enclave RPM (system packages)...'
+    sudo dnf install -y /tmp/enclave.rpm 2>&1 | tail -10
+    echo '  Enclave RPM installed.'
+  fi
+  echo '  Installing wizard RPM...'
   sudo dnf install -y /tmp/enclave-wizard.rpm 2>&1 | tail -5
+  echo '  Wizard RPM installed.'
 " 2>&1 | grep -v "^$"
 
 # Attach BMC network if bm-emulation was set up

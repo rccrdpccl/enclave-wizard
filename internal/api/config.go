@@ -190,6 +190,10 @@ func (h *ConfigHandler) getConfig(_ context.Context, _ *struct{}) (*GetConfigOut
 }
 
 func (h *ConfigHandler) writeConfig(_ context.Context, input *WriteConfigInput) (*struct{}, error) {
+	// WORKAROUND: force connected mode until disconnected support is ready
+	f := false
+	input.Body.Global.Disconnected = &f
+
 	if err := h.writer.WriteAll(&input.Body); err != nil {
 		return nil, huma.Error500InternalServerError("failed to write config", err)
 	}

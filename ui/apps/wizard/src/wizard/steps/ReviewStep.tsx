@@ -219,7 +219,7 @@ export const ReviewStep: React.FC = () => {
   }, [yamlContents]);
 
   const handleDownload = useCallback(() => {
-    for (const file of CONFIG_FILES) {
+    for (const file of configFiles) {
       const blob = new Blob([yamlContents[file.key]], { type: "text/yaml" });
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");

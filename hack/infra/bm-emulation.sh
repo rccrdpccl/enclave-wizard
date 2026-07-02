@@ -99,15 +99,16 @@ echo "╠═══════════════════════�
 echo "║  Control Plane VMs                                                         ║"
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 echo ""
-printf "  %-15s %-20s %-17s %-38s %-15s %s\n" "Name" "MAC" "IP" "BMC System ID" "BMC Address" "Disk"
-printf "  %-15s %-20s %-17s %-38s %-15s %s\n" "───────────────" "────────────────────" "─────────────────" "──────────────────────────────────────" "───────────────" "────────"
+printf "  %-15s %-20s %-17s %s\n" "Name" "MAC" "IP" "Disk"
+printf "  %-15s %-20s %-17s %s\n" "───────────────" "────────────────────" "─────────────────" "────────"
 
 for i in 0 1 2; do
   VM_NAME="enclave-cp-${i}"
   VM_MAC="00:60:2f:e0:c1:$(printf '%02x' "$i")"
   VM_IP_ADDR="192.168.223.$((10 + i))"
   UUID=$(echo "${VM_UUIDS}" | grep "^${VM_NAME}|" | cut -d'|' -f2 | tr -d '[:space:]')
-  printf "  %-15s %-20s %-17s %-38s %-15s %s\n" "${VM_NAME}" "${VM_MAC}" "${VM_IP_ADDR}" "${UUID}" "192.168.223.1:8100" "/dev/sda"
+  printf "  %-15s %-20s %-17s %s\n" "${VM_NAME}" "${VM_MAC}" "${VM_IP_ADDR}" "/dev/sda"
+  printf "  %-15s BMC: 192.168.223.1:8100  System ID: %s\n" "" "${UUID}"
 done
 
 echo ""

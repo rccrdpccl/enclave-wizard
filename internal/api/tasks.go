@@ -183,6 +183,11 @@ func (h *TasksHandler) startDeploy(ctx context.Context, _ *StartDeployInput) (*S
 	if err != nil {
 		return nil, huma.Error500InternalServerError("failed to read config", err)
 	}
+
+	// WORKAROUND: force connected mode until disconnected support is ready
+	f := false
+	cfg.Global.Disconnected = &f
+
 	if err := h.configWriter.WriteAll(cfg); err != nil {
 		return nil, huma.Error500InternalServerError("failed to write config before deploy", err)
 	}

@@ -101,7 +101,7 @@ existing_global = existing.get('global', {})
 
 # Infrastructure settings only — never touch enabled_plugins or plugin-specific fields
 infra = {
-    'workingDir': '/opt/enclave',
+    'workingDir': '/home/enclave',
     'lzBmcIP': '${BMC_VM_IP}',
     'disconnected': False,
     'baseDomain': '${BASE_DOMAIN}',

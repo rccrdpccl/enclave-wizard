@@ -109,7 +109,7 @@ ssh_key = open('/home/wizard/.ssh/id_rsa.pub').read().strip()
 # This is exactly what the UI sets when CaaS + VMaaS + BMaaS are selected
 config = {
     'global': {
-        'workingDir': '/opt/enclave',
+        'workingDir': '/home/enclave',
         'lzBmcIP': '${BMC_VM_IP}',
         'disconnected': False,
         'baseDomain': '${BASE_DOMAIN}',
