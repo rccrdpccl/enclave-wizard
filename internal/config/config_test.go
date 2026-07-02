@@ -104,6 +104,72 @@ func TestReadAll_ReadsCertificates(t *testing.T) {
 	}
 }
 
+func TestReadAll_ClearsCertPlaceholders(t *testing.T) {
+	root := newEnclaveDir(t, map[string]string{
+		"certificates.yaml": `
+sslAPICertificateFullChain: |
+  -----BEGIN CERTIFICATE-----
+  YOUR_API_CERTIFICATE
+  -----END CERTIFICATE-----
+sslAPICertificateKey: |
+  -----BEGIN PRIVATE KEY-----
+  YOUR_API_PRIVATE_KEY
+  -----END PRIVATE KEY-----
+sslCACertificate: |
+  -----BEGIN CERTIFICATE-----
+  YOUR_ROOT_CA_CERTIFICATE
+  -----END CERTIFICATE-----
+`,
+	})
+	cfg, err := NewReader(root).ReadAll()
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if cfg.Certificates.SSLAPICertificateFullChain != nil {
+		t.Errorf("SSLAPICertificateFullChain should be nil, got %q", *cfg.Certificates.SSLAPICertificateFullChain)
+	}
+	if cfg.Certificates.SSLAPICertificateKey != nil {
+		t.Errorf("SSLAPICertificateKey should be nil, got %q", *cfg.Certificates.SSLAPICertificateKey)
+	}
+	if cfg.Certificates.SSLCACertificate != nil {
+		t.Errorf("SSLCACertificate should be nil, got %q", *cfg.Certificates.SSLCACertificate)
+	}
+}
+
+func TestReadAll_PreservesRealCerts(t *testing.T) {
+	realCert := "-----BEGIN CERTIFICATE-----\nMIIBxTCCAW...\n-----END CERTIFICATE-----\n"
+	root := newEnclaveDir(t, map[string]string{
+		"certificates.yaml": "sslCACertificate: |\n  -----BEGIN CERTIFICATE-----\n  MIIBxTCCAW...\n  -----END CERTIFICATE-----\n",
+	})
+	cfg, err := NewReader(root).ReadAll()
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if cfg.Certificates.SSLCACertificate == nil {
+		t.Fatal("expected real cert to be preserved, got nil")
+	}
+	_ = realCert
+}
+
+func TestReadAll_ClearsSimplePlaceholders(t *testing.T) {
+	root := newEnclaveDir(t, map[string]string{
+		"global.yaml": "baseDomain: YOUR_BASE_DOMAIN\nclusterName: YOUR_CLUSTER_NAME\ndefaultPrefix: 24\n",
+	})
+	cfg, err := NewReader(root).ReadAll()
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if cfg.Global.BaseDomain != "" {
+		t.Errorf("BaseDomain should be empty, got %q", cfg.Global.BaseDomain)
+	}
+	if cfg.Global.ClusterName != "" {
+		t.Errorf("ClusterName should be empty, got %q", cfg.Global.ClusterName)
+	}
+	if cfg.Global.DefaultPrefix != 24 {
+		t.Errorf("DefaultPrefix should be preserved, got %d", cfg.Global.DefaultPrefix)
+	}
+}
+
 func TestReadAll_ReadsCloudInfraDiscoveryHosts(t *testing.T) {
 	root := newEnclaveDir(t, map[string]string{
 		"cloud_infra.yaml": "discovery_hosts:\n  - bmcAddress: 192.168.1.10\n",

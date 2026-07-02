@@ -1,6 +1,7 @@
 import {
   Card,
   CardBody,
+  ExpandableSection,
   FormGroup,
   FormHelperText,
   HelperText,
@@ -9,6 +10,7 @@ import {
   Title,
 } from "@patternfly/react-core";
 import type React from "react";
+import { useState } from "react";
 import { hostEntryCardStyles as styles } from "./hostEntryCardStyles.ts";
 
 interface HostEntry {
@@ -19,6 +21,7 @@ interface HostEntry {
   redfishUser: string;
   redfishPassword: string;
   rootDisk: string;
+  bmcSystemId?: string;
 }
 
 interface HostEntryCardProps {
@@ -51,8 +54,15 @@ export const HostEntryCard: React.FC<HostEntryCardProps> = ({
 }) => {
   const prefix = `${label.toLowerCase().replace(/\s+/g, "-")}-${index}`;
 
-  const update = (field: keyof HostEntry, value: string) =>
-    onChange({ ...host, [field]: value });
+  const update = (field: keyof HostEntry, value: string) => {
+    const updated = { ...host, [field]: value };
+    if (field === "bmcSystemId" && !value) {
+      delete updated.bmcSystemId;
+    }
+    onChange(updated);
+  };
+
+  const [advancedOpen, setAdvancedOpen] = useState(!!host.bmcSystemId);
 
   return (
     <Card isRounded isCompact>
@@ -167,6 +177,34 @@ export const HostEntryCard: React.FC<HostEntryCardProps> = ({
                 </HelperText>
               </FormHelperText>
             </FormGroup>
+          </div>
+          <div className={styles.fullWidth}>
+            <ExpandableSection
+              toggleText={advancedOpen ? "Hide advanced BMC settings" : "Advanced BMC settings"}
+              isExpanded={advancedOpen}
+              onToggle={(_e, expanded) => setAdvancedOpen(expanded)}
+              isCompact
+            >
+              <FormGroup
+                label="BMC System ID"
+                fieldId={`${prefix}-bmcsystemid`}
+              >
+                <TextInput
+                  id={`${prefix}-bmcsystemid`}
+                  value={host.bmcSystemId ?? ""}
+                  onChange={(_e, v) => update("bmcSystemId", v)}
+                  placeholder="Auto-detected (override for virtual BMC / sushy-tools)"
+                />
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem>
+                      Redfish System ID (e.g. VM UUID for sushy-tools).
+                      Leave empty for physical hardware.
+                    </HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
+              </FormGroup>
+            </ExpandableSection>
           </div>
         </div>
       </CardBody>

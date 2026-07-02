@@ -9,8 +9,8 @@ export function buildFinalConfig(state: WizardState): EnclaveConfig {
     ...state.configData,
     global: {
       ...globalData,
-      workingDir: "/home/enclave",
-      disconnected: true,
+      workingDir: globalData.workingDir || "/home/enclave",
+      disconnected: false,
     },
     certificates: state.configData.certificates ?? {},
     cloudInfra: state.configData.cloudInfra ?? { discovery_hosts: [] },

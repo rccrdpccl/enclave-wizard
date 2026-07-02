@@ -43,13 +43,9 @@ if [ -z "${VM_IP}" ]; then
   exit 1
 fi
 
-# Get LZ BMC IP (check any interface on the BMC subnet)
-BMC_VM_IP=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "ip -4 addr 2>/dev/null | grep -oP 'inet 192\.168\.223\.\K[0-9]+'" 2>/dev/null || echo "")
-[ -n "${BMC_VM_IP}" ] && BMC_VM_IP="192.168.223.${BMC_VM_IP}"
-if [ -z "${BMC_VM_IP}" ]; then
-  echo "ERROR: wizard VM has no BMC network IP. Run 'make bm-emulation' first."
-  exit 1
-fi
+# lzBmcIP = the wizard VM's primary IP (where Ironic binds)
+# BM nodes on the BMC network reach it via the hypervisor's routing
+LZ_IP="${VM_IP}"
 
 info "Writing BM emulation config to wizard..."
 
@@ -102,7 +98,7 @@ existing_global = existing.get('global', {})
 # Infrastructure settings only — never touch enabled_plugins or plugin-specific fields
 infra = {
     'workingDir': '/home/enclave',
-    'lzBmcIP': '${BMC_VM_IP}',
+    'lzBmcIP': '${LZ_IP}',
     'disconnected': False,
     'baseDomain': '${BASE_DOMAIN}',
     'clusterName': '${CLUSTER_NAME}',

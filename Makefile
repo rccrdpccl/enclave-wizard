@@ -91,6 +91,14 @@ bm-emulation-config:
 	@test -n '$(PULL_SECRET)' || (echo "Usage: make bm-emulation-config TARGET=root@host PULL_SECRET=/path/to/pull-secret.json" && exit 1)
 	hack/infra/bm-emulation-config.sh --host '$(TARGET)' --pull-secret '$(PULL_SECRET)'
 
+save-remote-config:
+	@test -n '$(TARGET)' || (echo "Usage: make save-remote-config TARGET=root@host" && exit 1)
+	hack/infra/save-remote-config.sh --host '$(TARGET)'
+
+restore-remote-config:
+	@test -n '$(TARGET)' || (echo "Usage: make restore-remote-config TARGET=root@host" && exit 1)
+	hack/infra/restore-remote-config.sh --host '$(TARGET)'
+
 bm-emulation-cleanup:
 	@test -n "$(TARGET)" || (echo "Usage: make bm-emulation-cleanup TARGET=root@host" && exit 1)
 	hack/infra/bm-emulation-cleanup.sh --host $(TARGET)

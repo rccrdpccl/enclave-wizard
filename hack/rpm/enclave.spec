@@ -8,6 +8,23 @@ BuildArch:      noarch
 
 Source0:        enclave-repo.tar.gz
 
+Requires:       bind-utils
+Requires:       curl
+Requires:       httpd
+Requires:       httpd-tools
+Requires:       ipcalc
+Requires:       jq
+Requires:       lsof
+Requires:       make
+Requires:       nmstate
+Requires:       openssl
+Requires:       podman
+Requires:       python3
+Requires:       rsync
+Requires:       skopeo
+Requires:       tar
+Requires:       unzip
+
 %description
 Red Hat Sovereign Enclave repo. Run setup_env.sh and setup_ansible.sh
 after install to configure the environment.

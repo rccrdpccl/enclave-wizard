@@ -126,6 +126,7 @@ func (r *Reader) readCloudInfra() (*models.CloudInfraConfig, error) {
 
 func clearTemplatePlaceholders(cfg *models.EnclaveConfig) {
 	clearStringFields(&cfg.Global)
+	clearStringFields(&cfg.Certificates)
 	for i := range cfg.Global.AgentHosts {
 		clearStringFields(&cfg.Global.AgentHosts[i])
 	}
@@ -140,8 +141,14 @@ func clearStringFields(ptr any) {
 		f := v.Field(i)
 		switch f.Kind() {
 		case reflect.String:
-			if f.CanSet() && strings.HasPrefix(f.String(), "YOUR_") {
+			if f.CanSet() && strings.Contains(f.String(), "YOUR_") {
 				f.SetString("")
+			}
+		case reflect.Pointer:
+			if !f.IsNil() && f.Type().Elem().Kind() == reflect.String {
+				if strings.Contains(f.Elem().String(), "YOUR_") {
+					f.Set(reflect.Zero(f.Type()))
+				}
 			}
 		case reflect.Struct:
 			if f.CanAddr() {

@@ -129,6 +129,48 @@ export interface GlobalConfig {
      */
     enabledPlugins?: Array<string> | null;
     /**
+     * OSAC deployment profile
+     * @type {string}
+     * @memberof GlobalConfig
+     */
+    osacProfile?: string;
+    /**
+     * Path to AAP license manifest.zip on the landing zone
+     * @type {string}
+     * @memberof GlobalConfig
+     */
+    osacAapLicenseFile?: string;
+    /**
+     * Use external PostgreSQL instead of built-in
+     * @type {boolean}
+     * @memberof GlobalConfig
+     */
+    osacBYODatabase?: boolean;
+    /**
+     * PostgreSQL connection URL when using BYO database
+     * @type {string}
+     * @memberof GlobalConfig
+     */
+    osacDatabaseUrl?: string;
+    /**
+     * Number of Keycloak replicas
+     * @type {number}
+     * @memberof GlobalConfig
+     */
+    rhbkInstances?: number;
+    /**
+     * Deploy PostgreSQL alongside Keycloak
+     * @type {boolean}
+     * @memberof GlobalConfig
+     */
+    rhbkDeployDatabase?: boolean;
+    /**
+     * PVC size for Keycloak PostgreSQL
+     * @type {string}
+     * @memberof GlobalConfig
+     */
+    rhbkDbSize?: string;
+    /**
      * Virtual IP for ingress wildcard
      * @type {string}
      * @memberof GlobalConfig
@@ -345,6 +387,13 @@ export function GlobalConfigFromJSONTyped(json: any, ignoreDiscriminator: boolea
         'disconnected': json['disconnected'] == null ? undefined : json['disconnected'],
         'diskEncryption': json['diskEncryption'] == null ? undefined : json['diskEncryption'],
         'enabledPlugins': json['enabled_plugins'] == null ? undefined : json['enabled_plugins'],
+        'osacProfile': json['osacProfile'] == null ? undefined : json['osacProfile'],
+        'osacAapLicenseFile': json['osacAapLicenseFile'] == null ? undefined : json['osacAapLicenseFile'],
+        'osacBYODatabase': json['osacBYODatabase'] == null ? undefined : json['osacBYODatabase'],
+        'osacDatabaseUrl': json['osacDatabaseUrl'] == null ? undefined : json['osacDatabaseUrl'],
+        'rhbkInstances': json['rhbk_instances'] == null ? undefined : json['rhbk_instances'],
+        'rhbkDeployDatabase': json['rhbk_deploy_database'] == null ? undefined : json['rhbk_deploy_database'],
+        'rhbkDbSize': json['rhbk_db_size'] == null ? undefined : json['rhbk_db_size'],
         'ingressVIP': json['ingressVIP'],
         'lvmsConfig': json['lvmsConfig'] == null ? undefined : LVMSStorageConfigFromJSON(json['lvmsConfig']),
         'lzBmcHostname': json['lzBmcHostname'] == null ? undefined : json['lzBmcHostname'],
@@ -393,6 +442,13 @@ export function GlobalConfigToJSONTyped(value?: GlobalConfig | null, ignoreDiscr
         'disconnected': value['disconnected'],
         'diskEncryption': value['diskEncryption'],
         'enabled_plugins': value['enabledPlugins'],
+        'osacProfile': value['osacProfile'],
+        'osacAapLicenseFile': value['osacAapLicenseFile'],
+        'osacBYODatabase': value['osacBYODatabase'],
+        'osacDatabaseUrl': value['osacDatabaseUrl'],
+        'rhbk_instances': value['rhbkInstances'],
+        'rhbk_deploy_database': value['rhbkDeployDatabase'],
+        'rhbk_db_size': value['rhbkDbSize'],
         'ingressVIP': value['ingressVIP'],
         'lvmsConfig': LVMSStorageConfigToJSON(value['lvmsConfig']),
         'lzBmcHostname': value['lzBmcHostname'],

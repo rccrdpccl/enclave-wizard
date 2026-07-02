@@ -45,9 +45,8 @@ VM_IP=$(${SSH} "${TARGET}" "cat /tmp/enclave-wizard-vm-ip 2>/dev/null" || true)
 [ -z "${VM_IP}" ] && error "wizard VM not found. Run 'make deploy' first."
 
 # Get LZ BMC IP
-BMC_VM_IP=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "ip -4 addr 2>/dev/null | grep -oP 'inet 192\.168\.223\.\K[0-9]+'" 2>/dev/null || echo "")
-[ -n "${BMC_VM_IP}" ] && BMC_VM_IP="192.168.223.${BMC_VM_IP}"
-[ -z "${BMC_VM_IP}" ] && error "wizard VM has no BMC network IP. Run 'make bm-emulation' first."
+# lzBmcIP = wizard VM's primary IP (Ironic binds here, BM nodes reach via routing)
+LZ_IP="${VM_IP}"
 
 # =============================================================================
 # Step 1: Upload AAP manifest via the file upload API (same as UI FileUpload)
@@ -110,7 +109,7 @@ ssh_key = open('/home/wizard/.ssh/id_rsa.pub').read().strip()
 config = {
     'global': {
         'workingDir': '/home/enclave',
-        'lzBmcIP': '${BMC_VM_IP}',
+        'lzBmcIP': '${LZ_IP}',
         'disconnected': False,
         'baseDomain': '${BASE_DOMAIN}',
         'clusterName': '${CLUSTER_NAME}',
