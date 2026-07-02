@@ -5,7 +5,7 @@ type LandingZoneConfig struct {
 	LZBMCIP       string  `json:"lzBmcIP" yaml:"lzBmcIP" doc:"Landing zone BMC IP for boot ISO serving" pattern:"^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$"`
 	LZBMCHostname *string `json:"lzBmcHostname,omitempty" yaml:"lzBmcHostname,omitempty" doc:"DNS hostname for landing zone BMC interface"`
 	WorkingDir    string  `json:"workingDir" yaml:"workingDir" doc:"Absolute path to root working directory" minLength:"1"`
-	Disconnected  *bool   `json:"disconnected,omitempty" yaml:"disconnected,omitempty" doc:"Air-gapped deployment mode (default: true)"`
+	Disconnected  *bool   `json:"disconnected" yaml:"disconnected" doc:"Air-gapped deployment mode"`
 }
 
 // Management Cluster Install Information

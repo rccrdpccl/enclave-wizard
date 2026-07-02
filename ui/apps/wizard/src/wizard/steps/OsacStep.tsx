@@ -16,11 +16,13 @@ import {
 import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
 import type React from "react";
 import { useCallback, useState } from "react";
+import { useAuth } from "../../auth/AuthContext.tsx";
 import { useWizard } from "../WizardContext.tsx";
 import { stepStyles } from "./stepStyles.ts";
 
 export const OsacStep: React.FC = () => {
   const { state, dispatch } = useWizard();
+  const { token } = useAuth();
   const globalData = ((state.configData as Record<string, unknown>).global ??
     {}) as Record<string, unknown>;
 
@@ -50,8 +52,13 @@ export const OsacStep: React.FC = () => {
         const formData = new FormData();
         formData.append("file", file);
         formData.append("dest", "plugins");
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers.Authorization = `Bearer ${token}`;
+        }
         const resp = await fetch("/api/v1/files", {
           method: "POST",
+          headers,
           body: formData,
         });
         if (!resp.ok) {

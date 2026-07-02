@@ -8,15 +8,22 @@ BuildArch:      noarch
 
 Source0:        enclave-repo.tar.gz
 
-Requires:       curl
-Requires:       openssl
-Requires:       jq
-Requires:       ipcalc
 Requires:       bind-utils
-Requires:       git-core
-Requires:       nmstate
-Requires:       podman
+Requires:       curl
 Requires:       httpd
+Requires:       httpd-tools
+Requires:       ipcalc
+Requires:       jq
+Requires:       lsof
+Requires:       make
+Requires:       nmstate
+Requires:       openssl
+Requires:       podman
+Requires:       python3
+Requires:       rsync
+Requires:       skopeo
+Requires:       tar
+Requires:       unzip
 
 %description
 Red Hat Sovereign Enclave distribution with all runtime dependencies
@@ -41,10 +48,11 @@ for f in "${ENCLAVE_DIR}/config/"*.example.yaml; do
     [ -f "${target}" ] || cp "${f}" "${target}"
 done
 
-# Run enclave's ansible setup (installs uv, Python 3.12, all deps in isolation)
-# setup_env.sh is skipped — RPM Requires handles system packages
-echo "Running enclave ansible setup..."
+# Run enclave setup scripts
 cd "${ENCLAVE_DIR}"
+echo "Running enclave environment setup..."
+bash ./setup_env.sh 2>&1 | tail -5
+echo "Running enclave ansible setup..."
 bash ./setup_ansible.sh 2>&1 | tail -5
 
 # Re-install with ansible-runner in the same venv so it shares all deps (kubernetes, etc.)

@@ -45,7 +45,7 @@ export const LandingZoneStep: React.FC = () => {
 
   const configData = state.configData as Record<string, unknown>;
   const globalData = (configData.global ?? {}) as Record<string, unknown>;
-  const disconnected = true;
+  const disconnected = false;
 
   return (
     <Form>
@@ -72,7 +72,7 @@ export const LandingZoneStep: React.FC = () => {
         label="Disconnected (air-gapped) deployment"
         isChecked={disconnected}
         isDisabled
-        description="Disconnected mode is always enabled. Connected mode will be available in a future release."
+        description="Disconnected (air-gapped) mode will be available in a future release."
       />
 
       <ExpandableSection

@@ -301,7 +301,6 @@ function WizardContent(): React.ReactElement {
 
         if (defaults.status === "fulfilled") {
           const d = defaults.value;
-          dispatch({ type: "SET_FIELD", path: "global.disconnected", value: d.disconnected });
           dispatch({ type: "SET_FIELD", path: "global.storage_plugin", value: d.storagePlugin });
           dispatch({ type: "SET_FIELD", path: "global.defaultPrefix", value: 24 });
           dispatch({ type: "SET_FIELD", path: "global.quayBackend", value: "LocalStorage" });
@@ -315,6 +314,9 @@ function WizardContent(): React.ReactElement {
         if (existingConfig.status === "fulfilled") {
           dispatch({ type: "LOAD_CONFIG", config: EnclaveConfigToJSON(existingConfig.value) });
         }
+
+        // Always connected mode (disconnected greyed out in UI)
+        dispatch({ type: "SET_FIELD", path: "global.disconnected", value: false });
       } catch (err) {
         console.warn("Failed to load initial data:", err);
       }
