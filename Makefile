@@ -13,6 +13,7 @@ build: build-ui
 	$(GO) build -ldflags="-w -s" -tags "$(TAGS)" -o $(BINARY) .
 
 build-linux: build-ui
+	rm -f $(BINARY)
 	$(CONTAINER_RUNTIME) run --rm -v $(PWD):/app:z -w /app golang:latest \
 		sh -c "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='-w -s' -tags '$(TAGS)' -o $(BINARY) ."
 
@@ -98,6 +99,10 @@ save-remote-config:
 restore-remote-config:
 	@test -n '$(TARGET)' || (echo "Usage: make restore-remote-config TARGET=root@host" && exit 1)
 	hack/infra/restore-remote-config.sh --host '$(TARGET)'
+
+sanity-check:
+	@test -n '$(TARGET)' || (echo "Usage: make sanity-check TARGET=root@host" && exit 1)
+	hack/infra/sanity-check.sh --host '$(TARGET)'
 
 bm-emulation-cleanup:
 	@test -n "$(TARGET)" || (echo "Usage: make bm-emulation-cleanup TARGET=root@host" && exit 1)

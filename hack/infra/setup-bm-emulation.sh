@@ -201,6 +201,39 @@ for m in json.load(sys.stdin)['Members']:
   echo "  ${VM_NAME}: ${UUID}"
 done
 
+# --- Step 6: Add wildcard DNS to the default libvirt network ---
+# The wizard VM uses the default network's dnsmasq (192.168.122.1) as its resolver.
+# Without this, *.apps routes (quay, console, oauth, etc.) won't resolve from the VM.
+info "Adding wildcard DNS for *.apps.${FQDN} to the default network..."
+
+DEFAULT_XML=$(mktemp)
+virsh net-dumpxml default > "${DEFAULT_XML}" 2>/dev/null
+
+if ! grep -q "apps.${FQDN}" "${DEFAULT_XML}"; then
+  # Add dnsmasq namespace if missing
+  if ! grep -q "dnsmasq:options" "${DEFAULT_XML}"; then
+    sed -i "s|<network>|<network xmlns:dnsmasq='http://libvirt.org/schemas/network/dnsmasq/1.0'>|" "${DEFAULT_XML}"
+    sed -i "s|</network>|  <dnsmasq:options>\n    <dnsmasq:option value=\"address=/apps.${FQDN}/${INGRESS_VIP}\"/>\n  </dnsmasq:options>\n</network>|" "${DEFAULT_XML}"
+  else
+    sed -i "s|</dnsmasq:options>|    <dnsmasq:option value=\"address=/apps.${FQDN}/${INGRESS_VIP}\"/>\n  </dnsmasq:options>|" "${DEFAULT_XML}"
+  fi
+
+  # Add API DNS entries if missing
+  if ! grep -q "api.${FQDN}" "${DEFAULT_XML}"; then
+    sed -i "s|<dns>|<dns>\n    <host ip='${API_VIP}'>\n      <hostname>api.${FQDN}</hostname>\n      <hostname>api-int.${FQDN}</hostname>\n    </host>|" "${DEFAULT_XML}"
+  fi
+
+  virsh net-destroy default 2>/dev/null || true
+  virsh net-undefine default 2>/dev/null || true
+  virsh net-define "${DEFAULT_XML}"
+  virsh net-start default
+  virsh net-autostart default
+  info "  Wildcard DNS added: *.apps.${FQDN} → ${INGRESS_VIP}"
+else
+  info "  Wildcard DNS already present"
+fi
+rm -f "${DEFAULT_XML}"
+
 echo ""
 info "Setup complete. VMs are shut off — Ironic will boot them during deployment."
 info "Sushy-tools: https://${NET_GATEWAY}:${BMC_PORT}"
