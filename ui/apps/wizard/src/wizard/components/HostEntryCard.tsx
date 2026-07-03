@@ -62,7 +62,7 @@ export const HostEntryCard: React.FC<HostEntryCardProps> = ({
     onChange(updated);
   };
 
-  const [advancedOpen, setAdvancedOpen] = useState(!!host.bmcSystemId);
+  const [advancedOpen, setAdvancedOpen] = useState(!!host.bmcSystemId || !!host.rootDisk);
 
   return (
     <Card isRounded isCompact>
@@ -156,35 +156,31 @@ export const HostEntryCard: React.FC<HostEntryCardProps> = ({
             />
           </FormGroup>
           <div className={styles.fullWidth}>
-            <FormGroup
-              label="Installation disk"
-              isRequired
-              fieldId={`${prefix}-rootdisk`}
-            >
-              <TextInput
-                id={`${prefix}-rootdisk`}
-                value={host.rootDisk}
-                onChange={(_e, v) => update("rootDisk", v)}
-                placeholder="/dev/sda"
-                isRequired
-              />
-              <FormHelperText>
-                <HelperText>
-                  <HelperTextItem>
-                    Block device path for OS installation (e.g.
-                    /dev/sda, /dev/disk/by-path/...)
-                  </HelperTextItem>
-                </HelperText>
-              </FormHelperText>
-            </FormGroup>
-          </div>
-          <div className={styles.fullWidth}>
             <ExpandableSection
-              toggleText={advancedOpen ? "Hide advanced BMC settings" : "Advanced BMC settings"}
+              toggleText={advancedOpen ? "Hide advanced settings" : "Advanced settings"}
               isExpanded={advancedOpen}
               onToggle={(_e, expanded) => setAdvancedOpen(expanded)}
               isCompact
             >
+              <FormGroup
+                label="Installation disk"
+                fieldId={`${prefix}-rootdisk`}
+              >
+                <TextInput
+                  id={`${prefix}-rootdisk`}
+                  value={host.rootDisk}
+                  onChange={(_e, v) => update("rootDisk", v)}
+                  placeholder="/dev/sda"
+                />
+                <FormHelperText>
+                  <HelperText>
+                    <HelperTextItem>
+                      Leave empty for auto-detection, or specify a device
+                      path (e.g. /dev/sda, /dev/disk/by-path/...)
+                    </HelperTextItem>
+                  </HelperText>
+                </FormHelperText>
+              </FormGroup>
               <FormGroup
                 label="BMC System ID"
                 fieldId={`${prefix}-bmcsystemid`}
