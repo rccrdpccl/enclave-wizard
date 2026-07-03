@@ -30,7 +30,9 @@ func (w *Writer) WriteAll(cfg *models.EnclaveConfig) error {
 	rhbkCfg := buildRhbkConfig(&pc)
 
 	globalCopy := cfg.Global
-	globalCopy.PluginsConfig = models.PluginsConfig{}
+	globalCopy.PluginsConfig = models.PluginsConfig{
+		EnabledPlugins: cfg.Global.EnabledPlugins,
+	}
 
 	if err := writeYAMLFile(filepath.Join(configDir, "global.yaml"), &globalCopy); err != nil {
 		return fmt.Errorf("writing global.yaml: %w", err)

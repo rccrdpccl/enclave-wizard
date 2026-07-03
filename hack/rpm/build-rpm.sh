@@ -26,6 +26,14 @@ else
   echo "[2/5] Cloning enclave repo (${ENCLAVE_BRANCH})..."
   ENCLAVE_TMP=$(mktemp -d)
   git clone --depth 1 --branch "${ENCLAVE_BRANCH}" "${ENCLAVE_REPO}" "${ENCLAVE_TMP}/enclave"
+
+  # Apply enclave-wizard overrides (pinned images, etc.)
+  OVERRIDES_DIR="${REPO_DIR}/hack/enclave"
+  if [ -d "${OVERRIDES_DIR}" ]; then
+    echo "    Applying overrides from hack/enclave/..."
+    cp -rv "${OVERRIDES_DIR}/." "${ENCLAVE_TMP}/enclave/" | tail -5
+  fi
+
   tar czf "${REPO_DIR}/enclave-repo.tar.gz" -C "${ENCLAVE_TMP}" enclave
   rm -rf "${ENCLAVE_TMP}"
 

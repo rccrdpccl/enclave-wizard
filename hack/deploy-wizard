@@ -195,6 +195,12 @@ for host in root.findall('.//dns/host'):
     sleep 3
   done
 
+  # Set lzBmcIP in global.yaml to current VM IP (primary network, not BMC)
+  ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
+    sudo sed -i 's|lzBmcIP:.*|lzBmcIP: ${VM_IP}|' /opt/enclave/config/global.yaml 2>/dev/null || true
+  " 2>/dev/null
+  echo "  lzBmcIP set to ${VM_IP}"
+
   # Add mirror DNS entry to BMC network pointing to wizard VM
   if [ -n "${BMC_VM_IP}" ]; then
     ${SSH} "${TARGET}" "
@@ -286,6 +292,29 @@ echo ""
 
 if $HTTPS_OK; then
     WIZARD_PASS=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "sudo cat /tmp/enclave-wizard-init-pass 2>/dev/null" 2>/dev/null || echo "(could not retrieve)")
+
+    # Merge wizard params into demo-params.json
+    PARAMS_FILE="${REPO_DIR}/demo-params.json"
+    python3 -c "
+import json, os
+path = '${PARAMS_FILE}'
+data = {}
+if os.path.exists(path):
+    with open(path) as f:
+        data = json.load(f)
+data['wizard'] = {
+    'url': 'https://${TARGET_HOST}:${HTTPS_PORT}/wizard',
+    'password': '${WIZARD_PASS}',
+    'vmIP': '${VM_IP}',
+    'landingZoneIP': '${BMC_VM_IP}',
+    'target': '${TARGET}',
+    'sshJump': 'ssh -J ${TARGET} wizard@${VM_IP}',
+}
+with open(path, 'w') as f:
+    json.dump(data, f, indent=2)
+print(f'  Params written to {os.path.realpath(path)}')
+"
+
     echo "Wizard URL:     https://${TARGET_HOST}:${HTTPS_PORT}/wizard"
     echo "Password:       ${WIZARD_PASS}"
     [ -n "${BMC_VM_IP}" ] && echo "Landing Zone IP: ${BMC_VM_IP}  (on BMC network)"

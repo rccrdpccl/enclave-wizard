@@ -8,6 +8,8 @@ import (
 	"log/slog"
 	"net/http"
 	"sort"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
@@ -33,6 +35,9 @@ type TasksHandler struct {
 	configReader *config.Reader
 	configWriter *config.Writer
 	enclaveDir   string
+
+	deployMu   sync.Mutex
+	deployment *models.Deployment
 }
 
 func NewTasksHandler(runner tasks.Runner, registry *plugins.Registry, configReader *config.Reader, configWriter *config.Writer, enclaveDir string) *TasksHandler {
@@ -174,6 +179,24 @@ func (h *TasksHandler) Register(api huma.API) {
 		Description: "Runs the enclave operational validation script that checks DNS, Redfish, certificates, and registry connectivity.",
 		Tags:        []string{"Tasks"},
 	}, h.startValidate)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "get-deployment",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/deployment",
+		Summary:     "Get current deployment state",
+		Description: "Returns the full deployment chain state including main playbook and all addon plugin phases.",
+		Tags:        []string{"Deployment"},
+	}, h.getDeployment)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "get-deployment-progress",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/deployment/progress",
+		Summary:     "Get deployment progress",
+		Description: "Returns live progress with completed task count, percentage, and current phase/task.",
+		Tags:        []string{"Deployment"},
+	}, h.getDeploymentProgress)
 }
 
 // --- Handlers ---
@@ -205,9 +228,27 @@ func (h *TasksHandler) startDeploy(ctx context.Context, _ *StartDeployInput) (*S
 		return nil, mapTaskError(err)
 	}
 
+	// Create deployment tracking
+	phases := []models.DeploymentPhase{
+		{Name: "main", TaskID: run.ID, Status: models.TaskStatusRunning},
+	}
+	for _, p := range addonPlugins {
+		phases = append(phases, models.DeploymentPhase{Name: p, Status: models.TaskStatusPending})
+	}
+
+	h.deployMu.Lock()
+	h.deployment = &models.Deployment{
+		ID:     run.ID,
+		Status: models.TaskStatusRunning,
+		Phases: phases,
+	}
+	h.deployMu.Unlock()
+
 	if len(addonPlugins) > 0 {
 		slog.Info("deploy with addon plugins queued", "plugins", addonPlugins)
 		go h.chainAddonPlugins(run.ID, addonPlugins)
+	} else {
+		go h.watchMainDeploy(run.ID)
 	}
 
 	return &StartTaskOutput{Body: *run}, nil
@@ -243,6 +284,47 @@ func (h *TasksHandler) addonPluginsFromConfig() []string {
 	return result
 }
 
+func (h *TasksHandler) setPhaseStatus(name string, status models.TaskStatus, taskID string) {
+	h.deployMu.Lock()
+	defer h.deployMu.Unlock()
+	if h.deployment == nil {
+		return
+	}
+	for i := range h.deployment.Phases {
+		if h.deployment.Phases[i].Name == name {
+			h.deployment.Phases[i].Status = status
+			if taskID != "" {
+				h.deployment.Phases[i].TaskID = taskID
+			}
+			break
+		}
+	}
+}
+
+func (h *TasksHandler) setDeploymentStatus(status models.TaskStatus) {
+	h.deployMu.Lock()
+	defer h.deployMu.Unlock()
+	if h.deployment != nil {
+		h.deployment.Status = status
+	}
+}
+
+func (h *TasksHandler) watchMainDeploy(mainRunID string) {
+	for {
+		time.Sleep(10 * time.Second)
+		mainRun, err := h.runner.Get(mainRunID)
+		if err != nil {
+			continue
+		}
+		if mainRun.Status == models.TaskStatusRunning {
+			continue
+		}
+		h.setPhaseStatus("main", mainRun.Status, "")
+		h.setDeploymentStatus(mainRun.Status)
+		return
+	}
+}
+
 func (h *TasksHandler) chainAddonPlugins(mainRunID string, pluginNames []string) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -264,15 +346,20 @@ func (h *TasksHandler) chainAddonPlugins(mainRunID string, pluginNames []string)
 		if mainRun.Status != models.TaskStatusSuccessful {
 			slog.Warn("skipping addon plugins — main deploy did not succeed",
 				"run_id", mainRunID, "status", mainRun.Status)
+			h.setPhaseStatus("main", mainRun.Status, "")
+			h.setDeploymentStatus(mainRun.Status)
 			return
 		}
 		break
 	}
 
+	h.setPhaseStatus("main", models.TaskStatusSuccessful, "")
 	slog.Info("main deploy completed, deploying addon plugins", "plugins", pluginNames)
 
 	for _, name := range pluginNames {
 		slog.Info("deploying addon plugin", "plugin", name)
+		h.setPhaseStatus(name, models.TaskStatusRunning, "")
+
 		run, _, err := h.runner.RunSync(context.Background(), tasks.StartRequest{
 			Type:     models.TaskTypeDeployPlugin,
 			Playbook: "playbooks/deploy-plugin.yaml",
@@ -283,16 +370,23 @@ func (h *TasksHandler) chainAddonPlugins(mainRunID string, pluginNames []string)
 		})
 		if err != nil {
 			slog.Error("addon plugin deploy failed to start", "plugin", name, "error", err)
+			h.setPhaseStatus(name, models.TaskStatusFailed, "")
+			h.setDeploymentStatus(models.TaskStatusFailed)
 			return
 		}
+
+		h.setPhaseStatus(name, run.Status, run.ID)
+
 		if run.Status != models.TaskStatusSuccessful {
 			slog.Error("addon plugin deploy failed", "plugin", name, "status", run.Status)
+			h.setDeploymentStatus(models.TaskStatusFailed)
 			return
 		}
 		slog.Info("addon plugin deployed successfully", "plugin", name)
 	}
 
 	slog.Info("all addon plugins deployed successfully")
+	h.setDeploymentStatus(models.TaskStatusSuccessful)
 }
 
 func (h *TasksHandler) startDeployPhase(ctx context.Context, input *StartDeployPhaseInput) (*StartTaskOutput, error) {
@@ -388,6 +482,91 @@ func (h *TasksHandler) startValidate(ctx context.Context, _ *StartValidateInput)
 		return nil, mapTaskError(err)
 	}
 	return &StartTaskOutput{Body: *run}, nil
+}
+
+// --- Deployment endpoints ---
+
+type GetDeploymentOutput struct {
+	Body models.Deployment
+}
+
+func (h *TasksHandler) getDeployment(_ context.Context, _ *struct{}) (*GetDeploymentOutput, error) {
+	h.deployMu.Lock()
+	defer h.deployMu.Unlock()
+
+	if h.deployment == nil {
+		return nil, huma.Error404NotFound("no active deployment")
+	}
+	return &GetDeploymentOutput{Body: *h.deployment}, nil
+}
+
+type GetDeploymentProgressOutput struct {
+	Body models.DeploymentProgress
+}
+
+func (h *TasksHandler) getDeploymentProgress(_ context.Context, _ *struct{}) (*GetDeploymentProgressOutput, error) {
+	h.deployMu.Lock()
+	dep := h.deployment
+	h.deployMu.Unlock()
+
+	if dep == nil {
+		return nil, huma.Error404NotFound("no active deployment")
+	}
+
+	completedPhases := 0
+	totalPhases := len(dep.Phases)
+	currentPhase := ""
+	currentTask := ""
+
+	for _, phase := range dep.Phases {
+		switch phase.Status {
+		case models.TaskStatusSuccessful:
+			completedPhases++
+		case models.TaskStatusRunning:
+			currentPhase = phase.Name
+		}
+
+		if phase.Status != models.TaskStatusRunning || phase.TaskID == "" {
+			continue
+		}
+		events, err := h.runner.Events(phase.TaskID)
+		if err != nil {
+			continue
+		}
+		for _, raw := range events {
+			var ev struct {
+				Event     string `json:"event"`
+				EventData struct {
+					Task string `json:"task"`
+				} `json:"event_data"`
+			}
+			if json.Unmarshal(raw, &ev) != nil {
+				continue
+			}
+			if strings.HasPrefix(ev.Event, "runner_on_") {
+				currentTask = ev.EventData.Task
+			}
+		}
+	}
+
+	pct := 0
+	if dep.Status == models.TaskStatusSuccessful {
+		pct = 100
+	} else if dep.Status == models.TaskStatusFailed {
+		pct = completedPhases * 100 / totalPhases
+	} else if totalPhases > 0 {
+		pct = completedPhases * 100 / totalPhases
+	}
+
+	return &GetDeploymentProgressOutput{
+		Body: models.DeploymentProgress{
+			Completed:    completedPhases,
+			Total:        totalPhases,
+			Percentage:   pct,
+			CurrentPhase: currentPhase,
+			CurrentTask:  currentTask,
+		},
+	}, nil
 }
 
 func mapTaskError(err error) error {
