@@ -91,8 +91,33 @@ export const DeployStep: React.FC = () => {
   // Track which phase logs we've already accumulated
   const [accumulatedLogs, setAccumulatedLogs] = useState("");
   const [lastPhaseTaskId, setLastPhaseTaskId] = useState<string | null>(null);
+  const logsReconstructedRef = useRef(false);
+
+  // On mount, check for an existing deployment and reconnect
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/v1/deployment");
+        if (!res.ok || cancelled) return;
+        const dep: Deployment = await res.json();
+        if (cancelled) return;
+        if (dep.status === "running" || dep.status === "pending") {
+          setStatus("deploying");
+          setDeploying(true);
+          setStartTime(new Date());
+        } else if (dep.status === "successful" || dep.status === "failed") {
+          setStatus("deploying");
+          setDeploying(false);
+          setStartTime(new Date());
+        }
+      } catch { /* no deployment */ }
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   const handleDeploy = useCallback(async () => {
+    logsReconstructedRef.current = false;
     setStatus("writing");
     setErrorMessage("");
     setErrorDetails([]);
@@ -128,7 +153,7 @@ export const DeployStep: React.FC = () => {
     }
   }, [api, tasksApi, state]);
 
-  // Poll deployment state
+  // Poll deployment state (also fetch once for completed deployments on reconnect)
   const fetchDeployment = useCallback(async (): Promise<Deployment | null> => {
     try {
       const res = await fetch("/api/v1/deployment");
@@ -136,7 +161,8 @@ export const DeployStep: React.FC = () => {
       return res.json();
     } catch { return null; }
   }, []);
-  const { data: deployment } = usePolling(fetchDeployment, 3000, deploying);
+  const pollDeployment = status === "deploying";
+  const { data: deployment } = usePolling(fetchDeployment, 3000, pollDeployment);
 
   // Poll progress
   const fetchProgress = useCallback(async (): Promise<DeploymentProgress | null> => {
@@ -146,7 +172,7 @@ export const DeployStep: React.FC = () => {
       return res.json();
     } catch { return null; }
   }, []);
-  const { data: progress } = usePolling(fetchProgress, 3000, deploying);
+  const { data: progress } = usePolling(fetchProgress, 3000, pollDeployment);
 
   // Find the currently running phase's task ID for log polling
   const currentRunningTaskId = useMemo(() => {
@@ -161,6 +187,35 @@ export const DeployStep: React.FC = () => {
     [tasksApi, currentRunningTaskId],
   );
   const { data: currentLogs } = usePolling(fetchLogs, 2000, deploying && !!currentRunningTaskId);
+
+  // Reconstruct logs from all phases on reconnect (page reload)
+  useEffect(() => {
+    if (!deployment || logsReconstructedRef.current) return;
+    const hasTaskIds = deployment.phases.some(p => p.taskId);
+    if (!hasTaskIds) return;
+    logsReconstructedRef.current = true;
+
+    (async () => {
+      let logs = "";
+      for (const phase of deployment.phases) {
+        if (!phase.taskId) continue;
+        try {
+          const phaseLogs = await tasksApi.getTaskLogs(phase.taskId);
+          if (phaseLogs) {
+            logs += `\n=== ${phaseLabel(phase.name)} ===\n\n${phaseLogs}`;
+            if (phase.status === "successful" || phase.status === "failed") {
+              logs += `\n\n=== ${phaseLabel(phase.name)} complete ===\n\n`;
+            }
+          }
+        } catch { /* skip */ }
+      }
+      setAccumulatedLogs(logs);
+      const running = deployment.phases.find(p => p.status === "running");
+      if (running?.taskId) {
+        setLastPhaseTaskId(running.taskId);
+      }
+    })();
+  }, [deployment, tasksApi]);
 
   // When phase changes, accumulate the previous phase's logs
   useEffect(() => {
