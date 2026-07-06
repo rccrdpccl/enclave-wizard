@@ -5,7 +5,7 @@ WIZARD_VERSION ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo dev)
 ENCLAVE_VERSION ?= $(shell git -C ../enclave rev-parse --short HEAD 2>/dev/null || echo dev)
 LDFLAGS := -w -s -X main.wizardVersion=$(WIZARD_VERSION) -X main.enclaveVersion=$(ENCLAVE_VERSION)
 
-.PHONY: build build-linux build-ui run test lint clean tidy deploy teardown generate enclave-mock clean-enclave-mock run-mock preview deploy-preview bm-emulation bm-emulation-config bm-emulation-cleanup test-config
+.PHONY: build build-linux build-ui run test lint clean tidy deploy teardown generate enclave-mock clean-enclave-mock run-mock preview deploy-preview bm-emulation bm-emulation-config bm-teardown test-config
 
 build-ui:
 	$(CONTAINER_RUNTIME) run --rm -v $(PWD)/ui:/app:z -w /app node:22-alpine \
@@ -107,9 +107,9 @@ sanity-check:
 	@test -n '$(TARGET)' || (echo "Usage: make sanity-check TARGET=root@host" && exit 1)
 	hack/infra/sanity-check.sh --host '$(TARGET)'
 
-bm-emulation-cleanup:
-	@test -n "$(TARGET)" || (echo "Usage: make bm-emulation-cleanup TARGET=root@host" && exit 1)
-	hack/infra/bm-emulation-cleanup.sh --host $(TARGET)
+bm-teardown:
+	@test -n "$(TARGET)" || (echo "Usage: make bm-teardown TARGET=root@host" && exit 1)
+	hack/infra/bm-teardown.sh --host $(TARGET)
 
 ENCLAVE_MOCK_BRANCH ?= main
 ENCLAVE_MOCK_REPO ?= git@github.com:rccrdpccl/enclave.git
