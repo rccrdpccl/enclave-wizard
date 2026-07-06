@@ -27,6 +27,11 @@ import (
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/validation"
 )
 
+var (
+	wizardVersion  = "dev"
+	enclaveVersion = "dev"
+)
+
 //go:embed all:ui/apps/wizard/dist
 var uiFiles embed.FS
 
@@ -81,6 +86,7 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store, opts
 	api.NewConfigHandler(reader, writer, validator).Register(humaAPI)
 	api.NewDefaultsHandler(enclaveDir).Register(humaAPI)
 	api.NewPluginsHandler(registry).Register(humaAPI)
+	api.NewVersionHandler(wizardVersion, enclaveVersion).Register(humaAPI)
 
 	return humaAPI, runner, nil
 }

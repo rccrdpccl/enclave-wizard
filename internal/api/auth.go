@@ -135,7 +135,7 @@ func BearerAuthMiddleware(store *auth.Store, noAuth bool) func(http.Handler) htt
 				return
 			}
 
-			if r.URL.Path == "/api/v1/auth/login" || r.URL.Path == "/api/v1/auth/mode" {
+			if r.URL.Path == "/api/v1/auth/login" || r.URL.Path == "/api/v1/auth/mode" || r.URL.Path == "/api/v1/version" {
 				next.ServeHTTP(w, r)
 				return
 			}

@@ -1,6 +1,9 @@
 BINARY := enclave-wizard
 GO := go
 CONTAINER_RUNTIME := $(shell command -v podman 2> /dev/null || echo docker)
+WIZARD_VERSION ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo dev)
+ENCLAVE_VERSION ?= $(shell git -C ../enclave rev-parse --short HEAD 2>/dev/null || echo dev)
+LDFLAGS := -w -s -X main.wizardVersion=$(WIZARD_VERSION) -X main.enclaveVersion=$(ENCLAVE_VERSION)
 
 .PHONY: build build-linux build-ui run test lint clean tidy deploy teardown generate enclave-mock clean-enclave-mock run-mock preview deploy-preview bm-emulation bm-emulation-config bm-emulation-cleanup test-config
 
@@ -10,23 +13,23 @@ build-ui:
 		yarn workspace @enclave-wizard-ui/wizard run -T vite build"
 
 build: build-ui
-	$(GO) build -ldflags="-w -s" -tags "$(TAGS)" -o $(BINARY) .
+	$(GO) build -ldflags="$(LDFLAGS)" -tags "$(TAGS)" -o $(BINARY) .
 
 build-linux: build-ui
 	rm -f $(BINARY)
 	$(CONTAINER_RUNTIME) run --rm -v $(PWD):/app:z -w /app golang:latest \
-		sh -c "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='-w -s' -tags '$(TAGS)' -o $(BINARY) ."
+		sh -c "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='$(LDFLAGS)' -tags '$(TAGS)' -o $(BINARY) ."
 
 run: build
 	./$(BINARY) --enclave-dir ../enclave --tls-cert hack/tls/server.crt --tls-key hack/tls/server.key
 
 run-demo: build-ui
-	$(GO) build -ldflags="-w -s" -tags dev -o $(BINARY) .
+	$(GO) build -ldflags="$(LDFLAGS)" -tags dev -o $(BINARY) .
 	./$(BINARY) --demo-deploy --enclave-dir ../enclave --tls-cert hack/tls/server.crt --tls-key hack/tls/server.key
 
 preview: build-ui
 	$(CONTAINER_RUNTIME) run --rm -v $(PWD):/app:z -w /app golang:latest \
-		sh -c "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='-w -s' -tags dev -o $(BINARY) ."
+		sh -c "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='$(LDFLAGS)' -tags dev -o $(BINARY) ."
 	hack/run-preview.sh $(PORT)
 
 test:
@@ -127,7 +130,7 @@ dev: build-ui
 	@mkdir -p hack/tls
 	@test -f hack/tls/server.crt || openssl req -new -x509 -nodes -days 365 \
 		-subj "/CN=localhost" -keyout hack/tls/server.key -out hack/tls/server.crt 2>/dev/null
-	$(GO) build -ldflags="-w -s" -tags dev -o $(BINARY) .
+	$(GO) build -ldflags="$(LDFLAGS)" -tags dev -o $(BINARY) .
 	./$(BINARY) --no-auth --enclave-dir enclave-mock \
 		--password-file /tmp/enclave-wizard-dev-pass \
 		--tls-cert hack/tls/server.crt --tls-key hack/tls/server.key

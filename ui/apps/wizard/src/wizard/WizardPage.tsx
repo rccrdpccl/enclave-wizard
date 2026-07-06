@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { EnclaveConfigToJSON } from "@enclave-wizard-ui/api-client";
 import { useEnclaveApi } from "../api/useEnclaveApi.ts";
+import { AboutDialog } from "../common/components/AboutDialog.tsx";
 import { RedHatLogo } from "../common/components/RedHatLogo.tsx";
 import {
   validateFields,
@@ -470,6 +471,9 @@ function WizardContent(): React.ReactElement {
               <Link to="/tasks" className={taskNavButton}>
                 <ListIcon /> Tasks
               </Link>
+            </SplitItem>
+            <SplitItem>
+              <AboutDialog />
             </SplitItem>
           </Split>
         </div>

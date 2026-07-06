@@ -37,6 +37,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import type { TaskRun } from "@enclave-wizard-ui/api-client";
 import { useTasksApi } from "../api/useTasksApi.ts";
 import { useEnclaveApi } from "../api/useEnclaveApi.ts";
+import { AboutDialog } from "../common/components/AboutDialog.tsx";
 import { RedHatLogo } from "../common/components/RedHatLogo.tsx";
 import { usePolling } from "./hooks/usePolling.ts";
 import { TaskStatusLabel } from "./components/TaskStatusLabel.tsx";
@@ -520,6 +521,9 @@ export const TasksPage: React.FC = () => {
               <Link to="/wizard" className={styles.navButton}>
                 <CogIcon /> Configuration
               </Link>
+            </SplitItem>
+            <SplitItem>
+              <AboutDialog />
             </SplitItem>
           </Split>
         </div>
