@@ -234,6 +234,46 @@ else
 fi
 rm -f "${DEFAULT_XML}"
 
+# --- Step 7: Write params file ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PARAMS_FILE="${SCRIPT_DIR}/../../demo-params.json"
+
+VM_DATA="["
+for i in $(seq 0 $((NUM_MASTERS - 1))); do
+  VM_NAME="${VM_PREFIX}-${i}"
+  VM_MAC="${VM_MAC_PREFIX}:$(printf '%02x' "$i")"
+  VM_UUID=$(virsh domuuid "${VM_NAME}" 2>/dev/null || echo "")
+  VM_IP="192.168.223.$((10 + i))"
+  [ "$i" -gt 0 ] && VM_DATA+=","
+  VM_DATA+="{\"name\":\"${VM_NAME}\",\"mac\":\"${VM_MAC}\",\"uuid\":\"${VM_UUID}\",\"ip\":\"${VM_IP}\"}"
+done
+VM_DATA+="]"
+
+python3 -c "
+import json, os
+path = '${PARAMS_FILE}'
+data = {}
+if os.path.exists(path):
+    with open(path) as f:
+        data = json.load(f)
+data['bmEmulation'] = {
+    'clusterName': '${CLUSTER_NAME}',
+    'baseDomain': '${BASE_DOMAIN}',
+    'fqdn': '${FQDN}',
+    'machineNetwork': '${NET_CIDR}',
+    'apiVIP': '${API_VIP}',
+    'ingressVIP': '${INGRESS_VIP}',
+    'rendezvousIP': '192.168.223.10',
+    'bmcAddress': '${NET_GATEWAY}:${BMC_PORT}',
+    'bmcUser': 'admin',
+    'bmcPassword': 'password',
+    'vms': ${VM_DATA},
+}
+with open(path, 'w') as f:
+    json.dump(data, f, indent=2)
+print(f'  Params written to {os.path.realpath(path)}')
+"
+
 echo ""
 info "Setup complete. VMs are shut off — Ironic will boot them during deployment."
 info "Sushy-tools: https://${NET_GATEWAY}:${BMC_PORT}"
