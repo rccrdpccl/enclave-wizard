@@ -10,6 +10,7 @@ import {
 } from "@patternfly/react-core";
 import type React from "react";
 import { useState } from "react";
+import { useAuth } from "../../auth/AuthContext.tsx";
 import { useWizard } from "../WizardContext.tsx";
 import { stepStyles } from "./stepStyles.ts";
 
@@ -25,6 +26,7 @@ function getValueByPath(obj: Record<string, unknown>, path: string): unknown {
 
 export const AAPStep: React.FC = () => {
   const { state, dispatch } = useWizard();
+  const { token } = useAuth();
   const [uploadFilename, setUploadFilename] = useState("");
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState("");
@@ -52,7 +54,11 @@ export const AAPStep: React.FC = () => {
     form.append("dest", "plugins/aap");
 
     try {
-      const resp = await fetch("/api/v1/files", { method: "POST", body: form });
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      const resp = await fetch("/api/v1/files", { method: "POST", headers, body: form });
       if (!resp.ok) {
         const text = await resp.text();
         throw new Error(text || `Upload failed (${resp.status})`);
