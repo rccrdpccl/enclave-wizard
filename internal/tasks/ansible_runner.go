@@ -34,20 +34,24 @@ type AnsibleRunner struct {
 }
 
 func NewAnsibleRunner(enclaveDir string) (*AnsibleRunner, error) {
-	if _, err := os.Stat(enclaveDir); err != nil {
+	absDir, err := filepath.Abs(enclaveDir)
+	if err != nil {
+		return nil, fmt.Errorf("resolving enclave directory: %w", err)
+	}
+	if _, err := os.Stat(absDir); err != nil {
 		return nil, fmt.Errorf("enclave directory: %w", err)
 	}
 	if _, err := exec.LookPath("ansible-runner"); err != nil {
 		return nil, ErrRunnerBin
 	}
 
-	artifactsDir := filepath.Join(enclaveDir, "artifacts")
+	artifactsDir := filepath.Join(absDir, "artifacts")
 	if err := os.MkdirAll(artifactsDir, 0750); err != nil {
 		return nil, fmt.Errorf("creating artifacts directory: %w", err)
 	}
 
 	return &AnsibleRunner{
-		enclaveDir:   enclaveDir,
+		enclaveDir:   absDir,
 		artifactsDir: artifactsDir,
 	}, nil
 }
@@ -210,7 +214,7 @@ func (r *AnsibleRunner) runAsync(req StartRequest) (*models.TaskRun, <-chan stru
 		return nil, nil, fmt.Errorf("writing run metadata: %w", err)
 	}
 
-	slog.Info("task started", "run_id", runID, "type", req.Type, "playbook", req.Playbook, "pid", run.PID)
+	slog.Info("task started", "run_id", runID, "type", req.Type, "playbook", req.Playbook, "pid", run.PID, "cmd", cmd.String(), "dir", cmd.Dir)
 
 	done := make(chan struct{})
 	r.mu.Lock()
@@ -295,7 +299,7 @@ func (r *AnsibleRunner) runFake(recordingFile string, run *models.TaskRun, runDi
 }
 
 func (r *AnsibleRunner) waitForCompletion(cmd *exec.Cmd, run *models.TaskRun, runDir string, done chan struct{}) {
-	_ = cmd.Wait()
+	waitErr := cmd.Wait()
 
 	now := time.Now()
 	run.EndedAt = &now
@@ -317,11 +321,17 @@ func (r *AnsibleRunner) waitForCompletion(cmd *exec.Cmd, run *models.TaskRun, ru
 		run.ExitCode = &rc
 	}
 
+	stderrBytes, _ := os.ReadFile(filepath.Join(runDir, "stderr"))
+
 	switch run.Status {
 	case models.TaskStatusSuccessful:
 		slog.Info("task completed", "run_id", run.ID, "playbook", run.Playbook, "duration", duration)
 	default:
-		slog.Warn("task did not complete successfully", "run_id", run.ID, "playbook", run.Playbook, "status", run.Status, "duration", duration)
+		slog.Warn("task did not complete successfully",
+			"run_id", run.ID, "playbook", run.Playbook,
+			"status", run.Status, "ar_status", arStatus,
+			"exit_code", run.ExitCode, "duration", duration,
+			"wait_err", waitErr, "stderr", string(stderrBytes))
 	}
 
 	writeRunJSON(runDir, run)

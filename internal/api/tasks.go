@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
 	"strings"
 	"sync"
@@ -217,9 +219,19 @@ func (h *TasksHandler) startDeploy(ctx context.Context, _ *StartDeployInput) (*S
 
 	addonPlugins := h.addonPluginsFromConfig()
 
+	playbook := "playbooks/main.yaml"
+	if len(addonPlugins) > 0 {
+		generated, err := h.generateDeployPlaybook(addonPlugins)
+		if err != nil {
+			return nil, huma.Error500InternalServerError("failed to generate deploy playbook", err)
+		}
+		playbook = generated
+		slog.Info("generated deploy playbook with addon plugins", "playbook", playbook, "plugins", addonPlugins)
+	}
+
 	run, err := h.runner.Start(tasks.StartRequest{
 		Type:     models.TaskTypeDeploy,
-		Playbook: "playbooks/main.yaml",
+		Playbook: playbook,
 		ExtraVars: map[string]string{
 			"workingDir": h.enclaveDir,
 		},
@@ -228,30 +240,45 @@ func (h *TasksHandler) startDeploy(ctx context.Context, _ *StartDeployInput) (*S
 		return nil, mapTaskError(err)
 	}
 
-	// Create deployment tracking
 	phases := []models.DeploymentPhase{
 		{Name: "main", TaskID: run.ID, Status: models.TaskStatusRunning},
 	}
 	for _, p := range addonPlugins {
-		phases = append(phases, models.DeploymentPhase{Name: p, Status: models.TaskStatusPending})
+		phases = append(phases, models.DeploymentPhase{Name: p, TaskID: run.ID, Status: models.TaskStatusPending})
 	}
 
 	h.deployMu.Lock()
 	h.deployment = &models.Deployment{
-		ID:     run.ID,
-		Status: models.TaskStatusRunning,
-		Phases: phases,
+		ID:         run.ID,
+		Status:     models.TaskStatusRunning,
+		Phases:     phases,
+		TotalTasks: 300 + len(addonPlugins)*30,
 	}
 	h.deployMu.Unlock()
 
-	if len(addonPlugins) > 0 {
-		slog.Info("deploy with addon plugins queued", "plugins", addonPlugins)
-		go h.chainAddonPlugins(run.ID, addonPlugins)
-	} else {
-		go h.watchMainDeploy(run.ID)
-	}
+	go h.watchDeploy(run.ID)
 
 	return &StartTaskOutput{Body: *run}, nil
+}
+
+func (h *TasksHandler) generateDeployPlaybook(addonPlugins []string) (string, error) {
+	var buf strings.Builder
+	buf.WriteString("---\n# Auto-generated: main deploy + addon plugins\n")
+	buf.WriteString("- ansible.builtin.import_playbook: main.yaml\n")
+	for _, name := range addonPlugins {
+		fmt.Fprintf(&buf, "- ansible.builtin.import_playbook: deploy-plugin.yaml\n")
+		fmt.Fprintf(&buf, "  vars:\n")
+		fmt.Fprintf(&buf, "    plugin_name: %s\n", name)
+		fmt.Fprintf(&buf, "    plugin_mirror: true\n")
+	}
+
+	dir := filepath.Join(h.enclaveDir, "playbooks")
+	os.MkdirAll(dir, 0750)
+	path := filepath.Join(dir, "deploy-all.yaml")
+	if err := os.WriteFile(path, []byte(buf.String()), 0640); err != nil {
+		return "", fmt.Errorf("writing deploy-all.yaml: %w", err)
+	}
+	return "playbooks/deploy-all.yaml", nil
 }
 
 func (h *TasksHandler) addonPluginsFromConfig() []string {
@@ -284,109 +311,24 @@ func (h *TasksHandler) addonPluginsFromConfig() []string {
 	return result
 }
 
-func (h *TasksHandler) setPhaseStatus(name string, status models.TaskStatus, taskID string) {
-	h.deployMu.Lock()
-	defer h.deployMu.Unlock()
-	if h.deployment == nil {
-		return
-	}
-	for i := range h.deployment.Phases {
-		if h.deployment.Phases[i].Name == name {
-			h.deployment.Phases[i].Status = status
-			if taskID != "" {
-				h.deployment.Phases[i].TaskID = taskID
-			}
-			break
-		}
-	}
-}
-
-func (h *TasksHandler) setDeploymentStatus(status models.TaskStatus) {
-	h.deployMu.Lock()
-	defer h.deployMu.Unlock()
-	if h.deployment != nil {
-		h.deployment.Status = status
-	}
-}
-
-func (h *TasksHandler) watchMainDeploy(mainRunID string) {
+func (h *TasksHandler) watchDeploy(runID string) {
 	for {
 		time.Sleep(10 * time.Second)
-		mainRun, err := h.runner.Get(mainRunID)
+		run, err := h.runner.Get(runID)
 		if err != nil {
 			continue
 		}
-		if mainRun.Status == models.TaskStatusRunning {
+		if run.Status == models.TaskStatusRunning {
 			continue
 		}
-		h.setPhaseStatus("main", mainRun.Status, "")
-		h.setDeploymentStatus(mainRun.Status)
+
+		h.deployMu.Lock()
+		if h.deployment != nil {
+			h.deployment.Status = run.Status
+		}
+		h.deployMu.Unlock()
 		return
 	}
-}
-
-func (h *TasksHandler) chainAddonPlugins(mainRunID string, pluginNames []string) {
-	defer func() {
-		if r := recover(); r != nil {
-			slog.Error("addon plugin chain panicked", "error", r)
-		}
-	}()
-
-	slog.Info("waiting for main deploy to complete before addon plugins", "plugins", pluginNames)
-
-	for {
-		time.Sleep(10 * time.Second)
-		mainRun, err := h.runner.Get(mainRunID)
-		if err != nil {
-			continue
-		}
-		if mainRun.Status == models.TaskStatusRunning {
-			continue
-		}
-		if mainRun.Status != models.TaskStatusSuccessful {
-			slog.Warn("skipping addon plugins — main deploy did not succeed",
-				"run_id", mainRunID, "status", mainRun.Status)
-			h.setPhaseStatus("main", mainRun.Status, "")
-			h.setDeploymentStatus(mainRun.Status)
-			return
-		}
-		break
-	}
-
-	h.setPhaseStatus("main", models.TaskStatusSuccessful, "")
-	slog.Info("main deploy completed, deploying addon plugins", "plugins", pluginNames)
-
-	for _, name := range pluginNames {
-		slog.Info("deploying addon plugin", "plugin", name)
-		h.setPhaseStatus(name, models.TaskStatusRunning, "")
-
-		run, _, err := h.runner.RunSync(context.Background(), tasks.StartRequest{
-			Type:     models.TaskTypeDeployPlugin,
-			Playbook: "playbooks/deploy-plugin.yaml",
-			ExtraVars: map[string]string{
-				"plugin_name": name,
-				"workingDir":  h.enclaveDir,
-			},
-		})
-		if err != nil {
-			slog.Error("addon plugin deploy failed to start", "plugin", name, "error", err)
-			h.setPhaseStatus(name, models.TaskStatusFailed, "")
-			h.setDeploymentStatus(models.TaskStatusFailed)
-			return
-		}
-
-		h.setPhaseStatus(name, run.Status, run.ID)
-
-		if run.Status != models.TaskStatusSuccessful {
-			slog.Error("addon plugin deploy failed", "plugin", name, "status", run.Status)
-			h.setDeploymentStatus(models.TaskStatusFailed)
-			return
-		}
-		slog.Info("addon plugin deployed successfully", "plugin", name)
-	}
-
-	slog.Info("all addon plugins deployed successfully")
-	h.setDeploymentStatus(models.TaskStatusSuccessful)
 }
 
 func (h *TasksHandler) startDeployPhase(ctx context.Context, input *StartDeployPhaseInput) (*StartTaskOutput, error) {
@@ -513,57 +455,50 @@ func (h *TasksHandler) getDeploymentProgress(_ context.Context, _ *struct{}) (*G
 		return nil, huma.Error404NotFound("no active deployment")
 	}
 
-	completedPhases := 0
-	totalPhases := len(dep.Phases)
-	currentPhase := ""
+	completedTasks := 0
 	currentTask := ""
 
-	for _, phase := range dep.Phases {
-		switch phase.Status {
-		case models.TaskStatusSuccessful:
-			completedPhases++
-		case models.TaskStatusRunning:
-			currentPhase = phase.Name
-		}
-
-		if phase.Status != models.TaskStatusRunning || phase.TaskID == "" {
-			continue
-		}
-		events, err := h.runner.Events(phase.TaskID)
-		if err != nil {
-			continue
-		}
+	events, err := h.runner.Events(dep.ID)
+	if err == nil {
 		for _, raw := range events {
 			var ev struct {
 				Event     string `json:"event"`
 				EventData struct {
 					Task string `json:"task"`
+					Play string `json:"play"`
 				} `json:"event_data"`
 			}
 			if json.Unmarshal(raw, &ev) != nil {
 				continue
 			}
-			if strings.HasPrefix(ev.Event, "runner_on_") {
+			switch {
+			case strings.HasPrefix(ev.Event, "runner_on_"):
+				completedTasks++
+				currentTask = ev.EventData.Task
+			case ev.Event == "playbook_on_task_start" && ev.EventData.Task != "":
 				currentTask = ev.EventData.Task
 			}
 		}
 	}
 
-	pct := 0
+	total := dep.TotalTasks
+	if total == 0 {
+		total = 350
+	}
+	pct := completedTasks * 100 / total
+	if pct > 99 && dep.Status == models.TaskStatusRunning {
+		pct = 99
+	}
 	if dep.Status == models.TaskStatusSuccessful {
 		pct = 100
-	} else if dep.Status == models.TaskStatusFailed {
-		pct = completedPhases * 100 / totalPhases
-	} else if totalPhases > 0 {
-		pct = completedPhases * 100 / totalPhases
 	}
 
 	return &GetDeploymentProgressOutput{
 		Body: models.DeploymentProgress{
-			Completed:    completedPhases,
-			Total:        totalPhases,
+			Completed:    completedTasks,
+			Total:        total,
 			Percentage:   pct,
-			CurrentPhase: currentPhase,
+			CurrentPhase: "",
 			CurrentTask:  currentTask,
 		},
 	}, nil
