@@ -5,6 +5,7 @@ import type { DeploymentState } from "../../api/useDeployment.ts";
 import { DeployStep } from "./DeployStep.tsx";
 
 const mockStart = vi.fn();
+const mockCancel = vi.fn();
 let mockDeploymentState: DeploymentState = {
   phase: "idle",
   progress: null,
@@ -12,12 +13,14 @@ let mockDeploymentState: DeploymentState = {
   startTime: null,
   error: null,
   taskId: null,
+  task: null,
 };
 
 vi.mock("../../api/useDeployment.ts", () => ({
   useDeployment: () => ({
     state: mockDeploymentState,
     start: mockStart,
+    cancel: mockCancel,
   }),
 }));
 
@@ -49,6 +52,7 @@ describe("DeployStep", () => {
       startTime: null,
       error: null,
       taskId: null,
+      task: null,
     };
     Element.prototype.scrollIntoView = vi.fn();
   });
@@ -104,44 +108,56 @@ describe("DeployStep", () => {
     expect(screen.getByText("field Y is invalid")).toBeInTheDocument();
   });
 
-  it("shows deploying state with progress", () => {
+  it("shows deploying state with output heading", () => {
     mockDeploymentState = {
       ...mockDeploymentState,
       phase: "deploying",
       taskId: "task-1",
       startTime: new Date(),
-      progress: { percentage: 42, currentTask: "Installing OSAC" },
+      task: { status: "running", startedAt: new Date() },
     };
 
     render(<DeployStep />);
     expect(screen.getByText("Deployment")).toBeInTheDocument();
-    expect(screen.getByText("Installing OSAC")).toBeInTheDocument();
+    expect(screen.getByText("Output")).toBeInTheDocument();
+    expect(screen.getByText("Waiting for output...")).toBeInTheDocument();
   });
 
-  it("shows success alert when complete", () => {
+  it("shows cancel button when deploying", () => {
+    mockDeploymentState = {
+      ...mockDeploymentState,
+      phase: "deploying",
+      taskId: "task-1",
+      task: { status: "running", startedAt: new Date() },
+    };
+
+    render(<DeployStep />);
+    expect(screen.getByTestId("cancel-deploy")).toBeInTheDocument();
+  });
+
+  it("shows completed state", () => {
     mockDeploymentState = {
       ...mockDeploymentState,
       phase: "complete",
       taskId: "task-1",
-      progress: { percentage: 100, currentTask: "" },
+      task: { status: "successful", startedAt: new Date(), endedAt: new Date(), exitCode: 0 },
     };
 
     render(<DeployStep />);
-    expect(
-      screen.getByText("Deployment completed successfully"),
-    ).toBeInTheDocument();
+    expect(screen.getByText("Deployment")).toBeInTheDocument();
+    expect(screen.queryByTestId("cancel-deploy")).not.toBeInTheDocument();
   });
 
-  it("shows failure alert when failed", () => {
+  it("shows failed state", () => {
     mockDeploymentState = {
       ...mockDeploymentState,
       phase: "failed",
       taskId: "task-1",
-      progress: { percentage: 50, currentTask: "" },
+      task: { status: "failed", startedAt: new Date(), endedAt: new Date(), exitCode: 1 },
     };
 
     render(<DeployStep />);
-    expect(screen.getByText("Deployment failed")).toBeInTheDocument();
+    expect(screen.getByText("Deployment")).toBeInTheDocument();
   });
 
   it("renders logs when available", () => {
@@ -149,12 +165,11 @@ describe("DeployStep", () => {
       ...mockDeploymentState,
       phase: "deploying",
       taskId: "task-1",
+      task: { status: "running", startedAt: new Date() },
       logs: "PLAY [Setup]\nTASK [install] ok",
     };
 
     render(<DeployStep />);
-    // Logs are inside expandable section, need to open it
-    const toggle = screen.getByText("Show output");
-    userEvent.click(toggle);
+    expect(screen.getByText("Output")).toBeInTheDocument();
   });
 });
