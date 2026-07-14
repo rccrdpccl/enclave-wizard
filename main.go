@@ -21,6 +21,7 @@ import (
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/api"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/auth"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/config"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/experience"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/logger"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/runner"
@@ -78,13 +79,21 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store, opts
 
 	if runner != nil {
 		api.NewTasksHandler(runner, registry, reader, writer, enclaveDir).Register(humaAPI)
+		api.NewStreamHandler(runner).Register(mux)
 	}
 
 	validator := validation.NewValidator(enclaveDir, runner)
 
+	experiences, err := experience.LoadFromDir(enclaveDir)
+	if err != nil {
+		slog.Warn("experience discovery failed", "error", err)
+	}
+	slog.Info("experiences loaded", "count", len(experiences))
+
 	api.NewAuthHandler(authStore, opts.NoAuth).Register(humaAPI)
 	api.NewConfigHandler(reader, writer, validator).Register(humaAPI)
 	api.NewDefaultsHandler(enclaveDir).Register(humaAPI)
+	api.NewExperiencesHandler(experiences).Register(humaAPI)
 	api.NewPluginsHandler(registry).Register(humaAPI)
 	api.NewVersionHandler(wizardVersion, enclaveVersion).Register(humaAPI)
 

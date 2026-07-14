@@ -1,4 +1,4 @@
-package runner
+package tasks
 
 import (
 	"context"
@@ -9,14 +9,18 @@ import (
 )
 
 var (
-	ErrBusy        = errors.New("a task is already running")
-	ErrNotFound    = errors.New("run not found")
-	ErrRunnerBin   = errors.New("ansible-runner binary not found in PATH")
-	ErrRunning     = errors.New("task is still running")
-	ErrNoRecording = errors.New("no recording found for this playbook/tags combination")
+	ErrBusy      = errors.New("a task is already running")
+	ErrNotFound  = errors.New("run not found")
+	ErrRunnerBin = errors.New("ansible-runner binary not found in PATH")
+	ErrRunning   = errors.New("task is still running")
 )
 
-// StartRequest describes a task to execute.
+// Event represents an SSE event sent on a task stream.
+type Event struct {
+	Type string // "status", "progress", "log", "done"
+	Data string // JSON-encoded payload
+}
+
 type StartRequest struct {
 	Type      models.TaskType
 	Playbook  string
@@ -25,17 +29,10 @@ type StartRequest struct {
 	Env       map[string]string
 }
 
-// Event represents a structured event emitted during a task run.
-type Event struct {
-	Type string          // "status", "progress", "log"
-	Data json.RawMessage
-}
-
-//go:generate go run go.uber.org/mock/mockgen -source=runner.go -destination=mock_runner.go -package=runner
+//go:generate go run go.uber.org/mock/mockgen -source=runner.go -destination=mock_runner.go -package=tasks
 type Runner interface {
 	Start(req StartRequest) (*models.TaskRun, error)
 	RunSync(ctx context.Context, req StartRequest) (*models.TaskRun, []byte, error)
-	Cancel(id string) error
 	Get(id string) (*models.TaskRun, error)
 	List() ([]models.TaskRun, error)
 	Logs(id string) ([]byte, error)
@@ -45,3 +42,4 @@ type Runner interface {
 	Shutdown(ctx context.Context) error
 	Recover() error
 }
+

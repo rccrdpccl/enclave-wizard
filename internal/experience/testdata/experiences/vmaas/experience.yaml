@@ -1,0 +1,17 @@
+---
+id: vmaas
+name: VMs as a Service
+description: Self-service virtual machine provisioning on OpenShift Virtualization
+plugins:
+  - name: trust-manager
+    order: 100
+  - name: rhbk
+    order: 101
+  - name: authorino
+    order: 102
+  - name: aap
+    order: 103
+  - name: cnv
+    order: 104
+  - name: osac
+    order: 200
