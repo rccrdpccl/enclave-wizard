@@ -38,7 +38,7 @@ describe("useWizardInit", () => {
     ];
 
     fetchSpy.mockResolvedValue(
-      new Response(JSON.stringify(apiExperiences), {
+      new Response(JSON.stringify({ experiences: apiExperiences }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       }),
@@ -52,6 +52,30 @@ describe("useWizardInit", () => {
 
     expect(fetchSpy).toHaveBeenCalledWith("/api/v1/experiences");
     expect(result.current.experiences).toEqual(apiExperiences);
+  });
+
+  it("handles huma-wrapped response with $schema field", async () => {
+    const apiExperiences = [
+      { id: "caas", name: "CaaS", description: "d", plugins: [] },
+      { id: "vmaas", name: "VMaaS", description: "d", plugins: [] },
+      { id: "bmaas", name: "BMaaS", description: "d", plugins: [] },
+    ];
+
+    fetchSpy.mockResolvedValue(
+      new Response(JSON.stringify({ $schema: "https://localhost/schemas/ExperiencesOutputBody.json", experiences: apiExperiences }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const { result } = renderHook(() => useTestHook(), { wrapper });
+
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    expect(result.current.experiences).toEqual(apiExperiences);
+    expect(result.current.flavors).toHaveLength(3);
   });
 
   it("falls back to hardcoded experiences when API returns 404", async () => {
@@ -112,7 +136,7 @@ describe("useWizardInit", () => {
     ];
 
     fetchSpy.mockResolvedValue(
-      new Response(JSON.stringify(apiExperiences), {
+      new Response(JSON.stringify({ experiences: apiExperiences }), {
         status: 200,
         headers: { "Content-Type": "application/json" },
       }),
