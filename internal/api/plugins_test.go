@@ -276,3 +276,92 @@ func TestValidateCombination_EmptyBodyReturnsBadRequest(t *testing.T) {
 		t.Error("expected non-200 for empty plugins list (minItems:1 constraint)")
 	}
 }
+
+// --- Get plugin schema ---
+
+func testPluginRegistryWithSchemas() *plugins.Registry {
+	r := plugins.NewRegistry([]models.Plugin{
+		{Name: "lvms", Type: models.PluginTypeFoundation, Order: 10},
+		{Name: "odf", Type: models.PluginTypeFoundation, Order: 10},
+		{Name: "nvidia-gpu", Type: models.PluginTypeAddon, Order: 110},
+	})
+	r.SetSchema("lvms", []byte(`{"type":"object","properties":{"deviceClass":{"type":"string"}}}`))
+	return r
+}
+
+func setupPluginsAPIWithSchemas() *httptest.Server {
+	mux := http.NewServeMux()
+	api := humago.New(mux, huma.DefaultConfig("test", "0.0.0"))
+	NewPluginsHandler(testPluginRegistryWithSchemas()).Register(api)
+	return httptest.NewServer(mux)
+}
+
+func TestGetPluginSchema_ReturnsValidJSON(t *testing.T) {
+	srv := setupPluginsAPIWithSchemas()
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/v1/plugins/lvms/schema")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+
+	assertEqual(t, "status", http.StatusOK, resp.StatusCode)
+
+	var schema json.RawMessage
+	if err := json.NewDecoder(resp.Body).Decode(&schema); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if !json.Valid(schema) {
+		t.Errorf("schema is not valid JSON: %s", schema)
+	}
+}
+
+func TestGetPluginSchema_ContainsExpectedFields(t *testing.T) {
+	srv := setupPluginsAPIWithSchemas()
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/v1/plugins/lvms/schema")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+
+	var schema map[string]any
+	json.NewDecoder(resp.Body).Decode(&schema)
+	if schema["type"] != "object" {
+		t.Errorf("expected type=object, got %v", schema["type"])
+	}
+	props, ok := schema["properties"].(map[string]any)
+	if !ok {
+		t.Fatal("expected properties map")
+	}
+	if _, ok := props["deviceClass"]; !ok {
+		t.Error("expected deviceClass in properties")
+	}
+}
+
+func TestGetPluginSchema_NonexistentPlugin_Returns404(t *testing.T) {
+	srv := setupPluginsAPIWithSchemas()
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/v1/plugins/nonexistent/schema")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	resp.Body.Close()
+	assertEqual(t, "status", http.StatusNotFound, resp.StatusCode)
+}
+
+func TestGetPluginSchema_PluginWithNoSchema_Returns404(t *testing.T) {
+	srv := setupPluginsAPIWithSchemas()
+	defer srv.Close()
+
+	// nvidia-gpu is a known plugin but has no schema
+	resp, err := http.Get(srv.URL + "/api/v1/plugins/nvidia-gpu/schema")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	resp.Body.Close()
+	assertEqual(t, "status", http.StatusNotFound, resp.StatusCode)
+}
