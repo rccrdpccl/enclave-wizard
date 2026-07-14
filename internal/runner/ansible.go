@@ -1,4 +1,4 @@
-package tasks
+package runner
 
 import (
 	"context"
@@ -17,60 +17,41 @@ import (
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
 )
 
+// AnsibleRunner executes ansible-runner subprocesses. It enforces single-task
+// execution through a mutex combined with an advisory file lock.
 type AnsibleRunner struct {
-	enclaveDir    string
-	artifactsDir  string
-	demoTypes     map[models.TaskType]bool
-	recordingsDir string
-	demoSpeed     float64
+	enclaveDir   string
+	artifactsDir string
 
 	mu       sync.Mutex
 	lockFile *os.File
 
 	activeRun *models.TaskRun
 	activeCmd *exec.Cmd
-	// Closed by waitForCompletion when the process exits.
-	done chan struct{}
+	done      chan struct{} // closed by waitForCompletion when the process exits
 }
 
+// NewAnsibleRunner creates a runner that executes real ansible-runner subprocesses.
 func NewAnsibleRunner(enclaveDir string) (*AnsibleRunner, error) {
-	if _, err := os.Stat(enclaveDir); err != nil {
+	absDir, err := filepath.Abs(enclaveDir)
+	if err != nil {
+		return nil, fmt.Errorf("resolving enclave directory: %w", err)
+	}
+	if _, err := os.Stat(absDir); err != nil {
 		return nil, fmt.Errorf("enclave directory: %w", err)
 	}
 	if _, err := exec.LookPath("ansible-runner"); err != nil {
 		return nil, ErrRunnerBin
 	}
 
-	artifactsDir := filepath.Join(enclaveDir, "artifacts")
+	artifactsDir := filepath.Join(absDir, "artifacts")
 	if err := os.MkdirAll(artifactsDir, 0750); err != nil {
 		return nil, fmt.Errorf("creating artifacts directory: %w", err)
 	}
 
 	return &AnsibleRunner{
-		enclaveDir:   enclaveDir,
+		enclaveDir:   absDir,
 		artifactsDir: artifactsDir,
-	}, nil
-}
-
-func NewDemoRunner(enclaveDir, recordingsDir string, speed float64, demoTypes map[models.TaskType]bool) (*AnsibleRunner, error) {
-	if _, err := os.Stat(enclaveDir); err != nil {
-		return nil, fmt.Errorf("enclave directory: %w", err)
-	}
-	if _, err := os.Stat(recordingsDir); err != nil {
-		return nil, fmt.Errorf("recordings directory: %w", err)
-	}
-
-	artifactsDir := filepath.Join(enclaveDir, "artifacts")
-	if err := os.MkdirAll(artifactsDir, 0750); err != nil {
-		return nil, fmt.Errorf("creating artifacts directory: %w", err)
-	}
-
-	return &AnsibleRunner{
-		enclaveDir:    enclaveDir,
-		artifactsDir:  artifactsDir,
-		demoTypes:     demoTypes,
-		recordingsDir: recordingsDir,
-		demoSpeed:     speed,
 	}, nil
 }
 
@@ -108,38 +89,6 @@ func (r *AnsibleRunner) runAsync(req StartRequest) (*models.TaskRun, <-chan stru
 	if err := os.MkdirAll(runDir, 0750); err != nil {
 		r.releaseLock()
 		return nil, nil, fmt.Errorf("creating run directory: %w", err)
-	}
-
-	if r.demoTypes[req.Type] {
-		key := ScenarioKey(req.Playbook, req.Tags)
-		recordingFile := filepath.Join(r.recordingsDir, key+".json")
-		if _, err := os.Stat(recordingFile); err != nil {
-			r.releaseLock()
-			return nil, nil, fmt.Errorf("%w: %s", ErrNoRecording, key)
-		}
-
-		now := time.Now()
-		run := &models.TaskRun{
-			ID:        runID,
-			Type:      req.Type,
-			Status:    models.TaskStatusRunning,
-			Playbook:  req.Playbook,
-			ExtraVars: req.ExtraVars,
-			StartedAt: now,
-		}
-		writeRunJSON(runDir, run)
-
-		slog.Info("demo task started", "run_id", runID, "playbook", req.Playbook, "speed", r.demoSpeed)
-
-		done := make(chan struct{})
-		r.mu.Lock()
-		r.activeRun = run
-		r.activeCmd = nil
-		r.done = done
-		r.mu.Unlock()
-
-		go r.runFake(recordingFile, run, runDir, done)
-		return run, done, nil
 	}
 
 	args := []string{"run", r.enclaveDir, "-p", req.Playbook, "--ident", runID}
@@ -210,7 +159,9 @@ func (r *AnsibleRunner) runAsync(req StartRequest) (*models.TaskRun, <-chan stru
 		return nil, nil, fmt.Errorf("writing run metadata: %w", err)
 	}
 
-	slog.Info("task started", "run_id", runID, "type", req.Type, "playbook", req.Playbook, "pid", run.PID)
+	slog.Info("task started", "run_id", runID, "type", req.Type, "playbook", req.Playbook, "pid", run.PID, "cmd", cmd.String(), "dir", cmd.Dir)
+
+	runCopy := *run
 
 	done := make(chan struct{})
 	r.mu.Lock()
@@ -221,81 +172,11 @@ func (r *AnsibleRunner) runAsync(req StartRequest) (*models.TaskRun, <-chan stru
 
 	go r.waitForCompletion(cmd, run, runDir, done)
 
-	return run, done, nil
-}
-
-func (r *AnsibleRunner) runFake(recordingFile string, run *models.TaskRun, runDir string, done chan struct{}) {
-	data, err := os.ReadFile(recordingFile)
-	if err != nil {
-		slog.Error("failed to read recording", "error", err)
-		r.releaseLock()
-		close(done)
-		return
-	}
-
-	var rec Recording
-	if err := json.Unmarshal(data, &rec); err != nil {
-		slog.Error("failed to parse recording", "error", err)
-		r.releaseLock()
-		close(done)
-		return
-	}
-
-	eventsDir := filepath.Join(runDir, "job_events")
-	os.MkdirAll(eventsDir, 0750)
-
-	var totalDuration time.Duration
-	if rec.Run.EndedAt != nil {
-		totalDuration = rec.Run.EndedAt.Sub(rec.Run.StartedAt)
-	}
-
-	var stdoutBuilder strings.Builder
-	for _, event := range rec.Events {
-		if r.demoSpeed > 0 && totalDuration > 0 && len(rec.Events) > 1 {
-			delay := time.Duration(float64(totalDuration) / float64(len(rec.Events)) / r.demoSpeed)
-			time.Sleep(delay)
-		}
-
-		var meta struct {
-			UUID    string `json:"uuid"`
-			Counter int    `json:"counter"`
-			Stdout  string `json:"stdout"`
-		}
-		json.Unmarshal(event, &meta)
-
-		filename := fmt.Sprintf("%03d-%s.json", meta.Counter, meta.UUID)
-		os.WriteFile(filepath.Join(eventsDir, filename), event, 0640)
-
-		if meta.Stdout != "" {
-			stdoutBuilder.WriteString(meta.Stdout)
-			stdoutBuilder.WriteString("\n")
-			os.WriteFile(filepath.Join(runDir, "stdout"), []byte(stdoutBuilder.String()), 0640)
-		}
-	}
-
-	os.WriteFile(filepath.Join(runDir, "stdout"), []byte(rec.Stdout), 0640)
-	os.WriteFile(filepath.Join(runDir, "stderr"), []byte(rec.Stderr), 0640)
-	os.WriteFile(filepath.Join(runDir, "status"), []byte(rec.Status), 0640)
-	os.WriteFile(filepath.Join(runDir, "rc"), []byte(fmt.Sprintf("%d", rec.RC)), 0640)
-
-	now := time.Now()
-	run.EndedAt = &now
-	switch rec.Status {
-	case "successful":
-		run.Status = models.TaskStatusSuccessful
-	default:
-		run.Status = models.TaskStatusFailed
-	}
-	run.ExitCode = &rec.RC
-	writeRunJSON(runDir, run)
-
-	slog.Info("demo task completed", "run_id", run.ID, "status", run.Status, "events", len(rec.Events))
-	r.releaseLock()
-	close(done)
+	return &runCopy, done, nil
 }
 
 func (r *AnsibleRunner) waitForCompletion(cmd *exec.Cmd, run *models.TaskRun, runDir string, done chan struct{}) {
-	_ = cmd.Wait()
+	waitErr := cmd.Wait()
 
 	now := time.Now()
 	run.EndedAt = &now
@@ -317,17 +198,62 @@ func (r *AnsibleRunner) waitForCompletion(cmd *exec.Cmd, run *models.TaskRun, ru
 		run.ExitCode = &rc
 	}
 
+	stderrBytes, _ := os.ReadFile(filepath.Join(runDir, "stderr"))
+
 	switch run.Status {
 	case models.TaskStatusSuccessful:
 		slog.Info("task completed", "run_id", run.ID, "playbook", run.Playbook, "duration", duration)
 	default:
-		slog.Warn("task did not complete successfully", "run_id", run.ID, "playbook", run.Playbook, "status", run.Status, "duration", duration)
+		slog.Warn("task did not complete successfully",
+			"run_id", run.ID, "playbook", run.Playbook,
+			"status", run.Status, "ar_status", arStatus,
+			"exit_code", run.ExitCode, "duration", duration,
+			"wait_err", waitErr, "stderr", string(stderrBytes))
 	}
 
 	writeRunJSON(runDir, run)
 
 	r.releaseLock()
 	close(done)
+}
+
+// Cancel terminates a running task by ID. It sends SIGTERM to the process
+// group, waits up to 10 seconds for graceful exit, then sends SIGKILL.
+func (r *AnsibleRunner) Cancel(id string) error {
+	r.mu.Lock()
+	if r.activeRun == nil || r.activeRun.ID != id {
+		r.mu.Unlock()
+		return ErrNotFound
+	}
+	cmd := r.activeCmd
+	run := r.activeRun
+	done := r.done
+	runDir := filepath.Join(r.artifactsDir, id)
+	r.mu.Unlock()
+
+	slog.Info("canceling task", "run_id", id)
+
+	if cmd != nil && cmd.Process != nil {
+		syscall.Kill(-cmd.Process.Pid, syscall.SIGTERM)
+	}
+
+	select {
+	case <-done:
+	case <-time.After(10 * time.Second):
+		slog.Warn("task did not terminate after SIGTERM, sending SIGKILL", "run_id", id)
+		if cmd != nil && cmd.Process != nil {
+			syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
+		}
+		<-done
+	}
+
+	// waitForCompletion may have already written status; override with canceled.
+	run.Status = models.TaskStatusCanceled
+	now := time.Now()
+	run.EndedAt = &now
+	writeRunJSON(runDir, run)
+
+	return nil
 }
 
 func (r *AnsibleRunner) Get(id string) (*models.TaskRun, error) {
@@ -346,102 +272,84 @@ func (r *AnsibleRunner) Events(id string) ([]json.RawMessage, error) {
 	return artifactEvents(r.artifactsDir, id)
 }
 
-// Stream returns a channel of SSE events for the given task run. For completed
-// tasks, all events are emitted immediately and the channel is closed. For
-// running tasks, events are polled until the task finishes.
+// Stream returns a channel that emits structured events for a running task.
+// The channel is closed when the task completes. For completed tasks, all
+// events are emitted immediately.
 func (r *AnsibleRunner) Stream(id string) (<-chan Event, error) {
-	run, err := r.Get(id)
-	if err != nil {
-		return nil, err
+	runDir := filepath.Join(r.artifactsDir, id)
+	if _, err := readRunJSON(runDir); err != nil {
+		return nil, ErrNotFound
 	}
 
 	ch := make(chan Event, 64)
-	go r.streamEvents(ch, run)
+
+	r.mu.Lock()
+	isActive := r.activeRun != nil && r.activeRun.ID == id
+	var done <-chan struct{}
+	if isActive {
+		done = r.done
+	}
+	r.mu.Unlock()
+
+	go r.streamEvents(runDir, ch, done)
+
 	return ch, nil
 }
 
-func (r *AnsibleRunner) streamEvents(ch chan<- Event, run *models.TaskRun) {
+func (r *AnsibleRunner) streamEvents(runDir string, ch chan<- Event, done <-chan struct{}) {
 	defer close(ch)
 
-	emitJSON := func(eventType string, v any) {
-		data, err := json.Marshal(v)
-		if err != nil {
-			return
-		}
-		ch <- Event{Type: eventType, Data: string(data)}
-	}
+	eventsDir := filepath.Join(runDir, "job_events")
+	emitted := 0
 
-	// Emit initial status.
-	emitJSON("status", map[string]string{"status": string(run.Status)})
-
-	// For completed tasks, emit all events then done.
-	if run.Status != models.TaskStatusRunning {
-		r.emitCompletedEvents(ch, run, emitJSON)
-		return
-	}
-
-	// For running tasks, poll for new events until done.
-	var lastEventCount int
 	for {
-		events, _ := r.Events(run.ID)
-		for i := lastEventCount; i < len(events); i++ {
-			r.emitAnsibleEvent(ch, events[i], emitJSON)
-		}
-		lastEventCount = len(events)
+		entries, _ := os.ReadDir(eventsDir)
+		sortEventEntries(entries)
 
-		updated, err := r.Get(run.ID)
-		if err != nil {
-			return
-		}
-		if updated.Status != models.TaskStatusRunning {
-			// Emit any final events we missed.
-			events, _ = r.Events(run.ID)
-			for i := lastEventCount; i < len(events); i++ {
-				r.emitAnsibleEvent(ch, events[i], emitJSON)
+		var jsonEntries []os.DirEntry
+		for _, e := range entries {
+			if strings.HasSuffix(e.Name(), ".json") {
+				jsonEntries = append(jsonEntries, e)
 			}
-			r.emitDone(ch, updated, emitJSON)
+		}
+
+		for i := emitted; i < len(jsonEntries); i++ {
+			data, err := os.ReadFile(filepath.Join(eventsDir, jsonEntries[i].Name()))
+			if err != nil {
+				continue
+			}
+			ch <- Event{Type: "log", Data: json.RawMessage(data)}
+			emitted++
+		}
+
+		// If no active done channel, this task is already completed.
+		if done == nil {
 			return
 		}
 
-		time.Sleep(500 * time.Millisecond)
+		select {
+		case <-done:
+			// Emit any remaining events after completion.
+			remaining, _ := os.ReadDir(eventsDir)
+			sortEventEntries(remaining)
+			var jsonRemaining []os.DirEntry
+			for _, e := range remaining {
+				if strings.HasSuffix(e.Name(), ".json") {
+					jsonRemaining = append(jsonRemaining, e)
+				}
+			}
+			for i := emitted; i < len(jsonRemaining); i++ {
+				data, err := os.ReadFile(filepath.Join(eventsDir, jsonRemaining[i].Name()))
+				if err != nil {
+					continue
+				}
+				ch <- Event{Type: "log", Data: json.RawMessage(data)}
+			}
+			return
+		case <-time.After(250 * time.Millisecond):
+			// Poll for new events.
+		}
 	}
-}
-
-func (r *AnsibleRunner) emitCompletedEvents(ch chan<- Event, run *models.TaskRun, emitJSON func(string, any)) {
-	events, _ := r.Events(run.ID)
-	for _, raw := range events {
-		r.emitAnsibleEvent(ch, raw, emitJSON)
-	}
-	r.emitDone(ch, run, emitJSON)
-}
-
-func (r *AnsibleRunner) emitAnsibleEvent(ch chan<- Event, raw json.RawMessage, emitJSON func(string, any)) {
-	var ev struct {
-		Event     string `json:"event"`
-		EventData struct {
-			Task string `json:"task"`
-		} `json:"event_data"`
-		Stdout string `json:"stdout"`
-	}
-	if json.Unmarshal(raw, &ev) != nil {
-		return
-	}
-
-	if ev.Stdout != "" {
-		emitJSON("log", map[string]string{"line": ev.Stdout})
-	}
-
-	if strings.HasPrefix(ev.Event, "runner_on_") && ev.EventData.Task != "" {
-		emitJSON("progress", map[string]string{"currentTask": ev.EventData.Task})
-	}
-}
-
-func (r *AnsibleRunner) emitDone(ch chan<- Event, run *models.TaskRun, emitJSON func(string, any)) {
-	done := map[string]any{"status": string(run.Status)}
-	if run.ExitCode != nil {
-		done["exitCode"] = *run.ExitCode
-	}
-	emitJSON("done", done)
 }
 
 func (r *AnsibleRunner) Delete(id string) error {
@@ -464,7 +372,6 @@ func (r *AnsibleRunner) Delete(id string) error {
 	slog.Info("task deleted", "run_id", id)
 	return nil
 }
-
 
 func (r *AnsibleRunner) Recover() error {
 	entries, err := os.ReadDir(r.artifactsDir)

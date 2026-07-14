@@ -1,6 +1,7 @@
 package api
 
 import (
+	"encoding/json"
 	"bufio"
 	"context"
 	"net/http"
@@ -9,11 +10,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tasks"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/runner"
 	"go.uber.org/mock/gomock"
 )
 
-func setupStreamServer(runner tasks.Runner) *httptest.Server {
+func setupStreamServer(runner runner.Runner) *httptest.Server {
 	mux := http.NewServeMux()
 	NewStreamHandler(runner).Register(mux)
 	return httptest.NewServer(mux)
@@ -51,15 +52,15 @@ func readSSEEvents(t *testing.T, resp *http.Response) []sseEvent {
 
 func TestStream_SSEFormat(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
+	m := runner.NewMockRunner(ctrl)
 
-	ch := make(chan tasks.Event, 3)
-	ch <- tasks.Event{Type: "status", Data: `{"status":"running"}`}
-	ch <- tasks.Event{Type: "log", Data: `{"line":"TASK [Install LVMS] ***"}`}
-	ch <- tasks.Event{Type: "done", Data: `{"status":"successful","exitCode":0}`}
+	ch := make(chan runner.Event, 3)
+	ch <- runner.Event{Type: "status", Data: json.RawMessage(`{"status":"running"}`)}
+	ch <- runner.Event{Type: "log", Data: json.RawMessage(`{"line":"TASK [Install LVMS] ***"}`)}
+	ch <- runner.Event{Type: "done", Data: json.RawMessage(`{"status":"successful","exitCode":0}`)}
 	close(ch)
 
-	m.EXPECT().Stream("run-1").Return((<-chan tasks.Event)(ch), nil)
+	m.EXPECT().Stream("run-1").Return((<-chan runner.Event)(ch), nil)
 
 	srv := setupStreamServer(m)
 	defer srv.Close()
@@ -87,9 +88,9 @@ func TestStream_SSEFormat(t *testing.T) {
 
 func TestStream_NotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
+	m := runner.NewMockRunner(ctrl)
 
-	m.EXPECT().Stream("nonexistent").Return(nil, tasks.ErrNotFound)
+	m.EXPECT().Stream("nonexistent").Return(nil, runner.ErrNotFound)
 
 	srv := setupStreamServer(m)
 	defer srv.Close()
@@ -105,16 +106,16 @@ func TestStream_NotFound(t *testing.T) {
 
 func TestStream_CompletedTask(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
+	m := runner.NewMockRunner(ctrl)
 
-	ch := make(chan tasks.Event, 4)
-	ch <- tasks.Event{Type: "status", Data: `{"status":"successful"}`}
-	ch <- tasks.Event{Type: "log", Data: `{"line":"PLAY RECAP"}`}
-	ch <- tasks.Event{Type: "progress", Data: `{"currentTask":"Final task"}`}
-	ch <- tasks.Event{Type: "done", Data: `{"status":"successful","exitCode":0}`}
+	ch := make(chan runner.Event, 4)
+	ch <- runner.Event{Type: "status", Data: json.RawMessage(`{"status":"successful"}`)}
+	ch <- runner.Event{Type: "log", Data: json.RawMessage(`{"line":"PLAY RECAP"}`)}
+	ch <- runner.Event{Type: "progress", Data: json.RawMessage(`{"currentTask":"Final task"}`)}
+	ch <- runner.Event{Type: "done", Data: json.RawMessage(`{"status":"successful","exitCode":0}`)}
 	close(ch)
 
-	m.EXPECT().Stream("completed-1").Return((<-chan tasks.Event)(ch), nil)
+	m.EXPECT().Stream("completed-1").Return((<-chan runner.Event)(ch), nil)
 
 	srv := setupStreamServer(m)
 	defer srv.Close()
@@ -137,13 +138,13 @@ func TestStream_CompletedTask(t *testing.T) {
 
 func TestStream_ClientDisconnect(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
+	m := runner.NewMockRunner(ctrl)
 
 	// Channel that will never close (simulates a long-running task).
-	ch := make(chan tasks.Event, 1)
-	ch <- tasks.Event{Type: "status", Data: `{"status":"running"}`}
+	ch := make(chan runner.Event, 1)
+	ch <- runner.Event{Type: "status", Data: json.RawMessage(`{"status":"running"}`)}
 
-	m.EXPECT().Stream("running-1").Return((<-chan tasks.Event)(ch), nil)
+	m.EXPECT().Stream("running-1").Return((<-chan runner.Event)(ch), nil)
 
 	srv := setupStreamServer(m)
 	defer srv.Close()
@@ -170,17 +171,17 @@ func TestStream_ClientDisconnect(t *testing.T) {
 
 func TestStream_MultipleEvents(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
+	m := runner.NewMockRunner(ctrl)
 
-	ch := make(chan tasks.Event, 5)
-	ch <- tasks.Event{Type: "status", Data: `{"status":"running","phase":"operators"}`}
-	ch <- tasks.Event{Type: "progress", Data: `{"completed":10,"total":350,"percentage":3,"currentTask":"Install LVMS operator"}`}
-	ch <- tasks.Event{Type: "log", Data: `{"line":"TASK [Install LVMS operator] ***"}`}
-	ch <- tasks.Event{Type: "progress", Data: `{"completed":42,"total":350,"percentage":12,"currentTask":"Configure storage"}`}
-	ch <- tasks.Event{Type: "done", Data: `{"status":"successful","exitCode":0}`}
+	ch := make(chan runner.Event, 5)
+	ch <- runner.Event{Type: "status", Data: json.RawMessage(`{"status":"running","phase":"operators"}`)}
+	ch <- runner.Event{Type: "progress", Data: json.RawMessage(`{"completed":10,"total":350,"percentage":3,"currentTask":"Install LVMS operator"}`)}
+	ch <- runner.Event{Type: "log", Data: json.RawMessage(`{"line":"TASK [Install LVMS operator] ***"}`)}
+	ch <- runner.Event{Type: "progress", Data: json.RawMessage(`{"completed":42,"total":350,"percentage":12,"currentTask":"Configure storage"}`)}
+	ch <- runner.Event{Type: "done", Data: json.RawMessage(`{"status":"successful","exitCode":0}`)}
 	close(ch)
 
-	m.EXPECT().Stream("run-multi").Return((<-chan tasks.Event)(ch), nil)
+	m.EXPECT().Stream("run-multi").Return((<-chan runner.Event)(ch), nil)
 
 	srv := setupStreamServer(m)
 	defer srv.Close()
@@ -202,12 +203,12 @@ func TestStream_MultipleEvents(t *testing.T) {
 
 func TestStream_PreClosedChannel(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
+	m := runner.NewMockRunner(ctrl)
 
-	ch := make(chan tasks.Event)
+	ch := make(chan runner.Event)
 	close(ch)
 
-	m.EXPECT().Stream("already-done").Return((<-chan tasks.Event)(ch), nil)
+	m.EXPECT().Stream("already-done").Return((<-chan runner.Event)(ch), nil)
 
 	srv := setupStreamServer(m)
 	defer srv.Close()

@@ -6,18 +6,18 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tasks"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/runner"
 )
 
 // StreamHandler serves SSE streams for task runs. It is registered as a raw
 // http.Handler rather than through huma because SSE connections are long-lived
 // and do not fit huma's request/response model.
 type StreamHandler struct {
-	runner tasks.Runner
+	runner runner.Runner
 }
 
 // NewStreamHandler creates a new SSE stream handler.
-func NewStreamHandler(runner tasks.Runner) *StreamHandler {
+func NewStreamHandler(runner runner.Runner) *StreamHandler {
 	return &StreamHandler{runner: runner}
 }
 
