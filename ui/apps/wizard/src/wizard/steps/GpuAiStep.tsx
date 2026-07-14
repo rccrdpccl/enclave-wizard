@@ -8,11 +8,20 @@ import {
 import type React from "react";
 import { getExperiencePlugins } from "../experiences.ts";
 import { useWizard } from "../WizardContext.tsx";
+import { SchemaStep } from "../components/SchemaStep.tsx";
 import { stepStyles } from "./stepStyles.ts";
 
 const GPU_PLUGINS = getExperiencePlugins("gpu");
 
-export const GpuAiStep: React.FC = () => {
+const GPU_SCHEMA_FIELDS = [
+  "global.gpuPassthrough",
+];
+
+/**
+ * Hand-crafted fallback form for when the plugin schema endpoint is not
+ * available. This preserves the original behavior.
+ */
+const GpuAiFallback: React.FC = () => {
   const { state, dispatch } = useWizard();
 
   const globalData = ((state.configData as Record<string, unknown>).global ??
@@ -57,5 +66,15 @@ export const GpuAiStep: React.FC = () => {
         />
       </FlexItem>
     </Flex>
+  );
+};
+
+export const GpuAiStep: React.FC = () => {
+  return (
+    <SchemaStep
+      pluginName="nvidia-gpu"
+      fieldPaths={GPU_SCHEMA_FIELDS}
+      fallback={<GpuAiFallback />}
+    />
   );
 };
