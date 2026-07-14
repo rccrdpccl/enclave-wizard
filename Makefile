@@ -2,7 +2,7 @@ BINARY := enclave-wizard
 GO := go
 CONTAINER_RUNTIME := $(shell command -v podman 2> /dev/null || echo docker)
 
-.PHONY: build build-linux build-ui run test lint clean tidy deploy teardown generate enclave-mock clean-enclave-mock run-mock preview deploy-preview bm-emulation bm-emulation-config bm-emulation-cleanup
+.PHONY: build build-linux build-ui run test lint clean tidy deploy teardown generate generate-schema enclave-mock clean-enclave-mock run-mock preview deploy-preview bm-emulation bm-emulation-config bm-emulation-cleanup
 
 build-ui:
 	$(CONTAINER_RUNTIME) run --rm -v $(PWD)/ui:/app:z -w /app node:22-alpine \
@@ -41,7 +41,10 @@ clean:
 tidy:
 	$(GO) mod tidy
 
-generate:
+generate-schema: ## Generate Go types from enclave JSON schemas.
+	$(GO) run ./cmd/schemagen --enclave-dir ../enclave --output internal/schema/
+
+generate: generate-schema ## Run all code generation.
 	$(GO) generate ./...
 
 rpm: build-linux
