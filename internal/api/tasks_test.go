@@ -4,35 +4,24 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
-	"os"
-	"path/filepath"
 	"testing"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/danielgtaylor/huma/v2/adapters/humago"
-	"github.com/rh-ecosystem-edge/enclave-wizard/internal/config"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
-	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tasks"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/runner"
 	"go.uber.org/mock/gomock"
 )
 
-const testEnclaveDir = "/opt/enclave"
-
-func setupTasksAPI(runner tasks.Runner) *httptest.Server {
+func setupTasksAPI(runner runner.Runner) *httptest.Server {
 	mux := http.NewServeMux()
 	api := humago.New(mux, huma.DefaultConfig("test", "0.0.0"))
 	registry := plugins.NewRegistry([]models.Plugin{
 		{Name: "lvms", Type: models.PluginTypeFoundation},
 	})
-	// Create a real temp dir for config read/write but use the fixed path for ExtraVars
-	tmpDir, _ := os.MkdirTemp("", "enclave-test-*")
-	os.MkdirAll(filepath.Join(tmpDir, "config"), 0755)
-	os.WriteFile(filepath.Join(tmpDir, "config", "global.yaml"), []byte("baseDomain: test\n"), 0644)
-	reader := config.NewReader(tmpDir)
-	writer := config.NewWriter(tmpDir)
-	NewTasksHandler(runner, registry, reader, writer, testEnclaveDir).Register(api)
+	NewTasksHandler(runner, registry, nil, nil, "/opt/enclave").Register(api)
 	return httptest.NewServer(mux)
 }
 
@@ -51,9 +40,9 @@ func sampleRun() *models.TaskRun {
 
 func TestStartDeploy_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
+	m := runner.NewMockRunner(ctrl)
 	run := sampleRun()
-	m.EXPECT().Start(tasks.StartRequest{
+	m.EXPECT().Start(runner.StartRequest{
 		Type:     models.TaskTypeDeploy,
 		Playbook: "playbooks/main.yaml",
 		ExtraVars: map[string]string{
@@ -80,8 +69,8 @@ func TestStartDeploy_Success(t *testing.T) {
 
 func TestStartDeploy_Busy(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
-	m.EXPECT().Start(gomock.Any()).Return(nil, tasks.ErrBusy)
+	m := runner.NewMockRunner(ctrl)
+	m.EXPECT().Start(gomock.Any()).Return(nil, runner.ErrBusy)
 
 	srv := setupTasksAPI(m)
 	defer srv.Close()
@@ -98,11 +87,11 @@ func TestStartDeploy_Busy(t *testing.T) {
 
 func TestStartDeployPhase_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
+	m := runner.NewMockRunner(ctrl)
 	run := sampleRun()
 	run.Type = models.TaskTypeDeployPhase
 	run.Playbook = "playbooks/03-deploy.yaml"
-	m.EXPECT().Start(tasks.StartRequest{
+	m.EXPECT().Start(runner.StartRequest{
 		Type:     models.TaskTypeDeployPhase,
 		Playbook: "playbooks/03-deploy.yaml",
 		ExtraVars: map[string]string{
@@ -128,7 +117,7 @@ func TestStartDeployPhase_Success(t *testing.T) {
 
 func TestStartDeployPhase_InvalidPhase(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
+	m := runner.NewMockRunner(ctrl)
 
 	srv := setupTasksAPI(m)
 	defer srv.Close()
@@ -155,11 +144,11 @@ func TestStartDeployPhase_AllPhases(t *testing.T) {
 	for phase, playbook := range expected {
 		t.Run(playbook, func(t *testing.T) {
 			ctrl := gomock.NewController(t)
-			m := tasks.NewMockRunner(ctrl)
+			m := runner.NewMockRunner(ctrl)
 			run := sampleRun()
 			run.Type = models.TaskTypeDeployPhase
 			run.Playbook = playbook
-			m.EXPECT().Start(tasks.StartRequest{
+			m.EXPECT().Start(runner.StartRequest{
 				Type:     models.TaskTypeDeployPhase,
 				Playbook: playbook,
 				ExtraVars: map[string]string{
@@ -189,12 +178,12 @@ func TestStartDeployPhase_AllPhases(t *testing.T) {
 
 func TestStartDeployPlugin_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
+	m := runner.NewMockRunner(ctrl)
 	run := sampleRun()
 	run.Type = models.TaskTypeDeployPlugin
 	run.Playbook = "playbooks/deploy-plugin.yaml"
 	run.ExtraVars = map[string]string{"plugin_name": "lvms", "workingDir": "/opt/enclave"}
-	m.EXPECT().Start(tasks.StartRequest{
+	m.EXPECT().Start(runner.StartRequest{
 		Type:     models.TaskTypeDeployPlugin,
 		Playbook: "playbooks/deploy-plugin.yaml",
 		ExtraVars: map[string]string{
@@ -221,7 +210,7 @@ func TestStartDeployPlugin_Success(t *testing.T) {
 
 func TestStartDeployPlugin_Unknown(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
+	m := runner.NewMockRunner(ctrl)
 
 	srv := setupTasksAPI(m)
 	defer srv.Close()
@@ -238,7 +227,7 @@ func TestStartDeployPlugin_Unknown(t *testing.T) {
 
 func TestListTasks_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
+	m := runner.NewMockRunner(ctrl)
 	runs := []models.TaskRun{*sampleRun()}
 	m.EXPECT().List().Return(runs, nil)
 
@@ -265,7 +254,7 @@ func TestListTasks_Success(t *testing.T) {
 
 func TestListTasks_Empty(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
+	m := runner.NewMockRunner(ctrl)
 	m.EXPECT().List().Return([]models.TaskRun{}, nil)
 
 	srv := setupTasksAPI(m)
@@ -288,7 +277,7 @@ func TestListTasks_Empty(t *testing.T) {
 
 func TestListTasks_NilRunsEncodesAsArray(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
+	m := runner.NewMockRunner(ctrl)
 	m.EXPECT().List().Return(nil, nil)
 
 	srv := setupTasksAPI(m)
@@ -313,7 +302,7 @@ func TestListTasks_NilRunsEncodesAsArray(t *testing.T) {
 
 func TestGetTask_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
+	m := runner.NewMockRunner(ctrl)
 	run := sampleRun()
 	m.EXPECT().Get("run-123").Return(run, nil)
 
@@ -335,8 +324,8 @@ func TestGetTask_Success(t *testing.T) {
 
 func TestGetTask_NotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
-	m.EXPECT().Get("nonexistent").Return(nil, tasks.ErrNotFound)
+	m := runner.NewMockRunner(ctrl)
+	m.EXPECT().Get("nonexistent").Return(nil, runner.ErrNotFound)
 
 	srv := setupTasksAPI(m)
 	defer srv.Close()
@@ -353,7 +342,7 @@ func TestGetTask_NotFound(t *testing.T) {
 
 func TestGetTaskLogs_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
+	m := runner.NewMockRunner(ctrl)
 	m.EXPECT().Logs("run-123").Return([]byte("PLAY [deploy] *******\nok: [localhost]\n"), nil)
 
 	srv := setupTasksAPI(m)
@@ -376,8 +365,8 @@ func TestGetTaskLogs_Success(t *testing.T) {
 
 func TestGetTaskLogs_NotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
-	m.EXPECT().Logs("nonexistent").Return(nil, tasks.ErrNotFound)
+	m := runner.NewMockRunner(ctrl)
+	m.EXPECT().Logs("nonexistent").Return(nil, runner.ErrNotFound)
 
 	srv := setupTasksAPI(m)
 	defer srv.Close()
@@ -394,7 +383,7 @@ func TestGetTaskLogs_NotFound(t *testing.T) {
 
 func TestGetTaskEvents_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
+	m := runner.NewMockRunner(ctrl)
 	events := []json.RawMessage{
 		json.RawMessage(`{"event":"playbook_on_start","counter":1}`),
 		json.RawMessage(`{"event":"runner_on_ok","counter":2}`),
@@ -423,8 +412,8 @@ func TestGetTaskEvents_Success(t *testing.T) {
 
 func TestGetTaskEvents_NotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
-	m.EXPECT().Events("nonexistent").Return(nil, tasks.ErrNotFound)
+	m := runner.NewMockRunner(ctrl)
+	m.EXPECT().Events("nonexistent").Return(nil, runner.ErrNotFound)
 
 	srv := setupTasksAPI(m)
 	defer srv.Close()
@@ -441,7 +430,7 @@ func TestGetTaskEvents_NotFound(t *testing.T) {
 
 func TestDeleteTask_Success(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
+	m := runner.NewMockRunner(ctrl)
 	m.EXPECT().Delete("run-123").Return(nil)
 
 	srv := setupTasksAPI(m)
@@ -458,8 +447,8 @@ func TestDeleteTask_Success(t *testing.T) {
 
 func TestDeleteTask_NotFound(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
-	m.EXPECT().Delete("nonexistent").Return(tasks.ErrNotFound)
+	m := runner.NewMockRunner(ctrl)
+	m.EXPECT().Delete("nonexistent").Return(runner.ErrNotFound)
 
 	srv := setupTasksAPI(m)
 	defer srv.Close()
@@ -475,8 +464,8 @@ func TestDeleteTask_NotFound(t *testing.T) {
 
 func TestDeleteTask_StillRunning(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	m := tasks.NewMockRunner(ctrl)
-	m.EXPECT().Delete("run-123").Return(tasks.ErrRunning)
+	m := runner.NewMockRunner(ctrl)
+	m.EXPECT().Delete("run-123").Return(runner.ErrRunning)
 
 	srv := setupTasksAPI(m)
 	defer srv.Close()

@@ -11,7 +11,8 @@ export interface FlavorDefinition {
   experienceId: string;
 }
 
-export const FLAVORS: FlavorDefinition[] = [
+/** Hardcoded fallback used when experiences API is unavailable */
+export const FALLBACK_FLAVORS: FlavorDefinition[] = [
   {
     id: "caas",
     title: "CaaS",
@@ -41,6 +42,12 @@ export const FLAVORS: FlavorDefinition[] = [
   },
 ];
 
-export function getFlavorPlugins(flavor: FlavorDefinition): string[] {
-  return getExperiencePlugins(flavor.experienceId);
+/** @deprecated Use FALLBACK_FLAVORS instead */
+export const FLAVORS = FALLBACK_FLAVORS;
+
+export function getFlavorPlugins(
+  flavor: FlavorDefinition,
+  experiences?: import("./experiences.ts").Experience[],
+): string[] {
+  return getExperiencePlugins(flavor.experienceId, experiences);
 }

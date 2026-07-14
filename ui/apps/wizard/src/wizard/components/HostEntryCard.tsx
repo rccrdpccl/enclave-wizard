@@ -1,7 +1,6 @@
 import {
   Card,
   CardBody,
-  ExpandableSection,
   FormGroup,
   FormHelperText,
   HelperText,
@@ -10,7 +9,6 @@ import {
   Title,
 } from "@patternfly/react-core";
 import type React from "react";
-import { useState } from "react";
 import { hostEntryCardStyles as styles } from "./hostEntryCardStyles.ts";
 
 interface HostEntry {
@@ -21,7 +19,6 @@ interface HostEntry {
   redfishUser: string;
   redfishPassword: string;
   rootDisk: string;
-  bmcSystemId?: string;
 }
 
 interface HostEntryCardProps {
@@ -37,10 +34,7 @@ const MAC_RE = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
 const IP_RE =
   /^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
 
-function validateField(
-  value: string,
-  pattern?: RegExp,
-): "default" | "error" {
+function validateField(value: string, pattern?: RegExp): "default" | "error" {
   if (!value) return "default";
   if (pattern && !pattern.test(value)) return "error";
   return "default";
@@ -54,15 +48,8 @@ export const HostEntryCard: React.FC<HostEntryCardProps> = ({
 }) => {
   const prefix = `${label.toLowerCase().replace(/\s+/g, "-")}-${index}`;
 
-  const update = (field: keyof HostEntry, value: string) => {
-    const updated = { ...host, [field]: value };
-    if (field === "bmcSystemId" && !value) {
-      delete updated.bmcSystemId;
-    }
-    onChange(updated);
-  };
-
-  const [advancedOpen, setAdvancedOpen] = useState(!!host.bmcSystemId || !!host.rootDisk);
+  const update = (field: keyof HostEntry, value: string) =>
+    onChange({ ...host, [field]: value });
 
   return (
     <Card isRounded isCompact>
@@ -156,51 +143,27 @@ export const HostEntryCard: React.FC<HostEntryCardProps> = ({
             />
           </FormGroup>
           <div className={styles.fullWidth}>
-            <ExpandableSection
-              toggleText={advancedOpen ? "Hide advanced settings" : "Advanced settings"}
-              isExpanded={advancedOpen}
-              onToggle={(_e, expanded) => setAdvancedOpen(expanded)}
-              isCompact
+            <FormGroup
+              label="Installation disk"
+              isRequired
+              fieldId={`${prefix}-rootdisk`}
             >
-              <FormGroup
-                label="Installation disk"
-                fieldId={`${prefix}-rootdisk`}
-              >
-                <TextInput
-                  id={`${prefix}-rootdisk`}
-                  value={host.rootDisk}
-                  onChange={(_e, v) => update("rootDisk", v)}
-                  placeholder="/dev/sda"
-                />
-                <FormHelperText>
-                  <HelperText>
-                    <HelperTextItem>
-                      Leave empty for auto-detection, or specify a device
-                      path (e.g. /dev/sda, /dev/disk/by-path/...)
-                    </HelperTextItem>
-                  </HelperText>
-                </FormHelperText>
-              </FormGroup>
-              <FormGroup
-                label="BMC System ID"
-                fieldId={`${prefix}-bmcsystemid`}
-              >
-                <TextInput
-                  id={`${prefix}-bmcsystemid`}
-                  value={host.bmcSystemId ?? ""}
-                  onChange={(_e, v) => update("bmcSystemId", v)}
-                  placeholder="Auto-detected (override for virtual BMC / sushy-tools)"
-                />
-                <FormHelperText>
-                  <HelperText>
-                    <HelperTextItem>
-                      Redfish System ID (e.g. VM UUID for sushy-tools).
-                      Leave empty for physical hardware.
-                    </HelperTextItem>
-                  </HelperText>
-                </FormHelperText>
-              </FormGroup>
-            </ExpandableSection>
+              <TextInput
+                id={`${prefix}-rootdisk`}
+                value={host.rootDisk}
+                onChange={(_e, v) => update("rootDisk", v)}
+                placeholder="/dev/sda"
+                isRequired
+              />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem>
+                    Block device path for OS installation (e.g. /dev/sda,
+                    /dev/disk/by-path/...)
+                  </HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            </FormGroup>
           </div>
         </div>
       </CardBody>

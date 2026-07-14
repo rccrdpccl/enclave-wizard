@@ -1,6 +1,7 @@
 import type React from "react";
 import { createContext, useContext, useReducer } from "react";
 import { FLAVORS, getFlavorPlugins, type FlavorId } from "./flavors.ts";
+import type { Experience } from "./experiences.ts";
 
 export interface ValidationError {
   field: string;
@@ -25,7 +26,7 @@ export interface WizardState {
 
 export type WizardAction =
   | { type: "SET_STEP"; step: number }
-  | { type: "TOGGLE_FLAVOR"; flavor: FlavorId }
+  | { type: "TOGGLE_FLAVOR"; flavor: FlavorId; experiences?: Experience[] }
   | { type: "SET_FIELD"; path: string; value: unknown }
   | { type: "SET_SCHEMA"; schema: unknown }
   | { type: "SET_PLUGINS"; plugins: unknown[] }
@@ -81,7 +82,7 @@ export function wizardReducer(
           ?.enabled_plugins as string[] ?? [],
       );
       for (const f of FLAVORS) {
-        for (const p of getFlavorPlugins(f)) {
+        for (const p of getFlavorPlugins(f, action.experiences)) {
           if (nextFlavors.has(f.id)) allPlugins.add(p);
           else allPlugins.delete(p);
         }

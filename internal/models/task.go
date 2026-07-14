@@ -33,6 +33,7 @@ type Deployment struct {
 	Status     TaskStatus        `json:"status" doc:"Overall deployment status"`
 	Phases     []DeploymentPhase `json:"phases" doc:"Ordered list of deployment phases"`
 	TotalTasks int               `json:"totalTasks" doc:"Estimated total ansible tasks across all phases"`
+	StartedAt  time.Time         `json:"startedAt" doc:"When the deployment was started"`
 }
 
 type DeploymentProgress struct {
@@ -51,7 +52,7 @@ type TaskRun struct {
 	ExtraVars map[string]string `json:"extraVars,omitempty" doc:"Extra variables passed to ansible-runner"`
 	PID       int               `json:"pid,omitempty" doc:"OS process ID of ansible-runner"`
 	ExitCode  *int              `json:"exitCode,omitempty" doc:"Process exit code"`
-	StartedAt time.Time          `json:"startedAt" doc:"When ansible-runner started"`
+	StartedAt time.Time         `json:"startedAt" doc:"When ansible-runner started"`
 	EndedAt   *time.Time        `json:"endedAt,omitempty" doc:"When the run completed"`
 	Error     string            `json:"error,omitempty" doc:"Error message if failed"`
 }

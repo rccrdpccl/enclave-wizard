@@ -40,6 +40,8 @@ import { ReviewStep } from "./steps/ReviewStep.tsx";
 import { SelectFlavorStep } from "./steps/SelectFlavorStep.tsx";
 import { StorageStep } from "./steps/StorageStep.tsx";
 import { WelcomeStep } from "./steps/WelcomeStep.tsx";
+import { CatalogProvider } from "./contexts/CatalogContext.tsx";
+import { useWizardInit } from "./hooks/useWizardInit.ts";
 import { useWizard, WizardProvider } from "./WizardContext.tsx";
 import { wizardStyles as styles } from "./wizardStyles.ts";
 import { css } from "@emotion/css";
@@ -266,6 +268,7 @@ function StepContent({
 }
 
 function WizardContent(): React.ReactElement {
+  useWizardInit();
   const { state, dispatch } = useWizard();
   const { schema, loading: schemaLoading } = useOpenApiSchema();
   const api = useEnclaveApi();
@@ -544,8 +547,10 @@ function WizardContent(): React.ReactElement {
 
 export const WizardPage: React.FC = () => {
   return (
-    <WizardProvider>
-      <WizardContent />
-    </WizardProvider>
+    <CatalogProvider>
+      <WizardProvider>
+        <WizardContent />
+      </WizardProvider>
+    </CatalogProvider>
   );
 };

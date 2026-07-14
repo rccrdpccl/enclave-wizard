@@ -10,8 +10,8 @@ import { CheckCircleIcon } from "@patternfly/react-icons";
 import type React from "react";
 import { useCallback, useState } from "react";
 import { useEnclaveApi } from "../../api/useEnclaveApi.ts";
-import { useWizard } from "../WizardContext.tsx";
 import { buildFinalConfig } from "../buildFinalConfig.ts";
+import { useWizard } from "../WizardContext.tsx";
 
 type GenerateStatus = "idle" | "writing" | "success" | "error";
 

@@ -1,4 +1,4 @@
-package tasks
+package runner
 
 import (
 	"encoding/json"
@@ -11,6 +11,7 @@ import (
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
 )
 
+// Recording captures all artifacts from a task run for replay.
 type Recording struct {
 	Run     models.TaskRun    `json:"run"`
 	Command json.RawMessage   `json:"command,omitempty"`
@@ -21,6 +22,7 @@ type Recording struct {
 	Events  []json.RawMessage `json:"events"`
 }
 
+// SaveRecording bundles artifacts from srcDir into a single JSON file at destFile.
 func SaveRecording(srcDir, destFile string) error {
 	run, err := readRunJSON(srcDir)
 	if err != nil {
@@ -69,6 +71,7 @@ func SaveRecording(srcDir, destFile string) error {
 	return os.WriteFile(destFile, out, 0640)
 }
 
+// LoadRecording unpacks a recording JSON file into destDir as ansible-runner artifacts.
 func LoadRecording(srcFile, destDir string) error {
 	data, err := os.ReadFile(srcFile)
 	if err != nil {

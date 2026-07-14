@@ -5,36 +5,25 @@ WIZARD_VERSION ?= $(shell git rev-parse --short HEAD 2>/dev/null || echo dev)
 ENCLAVE_VERSION ?= $(shell git -C ../enclave rev-parse --short HEAD 2>/dev/null || echo dev)
 LDFLAGS := -w -s -X main.wizardVersion=$(WIZARD_VERSION) -X main.enclaveVersion=$(ENCLAVE_VERSION)
 
-.DEFAULT_GOAL := help
-.DELETE_ON_ERROR:
+.PHONY: build build-linux build-ui run test lint clean tidy deploy teardown generate enclave-mock clean-enclave-mock run-mock preview deploy-preview bm-emulation bm-emulation-config bm-teardown test-config
 
-.PHONY: help
-help: ## Display this help.
-	@awk 'BEGIN {FS = ":.*##"; printf "\nUsage:\n  make \033[36m<target>\033[0m\n"} /^[a-zA-Z_0-9\/-]+:.*?##/ { printf "  \033[36m%-20s\033[0m %s\n", $$1, $$2 } /^##@/ { printf "\n\033[1m%s\033[0m\n", substr($$0, 5) } ' $(MAKEFILE_LIST)
-
-.PHONY: build build-linux build-ui run test lint clean tidy deploy deploy-full teardown generate enclave-mock clean-enclave-mock run-mock preview deploy-preview bm-emulation bm-emulation-config bm-teardown test-config demo-build demo-start demo-stop demo-restart
-
-##@ Build
-
-build-ui: ## Build the frontend (Vite).
+build-ui:
 	$(CONTAINER_RUNTIME) run --rm -v $(PWD)/ui:/app:z -w /app node:22-alpine \
 		sh -c "corepack enable && yarn install && \
 		yarn workspace @enclave-wizard-ui/wizard run -T vite build"
 
-build: build-ui ## Build UI + Go binary.
+build: build-ui
 	$(GO) build -ldflags="$(LDFLAGS)" -tags "$(TAGS)" -o $(BINARY) .
 
-build-linux: build-ui ## Cross-compile for linux/amd64 in a container.
+build-linux: build-ui
 	rm -f $(BINARY)
-	$(CONTAINER_RUNTIME) run --rm --memory=4g -v $(PWD):/app:z -w /app golang:latest \
+	$(CONTAINER_RUNTIME) run --rm -v $(PWD):/app:z -w /app golang:latest \
 		sh -c "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='$(LDFLAGS)' -tags '$(TAGS)' -o $(BINARY) ."
 
-##@ Run
-
-run: build ## Build and run against ../enclave.
+run: build
 	./$(BINARY) --enclave-dir ../enclave --tls-cert hack/tls/server.crt --tls-key hack/tls/server.key
 
-run-demo: build-ui ## Build and run in demo mode (foreground).
+run-demo: build-ui
 	$(GO) build -ldflags="$(LDFLAGS)" -tags dev -o $(BINARY) .
 	./$(BINARY) --demo-deploy --enclave-dir ../enclave --tls-cert hack/tls/server.crt --tls-key hack/tls/server.key
 
@@ -43,40 +32,32 @@ preview: build-ui
 		sh -c "CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='$(LDFLAGS)' -tags dev -o $(BINARY) ."
 	hack/run-preview.sh $(PORT)
 
-##@ Test & Lint
-
-test: ## Run all Go tests with coverage.
+test:
 	$(GO) test -cover ./...
 
-lint: ## Run go vet.
+lint:
 	$(GO) vet ./...
 
-##@ Maintenance
-
-clean: ## Remove build artifacts.
+clean:
 	rm -f $(BINARY)
 	rm -rf ui/apps/wizard/dist
 
-tidy: ## Run go mod tidy.
+tidy:
 	$(GO) mod tidy
 
-generate: ## Run go generate.
+generate:
 	$(GO) generate ./...
 
-rpm: build-linux ## Build RPM package.
+rpm: build-linux
 	hack/rpm/build-rpm.sh
-
-##@ Deploy
 
 deploy-preview:
 	@test -n "$(TARGET)" || (echo "Usage: make deploy-preview TARGET=root@host [PORT=3443]" && exit 1)
 	hack/deploy-preview.sh $(TARGET) $(PORT)
 
-deploy: ## Deploy to remote host. TARGET=root@host [AUTH=none]
+deploy: rpm
 	@test -n '$(TARGET)' || (echo "Usage: make deploy TARGET=root@host [AUTH=none]" && exit 1)
 	AUTH='$(AUTH)' hack/deploy-wizard '$(TARGET)'
-
-deploy-full: rpm deploy ## Build RPM and deploy.
 
 teardown:
 	@test -n "$(TARGET)" || (echo "Usage: make teardown TARGET=root@host" && exit 1)
@@ -145,7 +126,7 @@ run-mock: build
 	./$(BINARY) --enclave-dir enclave-mock \
 		--tls-cert hack/tls/server.crt --tls-key hack/tls/server.key
 
-dev: build-ui ## Build and run dev mode (no-auth, enclave-mock, foreground).
+dev: build-ui
 	@mkdir -p hack/tls
 	@test -f hack/tls/server.crt || openssl req -new -x509 -nodes -days 365 \
 		-subj "/CN=localhost" -keyout hack/tls/server.key -out hack/tls/server.crt 2>/dev/null
@@ -153,18 +134,3 @@ dev: build-ui ## Build and run dev mode (no-auth, enclave-mock, foreground).
 	./$(BINARY) --no-auth --enclave-dir enclave-mock \
 		--password-file /tmp/enclave-wizard-dev-pass \
 		--tls-cert hack/tls/server.crt --tls-key hack/tls/server.key
-
-##@ Demo Environment
-
-demo-build: build-ui ## Build the binary for demo mode.
-	$(GO) build -ldflags="$(LDFLAGS)" -tags dev -o $(BINARY) .
-
-demo-start: ## Start demo in background. SPEED=10 PORT=3443 ENCLAVE_DIR=hack/enclave
-	hack/demo-start.sh
-
-demo-stop: ## Stop the background demo.
-	hack/demo-stop.sh
-
-demo-restart: demo-stop demo-start ## Restart the demo.
-
-demo: demo-build demo-start ## Build and start demo (one command).
