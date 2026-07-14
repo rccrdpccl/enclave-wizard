@@ -2,6 +2,8 @@ package api
 
 import (
 	"context"
+	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 
@@ -37,6 +39,14 @@ type PluginValidateOutput struct {
 	}
 }
 
+type GetPluginSchemaInput struct {
+	Name string `path:"name" doc:"Plugin name" minLength:"1"`
+}
+
+type GetPluginSchemaOutput struct {
+	Body json.RawMessage
+}
+
 func (h *PluginsHandler) Register(api huma.API) {
 	huma.Register(api, huma.Operation{
 		OperationID: "list-plugins",
@@ -46,6 +56,15 @@ func (h *PluginsHandler) Register(api huma.API) {
 		Description: "Returns all known plugins and their types.",
 		Tags:        []string{"Plugins"},
 	}, h.listPlugins)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "get-plugin-schema",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/plugins/{name}/schema",
+		Summary:     "Get plugin config schema",
+		Description: "Returns the JSON schema for the named plugin's configuration. Used by the frontend for dynamic form rendering.",
+		Tags:        []string{"Plugins"},
+	}, h.getPluginSchema)
 
 	huma.Register(api, huma.Operation{
 		OperationID: "validate-plugin-combination",
@@ -61,6 +80,22 @@ func (h *PluginsHandler) listPlugins(_ context.Context, _ *struct{}) (*PluginsOu
 	out := &PluginsOutput{}
 	out.Body.Plugins = h.registry.All()
 	return out, nil
+}
+
+func (h *PluginsHandler) getPluginSchema(_ context.Context, input *GetPluginSchemaInput) (*GetPluginSchemaOutput, error) {
+	if _, ok := h.registry.Get(input.Name); !ok {
+		return nil, huma.Error404NotFound("unknown plugin: " + input.Name)
+	}
+
+	schema, err := h.registry.GetSchema(input.Name)
+	if err != nil {
+		if errors.Is(err, plugins.ErrSchemaNotFound) {
+			return nil, huma.Error404NotFound("no schema found for plugin: " + input.Name)
+		}
+		return nil, huma.Error500InternalServerError("failed to read schema", err)
+	}
+
+	return &GetPluginSchemaOutput{Body: json.RawMessage(schema)}, nil
 }
 
 func (h *PluginsHandler) validateCombination(_ context.Context, input *PluginValidateInput) (*PluginValidateOutput, error) {

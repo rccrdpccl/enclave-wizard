@@ -146,9 +146,17 @@ ${SSH} "${TARGET}" "
 "
 
 ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
+  echo '  Waiting for cloud-init...'
   sudo cloud-init status --wait 2>/dev/null || sleep 10
-  ls /tmp/enclave.rpm &>/dev/null && sudo dnf install -y /tmp/enclave.rpm 2>&1 | tail -5
+  echo '  cloud-init done.'
+  if ls /tmp/enclave.rpm &>/dev/null; then
+    echo '  Installing enclave RPM (system packages)...'
+    sudo dnf install -y /tmp/enclave.rpm 2>&1 | tail -10
+    echo '  Enclave RPM installed.'
+  fi
+  echo '  Installing wizard RPM...'
   sudo dnf install -y /tmp/enclave-wizard.rpm 2>&1 | tail -5
+  echo '  Wizard RPM installed.'
 " 2>&1 | grep -v "^$"
 
 # Attach BMC network if bm-emulation was set up
@@ -160,15 +168,49 @@ if ${SSH} "${TARGET}" "virsh net-info enclave-bmc" &>/dev/null; then
     sleep 5
   fi
   ${SSH} "${TARGET}" "ssh-keygen -R ${VM_IP} 2>/dev/null || true"
+  # Extract cluster DNS entries from the BMC network and add to /etc/hosts
+  ${SSH} "${TARGET}" "
+    virsh net-dumpxml enclave-bmc 2>/dev/null | python3 -c \"
+import sys, xml.etree.ElementTree as ET
+root = ET.parse(sys.stdin).getroot()
+for host in root.findall('.//dns/host'):
+    ip = host.get('ip')
+    names = ' '.join(h.text for h in host.findall('hostname'))
+    if names: print(f'{ip} {names}')
+\" > /tmp/enclave-bmc-hosts.txt 2>/dev/null
+    scp -o StrictHostKeyChecking=no /tmp/enclave-bmc-hosts.txt wizard@${VM_IP}:/tmp/enclave-bmc-hosts.txt
+  " 2>/dev/null || true
   ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
     sudo nmcli con mod 'Wired connection 2' ipv4.dns '192.168.223.1' ipv4.dns-priority -10 2>/dev/null || true
     sudo nmcli con up 'Wired connection 2' 2>/dev/null || true
+    # Add BMC DNS entries to /etc/hosts for reliable resolution
+    if [ -f /tmp/enclave-bmc-hosts.txt ]; then
+      sudo sed -i '/enclave-test.lab.local/d' /etc/hosts
+      cat /tmp/enclave-bmc-hosts.txt | sudo tee -a /etc/hosts > /dev/null
+    fi
   " 2>/dev/null || true
   for _attempt in 1 2 3 4 5; do
-    BMC_VM_IP=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "ip -4 addr show eth1 2>/dev/null | grep -oP 'inet \K[0-9.]+'" 2>/dev/null || echo "")
-    [ -n "${BMC_VM_IP}" ] && break
+    BMC_VM_IP=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "ip -4 addr 2>/dev/null | grep -oP 'inet 192\.168\.223\.\K[0-9]+'" 2>/dev/null || echo "")
+    [ -n "${BMC_VM_IP}" ] && BMC_VM_IP="192.168.223.${BMC_VM_IP}" && break
     sleep 3
   done
+
+  # Set lzBmcIP in global.yaml to current VM IP (primary network, not BMC)
+  ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
+    sudo sed -i 's|lzBmcIP:.*|lzBmcIP: ${VM_IP}|' /opt/enclave/config/global.yaml 2>/dev/null || true
+  " 2>/dev/null
+  echo "  lzBmcIP set to ${VM_IP}"
+
+  # Add mirror DNS entry to BMC network pointing to wizard VM
+  if [ -n "${BMC_VM_IP}" ]; then
+    ${SSH} "${TARGET}" "
+      virsh net-update enclave-bmc add dns-host '<host ip=\"${BMC_VM_IP}\"><hostname>mirror.enclave-test.lab.local</hostname></host>' --live --config 2>/dev/null || true
+    "
+    # Also add to /etc/hosts on wizard VM
+    ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
+      echo '${BMC_VM_IP} mirror.enclave-test.lab.local' | sudo tee -a /etc/hosts > /dev/null
+    " 2>/dev/null || true
+  fi
 fi
 
 # Disable auth if requested
@@ -250,6 +292,29 @@ echo ""
 
 if $HTTPS_OK; then
     WIZARD_PASS=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "sudo cat /tmp/enclave-wizard-init-pass 2>/dev/null" 2>/dev/null || echo "(could not retrieve)")
+
+    # Merge wizard params into demo-params.json
+    PARAMS_FILE="${REPO_DIR}/demo-params.json"
+    python3 -c "
+import json, os
+path = '${PARAMS_FILE}'
+data = {}
+if os.path.exists(path):
+    with open(path) as f:
+        data = json.load(f)
+data['wizard'] = {
+    'url': 'https://${TARGET_HOST}:${HTTPS_PORT}/wizard',
+    'password': '${WIZARD_PASS}',
+    'vmIP': '${VM_IP}',
+    'landingZoneIP': '${BMC_VM_IP}',
+    'target': '${TARGET}',
+    'sshJump': 'ssh -J ${TARGET} wizard@${VM_IP}',
+}
+with open(path, 'w') as f:
+    json.dump(data, f, indent=2)
+print(f'  Params written to {os.path.realpath(path)}')
+"
+
     echo "Wizard URL:     https://${TARGET_HOST}:${HTTPS_PORT}/wizard"
     echo "Password:       ${WIZARD_PASS}"
     [ -n "${BMC_VM_IP}" ] && echo "Landing Zone IP: ${BMC_VM_IP}  (on BMC network)"

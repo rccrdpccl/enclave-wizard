@@ -1,0 +1,5 @@
+[allowlist]
+  description = "Global Allowlist"
+  paths = [
+    'internal/config/config_test.go'
+  ]

@@ -99,16 +99,44 @@ echo "╠═══════════════════════�
 echo "║  Control Plane VMs                                                         ║"
 echo "╚══════════════════════════════════════════════════════════════════════════════╝"
 echo ""
-printf "  %-15s %-20s %-17s %-38s %-15s %s\n" "Name" "MAC" "IP" "BMC System ID" "BMC Address" "Disk"
-printf "  %-15s %-20s %-17s %-38s %-15s %s\n" "───────────────" "────────────────────" "─────────────────" "──────────────────────────────────────" "───────────────" "────────"
+printf "  %-15s %-20s %-17s %s\n" "Name" "MAC" "IP" "Disk"
+printf "  %-15s %-20s %-17s %s\n" "───────────────" "────────────────────" "─────────────────" "────────"
 
 for i in 0 1 2; do
   VM_NAME="enclave-cp-${i}"
   VM_MAC="00:60:2f:e0:c1:$(printf '%02x' "$i")"
   VM_IP_ADDR="192.168.223.$((10 + i))"
   UUID=$(echo "${VM_UUIDS}" | grep "^${VM_NAME}|" | cut -d'|' -f2 | tr -d '[:space:]')
-  printf "  %-15s %-20s %-17s %-38s %-15s %s\n" "${VM_NAME}" "${VM_MAC}" "${VM_IP_ADDR}" "${UUID}" "192.168.223.1:8100" "/dev/sda"
+  printf "  %-15s %-20s %-17s %s\n" "${VM_NAME}" "${VM_MAC}" "${VM_IP_ADDR}" "/dev/sda"
+  printf "  %-15s BMC: 192.168.223.1:8100  System ID: %s\n" "" "${UUID}"
 done
+
+PARAMS_FILE="${SCRIPT_DIR}/../../demo-params.json"
+cat > "${PARAMS_FILE}" <<JSONEOF
+{
+  "infra": {
+    "machineNetwork": "192.168.223.0/24",
+    "gateway": "192.168.223.1",
+    "apiVIP": "${API_VIP}",
+    "ingressVIP": "${INGRESS_VIP}",
+    "rendezvousIP": "192.168.223.10",
+    "baseDomain": "${BASE_DOMAIN}",
+    "clusterName": "${CLUSTER_NAME}",
+    "defaultPrefix": 24,
+    "bmc": {
+      "endpoint": "192.168.223.1:8100",
+      "user": "admin",
+      "password": "password"
+    },
+    "hosts": [
+      {"name": "enclave-cp-0", "mac": "00:60:2f:e0:c1:00", "ip": "192.168.223.10", "disk": "/dev/sda", "uuid": "$(echo "${VM_UUIDS}" | grep "^enclave-cp-0|" | cut -d'|' -f2 | tr -d '[:space:]')"},
+      {"name": "enclave-cp-1", "mac": "00:60:2f:e0:c1:01", "ip": "192.168.223.11", "disk": "/dev/sda", "uuid": "$(echo "${VM_UUIDS}" | grep "^enclave-cp-1|" | cut -d'|' -f2 | tr -d '[:space:]')"},
+      {"name": "enclave-cp-2", "mac": "00:60:2f:e0:c1:02", "ip": "192.168.223.12", "disk": "/dev/sda", "uuid": "$(echo "${VM_UUIDS}" | grep "^enclave-cp-2|" | cut -d'|' -f2 | tr -d '[:space:]')"}
+    ]
+  }
+}
+JSONEOF
+info "Params written to $(realpath "${PARAMS_FILE}")"
 
 echo ""
 info "Next: deploy the wizard with 'make deploy TARGET=${TARGET}'"

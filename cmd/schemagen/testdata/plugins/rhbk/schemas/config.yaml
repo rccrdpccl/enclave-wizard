@@ -1,0 +1,41 @@
+type: object
+required:
+  - rhbk_instances
+properties:
+  rhbk_instances:
+    type: integer
+    description: Number of Keycloak replicas
+    minimum: 1
+  rhbk_deploy_database:
+    type: boolean
+    description: Deploy PostgreSQL alongside Keycloak
+  rhbk_db_size:
+    type: string
+    description: PVC size for Keycloak PostgreSQL
+  rhbk_admin_password:
+    type: string
+    description: Admin password for Keycloak
+    minLength: 8
+  rhbk_log_level:
+    type: string
+    description: Keycloak log level
+    enum:
+      - DEBUG
+      - INFO
+      - WARN
+      - ERROR
+  rhbk_max_connections:
+    type: integer
+    description: Maximum database connections
+    minimum: 1
+    maximum: 1000
+  rhbk_hostname_pattern:
+    type: string
+    description: Hostname pattern for Keycloak
+    pattern: "^[a-z][a-z0-9-]*$"
+  rhbk_replicas_list:
+    type: array
+    description: List of replica configurations
+    minItems: 1
+    items:
+      type: string

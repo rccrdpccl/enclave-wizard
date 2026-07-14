@@ -17,15 +17,58 @@ echo ""
 echo "[1/5] Building wizard binary with embedded UI..."
 make -C "${REPO_DIR}" build-linux
 
-# --- Clone enclave repo ---
-echo "[2/5] Cloning enclave repo (${ENCLAVE_BRANCH})..."
-ENCLAVE_TMP=$(mktemp -d)
-git clone --depth 1 --branch "${ENCLAVE_BRANCH}" "${ENCLAVE_REPO}" "${ENCLAVE_TMP}/enclave"
-tar czf "${REPO_DIR}/enclave-repo.tar.gz" -C "${ENCLAVE_TMP}" enclave
-rm -rf "${ENCLAVE_TMP}"
+# --- Clone enclave repo (skip if RPM exists) ---
+ENCLAVE_RPM=$(find "${OUT_DIR}" -maxdepth 1 -name "enclave-[0-9]*.rpm" 2>/dev/null | head -1)
+if [ -n "${ENCLAVE_RPM}" ]; then
+  echo "[2/5] Enclave RPM already exists: $(basename ${ENCLAVE_RPM}) — skipping"
+  echo "[3/5] Skipped"
+else
+  echo "[2/5] Cloning enclave repo (${ENCLAVE_BRANCH})..."
+  ENCLAVE_TMP=$(mktemp -d)
+  git clone --depth 1 --branch "${ENCLAVE_BRANCH}" "${ENCLAVE_REPO}" "${ENCLAVE_TMP}/enclave"
 
-# --- Build enclave RPM ---
-echo "[3/5] Building enclave RPM..."
+  # Apply enclave-wizard overrides (pinned images, etc.)
+  OVERRIDES_DIR="${REPO_DIR}/hack/enclave"
+  if [ -d "${OVERRIDES_DIR}" ]; then
+    echo "    Applying overrides from hack/enclave/..."
+    cp -rv "${OVERRIDES_DIR}/." "${ENCLAVE_TMP}/enclave/" | tail -5
+  fi
+
+  tar czf "${REPO_DIR}/enclave-repo.tar.gz" -C "${ENCLAVE_TMP}" enclave
+  rm -rf "${ENCLAVE_TMP}"
+
+  # --- Build enclave RPM ---
+  echo "[3/5] Building enclave RPM..."
+  mkdir -p "${OUT_DIR}"
+
+  podman run --rm \
+      -v "${REPO_DIR}:/src:z" \
+      -v "${OUT_DIR}:/out:z" \
+      -w /src \
+      fedora:latest \
+      bash -c '
+          set -e
+          dnf install -y rpm-build 2>/dev/null | tail -1
+
+          RPMBUILD_DIR=$(mktemp -d)
+          mkdir -p ${RPMBUILD_DIR}/{SOURCES,SPECS,RPMS,BUILD,SRPMS}
+
+          cp /src/enclave-repo.tar.gz  ${RPMBUILD_DIR}/SOURCES/enclave-repo.tar.gz
+          cp /src/hack/rpm/enclave.spec ${RPMBUILD_DIR}/SPECS/
+
+          rpmbuild -bb \
+              --define "_topdir ${RPMBUILD_DIR}" \
+              ${RPMBUILD_DIR}/SPECS/enclave.spec
+
+          cp ${RPMBUILD_DIR}/RPMS/*/*.rpm /out/
+          rm -rf ${RPMBUILD_DIR}
+      '
+
+  rm -f "${REPO_DIR}/enclave-repo.tar.gz"
+fi
+
+# --- Build enclave-wizard RPM (always) ---
+echo "[4/5] Building enclave-wizard RPM..."
 mkdir -p "${OUT_DIR}"
 
 podman run --rm \
@@ -34,34 +77,8 @@ podman run --rm \
     -w /src \
     fedora:latest \
     bash -c '
-        dnf install -y rpm-build 2>/dev/null
-
-        RPMBUILD_DIR=$(mktemp -d)
-        mkdir -p ${RPMBUILD_DIR}/{SOURCES,SPECS,RPMS,BUILD,SRPMS}
-
-        cp /src/enclave-repo.tar.gz  ${RPMBUILD_DIR}/SOURCES/enclave-repo.tar.gz
-        cp /src/hack/rpm/enclave.spec ${RPMBUILD_DIR}/SPECS/
-
-        rpmbuild -bb \
-            --define "_topdir ${RPMBUILD_DIR}" \
-            ${RPMBUILD_DIR}/SPECS/enclave.spec
-
-        cp ${RPMBUILD_DIR}/RPMS/*/*.rpm /out/
-        rm -rf ${RPMBUILD_DIR}
-    '
-
-rm -f "${REPO_DIR}/enclave-repo.tar.gz"
-
-# --- Build enclave-wizard RPM ---
-echo "[4/5] Building enclave-wizard RPM..."
-
-podman run --rm \
-    -v "${REPO_DIR}:/src:z" \
-    -v "${OUT_DIR}:/out:z" \
-    -w /src \
-    fedora:latest \
-    bash -c '
-        dnf install -y rpm-build 2>/dev/null
+        set -e
+        dnf install -y rpm-build 2>/dev/null | tail -1
 
         RPMBUILD_DIR=$(mktemp -d)
         mkdir -p ${RPMBUILD_DIR}/{SOURCES,SPECS,RPMS,BUILD,SRPMS}

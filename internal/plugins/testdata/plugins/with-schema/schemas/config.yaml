@@ -1,0 +1,11 @@
+type: object
+properties:
+  replicas:
+    type: integer
+    description: Number of replicas
+    minimum: 1
+  enabled:
+    type: boolean
+    description: Enable the feature
+required:
+  - replicas

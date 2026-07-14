@@ -2,10 +2,10 @@
 
 package main
 
-import "github.com/rh-ecosystem-edge/enclave-wizard/internal/tasks"
+import "github.com/rh-ecosystem-edge/enclave-wizard/internal/runner"
 
 type DevOptions struct{}
 
-func applyRunnerMode(_ *Options, runner tasks.Runner, _ string) (tasks.Runner, error) {
-	return runner, nil
+func applyRunnerMode(_ *Options, r runner.Runner, _ string) (runner.Runner, error) {
+	return r, nil
 }

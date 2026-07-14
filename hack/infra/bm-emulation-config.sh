@@ -43,12 +43,9 @@ if [ -z "${VM_IP}" ]; then
   exit 1
 fi
 
-# Get LZ BMC IP
-BMC_VM_IP=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "ip -4 addr show eth1 2>/dev/null | grep -oP 'inet \K[0-9.]+'" 2>/dev/null || echo "")
-if [ -z "${BMC_VM_IP}" ]; then
-  echo "ERROR: wizard VM has no BMC network IP. Run 'make bm-emulation' first."
-  exit 1
-fi
+# lzBmcIP = the wizard VM's primary IP (where Ironic binds)
+# BM nodes on the BMC network reach it via the hypervisor's routing
+LZ_IP="${VM_IP}"
 
 info "Writing BM emulation config to wizard..."
 
@@ -60,6 +57,12 @@ ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
 
 # Transfer pull secret
 ${SCP} "${PULL_SECRET}" "${TARGET}:/tmp/enclave-pull-secret.json"
+
+# Write SSH pub key directly to enclave config (bypass RPM default)
+${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
+  sudo cp /home/wizard/.ssh/id_rsa.pub /opt/enclave/config/ssh-pub-key.pub
+  sudo chmod 644 /opt/enclave/config/ssh-pub-key.pub
+" 2>/dev/null
 
 # Read SSH key from wizard VM
 SSH_KEY=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "cat /home/wizard/.ssh/id_rsa.pub" 2>/dev/null)
@@ -79,23 +82,23 @@ ${SSH} "${TARGET}" "scp -o StrictHostKeyChecking=no /tmp/enclave-pull-secret.jso
 # Build and write config directly on the wizard VM
 ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
   python3 -c \"
-import json
+import json, subprocess as sp
 
 ps = json.load(open('/tmp/pull-secret.json'))
 ssh_key = open('/home/wizard/.ssh/id_rsa.pub').read().strip()
 
-# Read existing config to preserve UI selections
-import subprocess, json as j
+# Read existing config to preserve UI selections (flavors, plugins, OSAC)
 try:
-    r = subprocess.run(['sudo', 'curl', '-sk', 'https://localhost:3443/api/v1/config'], capture_output=True, text=True)
-    existing = j.loads(r.stdout) if r.returncode == 0 else {}
+    r = sp.run(['sudo', 'curl', '-sk', 'https://localhost:3443/api/v1/config'], capture_output=True, text=True)
+    existing = json.loads(r.stdout) if r.returncode == 0 else {}
 except:
     existing = {}
 existing_global = existing.get('global', {})
 
+# Infrastructure settings only — never touch enabled_plugins or plugin-specific fields
 infra = {
-    'workingDir': '/opt/enclave',
-    'lzBmcIP': '${BMC_VM_IP}',
+    'workingDir': '/home/enclave',
+    'lzBmcIP': '${LZ_IP}',
     'disconnected': False,
     'baseDomain': '${BASE_DOMAIN}',
     'clusterName': '${CLUSTER_NAME}',
@@ -111,13 +114,19 @@ infra = {
     'quayUser': 'admin',
     'quayPassword': 'password',
     'quayBackend': 'LocalStorage',
-    'storage_plugin': existing_global.get('storage_plugin', 'lvms'),
     'agent_hosts': [
         {'name': 'enclave-cp-0', 'macAddress': '00:60:2f:e0:c1:00', 'ipAddress': '192.168.223.10', 'redfish': '192.168.223.1:8100', 'redfishUser': 'admin', 'redfishPassword': 'password', 'rootDisk': '/dev/sda', 'bmcSystemId': '${UUID0}'},
         {'name': 'enclave-cp-1', 'macAddress': '00:60:2f:e0:c1:01', 'ipAddress': '192.168.223.11', 'redfish': '192.168.223.1:8100', 'redfishUser': 'admin', 'redfishPassword': 'password', 'rootDisk': '/dev/sda', 'bmcSystemId': '${UUID1}'},
         {'name': 'enclave-cp-2', 'macAddress': '00:60:2f:e0:c1:02', 'ipAddress': '192.168.223.12', 'redfish': '192.168.223.1:8100', 'redfishUser': 'admin', 'redfishPassword': 'password', 'rootDisk': '/dev/sda', 'bmcSystemId': '${UUID2}'},
     ],
 }
+
+# Merge: existing keeps plugin selections, infra overwrites network/host settings
+# Set defaults for fields the existing config might not have
+if 'storage_plugin' not in existing_global:
+    infra['storage_plugin'] = 'lvms'
+if 'enabled_plugins' not in existing_global:
+    infra['enabled_plugins'] = ['lvms']
 
 merged_global = {**existing_global, **infra}
 config = {
@@ -127,7 +136,6 @@ config = {
 }
 
 # Try with topology, then without
-import subprocess as sp
 json.dump({**config, 'topology': existing.get('topology', {'availability_zones': []})}, open('/tmp/wizard-config.json', 'w'))
 r = sp.run(['sudo', 'curl', '-sk', '-X', 'PUT', 'https://localhost:3443/api/v1/config', '-H', 'Content-Type: application/json', '-d', '@/tmp/wizard-config.json', '-o', '/tmp/resp.txt', '-w', '%{http_code}'], capture_output=True, text=True)
 if r.stdout.strip() == '422':
@@ -135,7 +143,8 @@ if r.stdout.strip() == '422':
     r = sp.run(['sudo', 'curl', '-sk', '-X', 'PUT', 'https://localhost:3443/api/v1/config', '-H', 'Content-Type: application/json', '-d', '@/tmp/wizard-config.json', '-o', '/tmp/resp.txt', '-w', '%{http_code}'], capture_output=True, text=True)
 code = r.stdout.strip()
 if code in ('200', '204'):
-    print('OK')
+    plugins = merged_global.get('enabled_plugins', ['lvms'])
+    print(f'OK (plugins: {plugins})')
 else:
     print(f'FAILED (HTTP {code})')
     print(open('/tmp/resp.txt').read())

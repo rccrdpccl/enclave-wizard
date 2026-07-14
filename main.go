@@ -21,10 +21,16 @@ import (
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/api"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/auth"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/config"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/experience"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/logger"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
-	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tasks"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/runner"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/validation"
+)
+
+var (
+	wizardVersion  = "dev"
+	enclaveVersion = "dev"
 )
 
 //go:embed all:ui/apps/wizard/dist
@@ -42,7 +48,7 @@ type Options struct {
 	DevOptions
 }
 
-func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store, opts *Options) (huma.API, tasks.Runner, error) {
+func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store, opts *Options) (huma.API, runner.Runner, error) {
 	apiConfig := huma.DefaultConfig("Enclave Configuration Wizard", "0.1.0")
 	apiConfig.Info.Description = "API for managing Enclave deployment configuration files on the Landing Zone."
 
@@ -59,12 +65,16 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store, opts
 	reader := config.NewReader(enclaveDir)
 	writer := config.NewWriter(enclaveDir)
 
-	loadedPlugins, err := plugins.LoadFromDir(enclaveDir)
+	loadResult, err := plugins.LoadFromDirWithSchemas(enclaveDir)
 	if err != nil {
 		slog.Warn("plugin discovery failed, using empty registry", "error", err)
+		loadResult = &plugins.LoadResult{Schemas: make(map[string][]byte)}
 	}
-	registry := plugins.NewRegistry(loadedPlugins)
-	slog.Info("plugins loaded", "count", len(loadedPlugins))
+	registry := plugins.NewRegistry(loadResult.Plugins)
+	for name, schema := range loadResult.Schemas {
+		registry.SetSchema(name, schema)
+	}
+	slog.Info("plugins loaded", "count", len(loadResult.Plugins), "schemas", len(loadResult.Schemas))
 
 	runner, err := initRunner(opts, enclaveDir)
 	if err != nil {
@@ -73,14 +83,25 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store, opts
 
 	if runner != nil {
 		api.NewTasksHandler(runner, registry, reader, writer, enclaveDir).Register(humaAPI)
+		api.NewDeployHandler(runner, registry, reader, writer, enclaveDir).Register(humaAPI)
+		api.NewStreamHandler(runner).Register(mux)
 	}
 
 	validator := validation.NewValidator(enclaveDir, runner)
 
+	experiences, err := experience.LoadFromDir(enclaveDir)
+	if err != nil {
+		slog.Warn("experience discovery failed", "error", err)
+	}
+	slog.Info("experiences loaded", "count", len(experiences))
+
 	api.NewAuthHandler(authStore, opts.NoAuth).Register(humaAPI)
 	api.NewConfigHandler(reader, writer, validator).Register(humaAPI)
 	api.NewDefaultsHandler(enclaveDir).Register(humaAPI)
+	api.NewExperiencesHandler(experiences).Register(humaAPI)
+	api.NewFileUploadHandler(enclaveDir).Register(humaAPI)
 	api.NewPluginsHandler(registry).Register(humaAPI)
+	api.NewVersionHandler(wizardVersion, enclaveVersion).Register(humaAPI)
 
 	return humaAPI, runner, nil
 }
@@ -159,15 +180,7 @@ func main() {
 		}
 		setupUIHandler(mux)
 
-		fileUpload := api.NewFileUploadHandler(opts.EnclaveDir)
-		var rootHandler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == "/api/v1/files" {
-				fileUpload.ServeHTTP(w, r)
-				return
-			}
-			mux.ServeHTTP(w, r)
-		})
-		handler := api.LoggingMiddleware(api.BearerAuthMiddleware(authStore, opts.NoAuth)(rootHandler))
+		handler := api.LoggingMiddleware(api.BearerAuthMiddleware(authStore, opts.NoAuth)(mux))
 
 		httpsServer := &http.Server{
 			Addr:    fmt.Sprintf(":%d", opts.HTTPSPort),

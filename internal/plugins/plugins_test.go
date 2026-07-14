@@ -1,6 +1,7 @@
 package plugins
 
 import (
+	"errors"
 	"testing"
 
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
@@ -78,5 +79,43 @@ func TestValidateCombinationAuthorino(t *testing.T) {
 	errs := r.ValidateCombination([]string{"lvms", "authorino"})
 	if len(errs) != 0 {
 		t.Errorf("expected no errors for authorino, got %v", errs)
+	}
+}
+
+func TestRegistrySetAndGetSchema(t *testing.T) {
+	r := testRegistry()
+	schema := []byte(`{"type":"object"}`)
+	r.SetSchema("lvms", schema)
+
+	got, err := r.GetSchema("lvms")
+	if err != nil {
+		t.Fatalf("GetSchema: %v", err)
+	}
+	if string(got) != string(schema) {
+		t.Errorf("GetSchema = %s, want %s", got, schema)
+	}
+}
+
+func TestRegistryGetSchema_NotFound(t *testing.T) {
+	r := testRegistry()
+
+	_, err := r.GetSchema("lvms")
+	if err == nil {
+		t.Fatal("expected error for missing schema")
+	}
+	if !errors.Is(err, ErrSchemaNotFound) {
+		t.Errorf("expected ErrSchemaNotFound, got %v", err)
+	}
+}
+
+func TestRegistryGetSchema_UnknownPlugin(t *testing.T) {
+	r := testRegistry()
+
+	_, err := r.GetSchema("nonexistent")
+	if err == nil {
+		t.Fatal("expected error for unknown plugin schema")
+	}
+	if !errors.Is(err, ErrSchemaNotFound) {
+		t.Errorf("expected ErrSchemaNotFound, got %v", err)
 	}
 }

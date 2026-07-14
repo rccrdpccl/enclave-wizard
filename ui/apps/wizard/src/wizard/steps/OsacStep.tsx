@@ -16,6 +16,7 @@ import {
 import { OutlinedQuestionCircleIcon } from "@patternfly/react-icons";
 import type React from "react";
 import { useCallback, useState } from "react";
+import { useFileUpload } from "../../api/useFileUpload.ts";
 import { useWizard } from "../WizardContext.tsx";
 import { stepStyles } from "./stepStyles.ts";
 
@@ -35,39 +36,25 @@ export const OsacStep: React.FC = () => {
   const rhbkDbSize = (globalData.rhbk_db_size as string) ?? "5Gi";
 
   const [uploadFilename, setUploadFilename] = useState("");
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState("");
+  const { upload, uploading, error: uploadError } = useFileUpload();
 
-  const setField = (field: string, value: unknown) =>
-    dispatch({ type: "SET_FIELD", path: `global.${field}`, value });
+  const setField = useCallback(
+    (field: string, value: unknown) =>
+      dispatch({ type: "SET_FIELD", path: `global.${field}`, value }),
+    [dispatch],
+  );
 
   const handleFileUpload = useCallback(
     async (_e: unknown, file: File) => {
-      setUploadError("");
-      setUploading(true);
       setUploadFilename(file.name);
       try {
-        const formData = new FormData();
-        formData.append("file", file);
-        formData.append("dest", "plugins");
-        const resp = await fetch("/api/v1/files", {
-          method: "POST",
-          body: formData,
-        });
-        if (!resp.ok) {
-          throw new Error(await resp.text());
-        }
-        const { path } = (await resp.json()) as { path: string };
+        const { path } = await upload(file, "plugins");
         setField("osacAapLicenseFile", path);
-      } catch (err) {
-        setUploadError(
-          err instanceof Error ? err.message : "Upload failed",
-        );
-      } finally {
-        setUploading(false);
+      } catch {
+        // error is tracked by useFileUpload
       }
     },
-    [setField],
+    [upload, setField],
   );
 
   const handleFileClear = useCallback(() => {
@@ -92,10 +79,10 @@ export const OsacStep: React.FC = () => {
           label={
             <span>
               AAP subscription manifest{" "}
-              <Popover
-                bodyContent="The OSAC platform uses Ansible Automation Platform (AAP) as its automation engine. AAP requires a Red Hat subscription manifest (manifest.zip) to operate. Download it from access.redhat.com under Subscription Allocations."
-              >
-                <OutlinedQuestionCircleIcon style={{ cursor: "pointer", color: "#6a6e73" }} />
+              <Popover bodyContent="The OSAC platform uses Ansible Automation Platform (AAP) as its automation engine. AAP requires a Red Hat subscription manifest (manifest.zip) to operate. Download it from access.redhat.com under Subscription Allocations.">
+                <OutlinedQuestionCircleIcon
+                  style={{ cursor: "pointer", color: "#6a6e73" }}
+                />
               </Popover>
             </span>
           }
@@ -137,8 +124,8 @@ export const OsacStep: React.FC = () => {
           {!aapLicenseFile && !uploadError && (
             <HelperText>
               <HelperTextItem>
-                Download manifest.zip from Red Hat Subscription
-                Allocations (access.redhat.com)
+                Download manifest.zip from Red Hat Subscription Allocations
+                (access.redhat.com)
               </HelperTextItem>
             </HelperText>
           )}
@@ -174,11 +161,7 @@ export const OsacStep: React.FC = () => {
 
       {byoDatabase && (
         <FlexItem>
-          <FormGroup
-            label="Database URL"
-            isRequired
-            fieldId="database-url"
-          >
+          <FormGroup label="Database URL" isRequired fieldId="database-url">
             <TextInput
               id="database-url"
               value={databaseUrl}
@@ -231,10 +214,7 @@ export const OsacStep: React.FC = () => {
       </FlexItem>
 
       <FlexItem>
-        <FormGroup
-          label="Keycloak database"
-          fieldId="rhbk-deploy-database"
-        >
+        <FormGroup label="Keycloak database" fieldId="rhbk-deploy-database">
           <Switch
             id="rhbk-deploy-database"
             label="Deploy built-in PostgreSQL for Keycloak"
@@ -249,10 +229,7 @@ export const OsacStep: React.FC = () => {
 
       {rhbkDeployDatabase && (
         <FlexItem>
-          <FormGroup
-            label="Keycloak database size"
-            fieldId="rhbk-db-size"
-          >
+          <FormGroup label="Keycloak database size" fieldId="rhbk-db-size">
             <TextInput
               id="rhbk-db-size"
               value={rhbkDbSize}
@@ -267,7 +244,6 @@ export const OsacStep: React.FC = () => {
           </FormGroup>
         </FlexItem>
       )}
-
     </Flex>
   );
 };

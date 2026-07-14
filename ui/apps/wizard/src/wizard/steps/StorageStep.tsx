@@ -32,18 +32,30 @@ function VipPoolEditor({
   value: VipPool | undefined;
   onChange: (v: VipPool) => void;
 }) {
-  const pool: VipPool = value ?? { subnet_cidr: 24, ip_ranges: [{ start: "", end: "" }] };
-  const ranges = pool.ip_ranges.length > 0 ? pool.ip_ranges : [{ start: "", end: "" }];
+  const pool: VipPool = value ?? {
+    subnet_cidr: 24,
+    ip_ranges: [{ start: "", end: "" }],
+  };
+  const ranges =
+    pool.ip_ranges.length > 0 ? pool.ip_ranges : [{ start: "", end: "" }];
 
   const update = (patch: Partial<VipPool>) =>
     onChange({ ...pool, ...patch } as VipPool);
 
   const setRange = (i: number, field: keyof IPRange, val: string) =>
-    update({ ip_ranges: ranges.map((r, idx) => (idx === i ? { ...r, [field]: val } : r)) });
+    update({
+      ip_ranges: ranges.map((r, idx) =>
+        idx === i ? { ...r, [field]: val } : r,
+      ),
+    });
 
   return (
     <>
-      <FormGroup label="Subnet prefix length" fieldId="vast-vip-cidr" isRequired>
+      <FormGroup
+        label="Subnet prefix length"
+        fieldId="vast-vip-cidr"
+        isRequired
+      >
         <TextInput
           id="vast-vip-cidr"
           type="number"
@@ -83,7 +95,9 @@ function VipPoolEditor({
               <Button
                 variant="plain"
                 aria-label="Remove range"
-                onClick={() => update({ ip_ranges: ranges.filter((_, idx) => idx !== i) })}
+                onClick={() =>
+                  update({ ip_ranges: ranges.filter((_, idx) => idx !== i) })
+                }
                 isDisabled={ranges.length === 1}
               >
                 <MinusCircleIcon />
@@ -94,7 +108,9 @@ function VipPoolEditor({
         <Button
           variant="link"
           icon={<PlusCircleIcon />}
-          onClick={() => update({ ip_ranges: [...ranges, { start: "", end: "" }] })}
+          onClick={() =>
+            update({ ip_ranges: [...ranges, { start: "", end: "" }] })
+          }
         >
           Add IP range
         </Button>
@@ -131,10 +147,15 @@ export const StorageStep: React.FC = () => {
   const vastVipPool = globalData.vastVipPool as VipPool | undefined;
   const quayUser = (globalData.quayUser as string) ?? "";
   const quayPassword = (globalData.quayPassword as string) ?? "";
-  const rgwConfig = (globalData.quayBackendRGWConfiguration ?? {}) as Record<string, unknown>;
+  const rgwConfig = (globalData.quayBackendRGWConfiguration ?? {}) as Record<
+    string,
+    unknown
+  >;
 
   const selectBackend = (next: string) => {
-    const nonStorage = enabledPlugins.filter((p) => !STORAGE_PLUGINS.includes(p));
+    const nonStorage = enabledPlugins.filter(
+      (p) => !STORAGE_PLUGINS.includes(p),
+    );
     onChange("global.enabled_plugins", [...nonStorage, next]);
     onChange("global.storage_plugin", next);
     if (next !== "odf") {
@@ -149,7 +170,10 @@ export const StorageStep: React.FC = () => {
   };
 
   const updateRgwField = (key: string, value: string) =>
-    onChange("global.quayBackendRGWConfiguration", { ...rgwConfig, [key]: value });
+    onChange("global.quayBackendRGWConfiguration", {
+      ...rgwConfig,
+      [key]: value,
+    });
 
   const quayLocalLabel =
     backend === "vast-csi"
@@ -169,7 +193,11 @@ export const StorageStep: React.FC = () => {
         Storage
       </Title>
 
-      <Title headingLevel="h3" size="lg" className={stepStyles.firstSectionTitle}>
+      <Title
+        headingLevel="h3"
+        size="lg"
+        className={stepStyles.firstSectionTitle}
+      >
         Hub Cluster Storage
       </Title>
       <p className={stepStyles.subtitle}>
@@ -226,9 +254,17 @@ export const StorageStep: React.FC = () => {
         style={{ marginTop: "0.5rem" }}
       />
       {backend === "vast-csi" && (
-        <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }} style={subFormStyle}>
+        <Flex
+          direction={{ default: "column" }}
+          gap={{ default: "gapMd" }}
+          style={subFormStyle}
+        >
           <FlexItem>
-            <FormGroup label="Management endpoint" fieldId="vast-endpoint" isRequired>
+            <FormGroup
+              label="Management endpoint"
+              fieldId="vast-endpoint"
+              isRequired
+            >
               <TextInput
                 id="vast-endpoint"
                 value={vastEndpoint}
@@ -239,7 +275,11 @@ export const StorageStep: React.FC = () => {
             </FormGroup>
           </FlexItem>
           <FlexItem>
-            <FormGroup label="Admin username" fieldId="vast-username" isRequired>
+            <FormGroup
+              label="Admin username"
+              fieldId="vast-username"
+              isRequired
+            >
               <TextInput
                 id="vast-username"
                 value={vastAdminUsername}
@@ -249,7 +289,11 @@ export const StorageStep: React.FC = () => {
             </FormGroup>
           </FlexItem>
           <FlexItem>
-            <FormGroup label="Admin password" fieldId="vast-password" isRequired>
+            <FormGroup
+              label="Admin password"
+              fieldId="vast-password"
+              isRequired
+            >
               <TextInput
                 id="vast-password"
                 type="password"
@@ -294,10 +338,10 @@ export const StorageStep: React.FC = () => {
         label={
           <span>
             External object storage{" "}
-            <Popover
-              bodyContent="Any S3-compatible object store such as Ceph RadosGW, AWS S3, or MinIO. Requires access credentials and a pre-created bucket."
-            >
-              <OutlinedQuestionCircleIcon style={{ cursor: "pointer", color: "#6a6e73" }} />
+            <Popover bodyContent="Any S3-compatible object store such as Ceph RadosGW, AWS S3, or MinIO. Requires access credentials and a pre-created bucket.">
+              <OutlinedQuestionCircleIcon
+                style={{ cursor: "pointer", color: "#6a6e73" }}
+              />
             </Popover>
           </span>
         }
@@ -307,7 +351,11 @@ export const StorageStep: React.FC = () => {
         style={{ marginTop: "0.5rem" }}
       />
       {quayBackend === "RadosGWStorage" && (
-        <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }} style={subFormStyle}>
+        <Flex
+          direction={{ default: "column" }}
+          gap={{ default: "gapMd" }}
+          style={subFormStyle}
+        >
           {RGW_FIELDS.map(({ key, label }) => (
             <FlexItem key={key}>
               <FormGroup label={label} isRequired fieldId={`rgw-${key}`}>

@@ -100,6 +100,11 @@ export class WizardPage {
     await this.page.waitForTimeout(500);
   }
 
+  async navigateToSubStep(label: string) {
+    await this.page.getByText(label, { exact: true }).click();
+    await this.page.waitForTimeout(500);
+  }
+
   async clickBack() {
     await this.page.getByRole("button", { name: "Back" }).click();
   }
@@ -209,7 +214,7 @@ export class WizardPage {
   async fillOsac(config: OsacConfig) {
     // Upload AAP license manifest
     const filename = config.aapLicenseFilename ?? "manifest.zip";
-    const fileInput = this.page.locator("#aap-license-upload input[type='file']");
+    const fileInput = this.page.locator("input[type='file']").first();
     await fileInput.setInputFiles({
       name: filename,
       mimeType: "application/zip",
@@ -225,9 +230,9 @@ export class WizardPage {
       }
     }
 
-    // RHBK instances
+    // RHBK instances (NumberInput — target the inner input element)
     if (config.rhbkInstances != null) {
-      const input = this.page.locator("#rhbk-instances");
+      const input = this.page.locator("#rhbk-instances input[type='number']");
       await input.fill(String(config.rhbkInstances));
     }
 

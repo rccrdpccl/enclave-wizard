@@ -7,6 +7,9 @@ import {
   DescriptionListTerm,
   EmptyState,
   EmptyStateBody,
+  Progress,
+  ProgressMeasureLocation,
+  ProgressVariant,
   Spinner,
   Split,
   SplitItem,
@@ -17,16 +20,11 @@ import {
 import { AnsiUp } from "ansi_up";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { TaskRun } from "@enclave-wizard-ui/api-client";
-import { useEnclaveApi } from "../../api/useEnclaveApi.ts";
-import { useTasksApi } from "../../api/useTasksApi.ts";
+import { useDeployment } from "../../api/useDeployment.ts";
 import { useWizard } from "../WizardContext.tsx";
 import { buildFinalConfig } from "../buildFinalConfig.ts";
-import { usePolling } from "../../tasks/hooks/usePolling.ts";
 import { TaskStatusLabel } from "../../tasks/components/TaskStatusLabel.tsx";
 import { tasksStyles as styles } from "../../tasks/tasksStyles.ts";
-
-type DeployStatus = "idle" | "writing" | "deploying" | "error";
 
 function formatDuration(start?: Date | null, end?: Date | null): string {
   if (!start) return "—";
@@ -40,71 +38,12 @@ function formatDuration(start?: Date | null, end?: Date | null): string {
 }
 
 export const DeployStep: React.FC = () => {
-  const { state } = useWizard();
-  const api = useEnclaveApi();
-  const tasksApi = useTasksApi();
-  const [status, setStatus] = useState<DeployStatus>("idle");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [errorDetails, setErrorDetails] = useState<string[]>([]);
-  const [taskId, setTaskId] = useState<string | null>(null);
-  const [taskDone, setTaskDone] = useState(false);
+  const { state: wizardState } = useWizard();
+  const { state: deployment, start, cancel } = useDeployment();
 
-  const handleDeploy = useCallback(async () => {
-    setStatus("writing");
-    setErrorMessage("");
-    setErrorDetails([]);
-    try {
-      await api.writeConfig(buildFinalConfig(state));
-      setStatus("deploying");
-      const task = await tasksApi.startDeploy();
-      setTaskId(task.id);
-    } catch (err: unknown) {
-      setStatus("error");
-      const details: string[] = [];
-      if (err && typeof err === "object" && "response" in err) {
-        try {
-          const body = await (err as { response: Response }).response.json();
-          if (body.errors && Array.isArray(body.errors)) {
-            for (const e of body.errors) {
-              details.push(e.message ?? String(e));
-            }
-          } else if (body.detail) {
-            details.push(body.detail);
-          }
-        } catch {
-          // response not JSON
-        }
-      }
-      setErrorDetails(details);
-      setErrorMessage(
-        details.length > 0
-          ? "Configuration validation failed"
-          : err instanceof Error ? err.message : "Failed to start deployment",
-      );
-    }
-  }, [api, tasksApi, state]);
-
-  // Poll task status
-  const fetchTask = useCallback(
-    () => (taskId ? tasksApi.getTask(taskId) : Promise.resolve(null)),
-    [tasksApi, taskId],
-  );
-  const { data: task } = usePolling(fetchTask, 3000, !!taskId && !taskDone);
-
-  const isRunning = task?.status === "running";
-
-  useEffect(() => {
-    if (task != null && !isRunning) {
-      setTaskDone(true);
-    }
-  }, [task, isRunning]);
-
-  // Poll logs
-  const fetchLogs = useCallback(
-    () => (taskId ? tasksApi.getTaskLogs(taskId) : Promise.resolve("")),
-    [tasksApi, taskId],
-  );
-  const { data: logs } = usePolling(fetchLogs, 2000, !!taskId && !taskDone);
+  const handleDeploy = useCallback(() => {
+    start(buildFinalConfig(wizardState));
+  }, [start, wizardState]);
 
   const ansiUp = useMemo(() => {
     const instance = new AnsiUp();
@@ -113,12 +52,14 @@ export const DeployStep: React.FC = () => {
   }, []);
 
   const logsHtml = useMemo(() => {
-    if (!logs) return "";
-    return ansiUp.ansi_to_html(logs);
-  }, [logs, ansiUp]);
+    if (!deployment.logs) return "";
+    return ansiUp.ansi_to_html(deployment.logs);
+  }, [deployment.logs, ansiUp]);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
   const [follow, setFollow] = useState(true);
+
+  const isRunning = deployment.phase === "deploying";
 
   useEffect(() => {
     if (follow && isRunning && logsEndRef.current) {
@@ -126,7 +67,7 @@ export const DeployStep: React.FC = () => {
     }
   }, [logsHtml, follow, isRunning]);
 
-  if (status === "writing") {
+  if (deployment.phase === "writing") {
     return (
       <EmptyState
         variant="lg"
@@ -141,23 +82,26 @@ export const DeployStep: React.FC = () => {
     );
   }
 
-  if (status === "idle" || (status === "error" && !taskId)) {
+  if (
+    deployment.phase === "idle" ||
+    (deployment.phase === "error" && !deployment.taskId)
+  ) {
     return (
       <div>
         <Title headingLevel="h2" size="xl">
           Deploy
         </Title>
 
-        {status === "error" && (
+        {deployment.phase === "error" && deployment.error && (
           <Alert
             variant="danger"
-            title={errorMessage}
+            title={deployment.error.message}
             isInline
             style={{ margin: "1rem 0" }}
           >
-            {errorDetails.length > 0 && (
+            {deployment.error.details.length > 0 && (
               <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>
-                {errorDetails.map((d, i) => (
+                {deployment.error.details.map((d, i) => (
                   <li key={i}>{d}</li>
                 ))}
               </ul>
@@ -176,7 +120,9 @@ export const DeployStep: React.FC = () => {
     );
   }
 
-  // Deploying — show task output
+  // Deploying / complete / failed — show task output
+  const task = deployment.task;
+
   return (
     <Stack hasGutter>
       <StackItem>
@@ -215,10 +161,26 @@ export const DeployStep: React.FC = () => {
         </StackItem>
       )}
 
-      {task?.error && (
+      {deployment.progress && (
+        <StackItem>
+          <Progress
+            value={deployment.phase === "complete" ? 100 : (deployment.progress.percentage ?? 0)}
+            title={deployment.progress.currentTask || (isRunning ? "Starting..." : "")}
+            measureLocation={ProgressMeasureLocation.top}
+            variant={
+              deployment.phase === "failed" ? ProgressVariant.danger
+              : deployment.phase === "complete" ? ProgressVariant.success
+              : undefined
+            }
+            aria-label="Deployment progress"
+          />
+        </StackItem>
+      )}
+
+      {deployment.error && (
         <StackItem>
           <Alert variant="danger" title="Error" isInline>
-            {task.error}
+            {deployment.error.message}
           </Alert>
         </StackItem>
       )}
@@ -231,15 +193,27 @@ export const DeployStep: React.FC = () => {
             </Title>
           </SplitItem>
           {isRunning && (
-            <SplitItem>
-              <Button
-                variant="link"
-                isInline
-                onClick={() => setFollow((f) => !f)}
-              >
-                {follow ? "Unfollow" : "Follow"}
-              </Button>
-            </SplitItem>
+            <>
+              <SplitItem>
+                <Button
+                  variant="link"
+                  isInline
+                  onClick={() => setFollow((f) => !f)}
+                >
+                  {follow ? "Unfollow" : "Follow"}
+                </Button>
+              </SplitItem>
+              <SplitItem>
+                <Button
+                  variant="danger"
+                  isInline
+                  onClick={cancel}
+                  data-testid="cancel-deploy"
+                >
+                  Cancel
+                </Button>
+              </SplitItem>
+            </>
           )}
         </Split>
       </StackItem>

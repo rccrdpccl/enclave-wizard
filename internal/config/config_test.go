@@ -104,6 +104,72 @@ func TestReadAll_ReadsCertificates(t *testing.T) {
 	}
 }
 
+func TestReadAll_ClearsCertPlaceholders(t *testing.T) {
+	root := newEnclaveDir(t, map[string]string{
+		"certificates.yaml": `
+sslAPICertificateFullChain: |
+  -----BEGIN CERTIFICATE-----
+  YOUR_API_CERTIFICATE
+  -----END CERTIFICATE-----
+sslAPICertificateKey: |
+  -----BEGIN PRIVATE KEY-----
+  YOUR_API_PRIVATE_KEY
+  -----END PRIVATE KEY-----
+sslCACertificate: |
+  -----BEGIN CERTIFICATE-----
+  YOUR_ROOT_CA_CERTIFICATE
+  -----END CERTIFICATE-----
+`,
+	})
+	cfg, err := NewReader(root).ReadAll()
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if cfg.Certificates.SSLAPICertificateFullChain != nil {
+		t.Errorf("SSLAPICertificateFullChain should be nil, got %q", *cfg.Certificates.SSLAPICertificateFullChain)
+	}
+	if cfg.Certificates.SSLAPICertificateKey != nil {
+		t.Errorf("SSLAPICertificateKey should be nil, got %q", *cfg.Certificates.SSLAPICertificateKey)
+	}
+	if cfg.Certificates.SSLCACertificate != nil {
+		t.Errorf("SSLCACertificate should be nil, got %q", *cfg.Certificates.SSLCACertificate)
+	}
+}
+
+func TestReadAll_PreservesRealCerts(t *testing.T) {
+	realCert := "-----BEGIN CERTIFICATE-----\nMIIBxTCCAW...\n-----END CERTIFICATE-----\n"
+	root := newEnclaveDir(t, map[string]string{
+		"certificates.yaml": "sslCACertificate: |\n  -----BEGIN CERTIFICATE-----\n  MIIBxTCCAW...\n  -----END CERTIFICATE-----\n",
+	})
+	cfg, err := NewReader(root).ReadAll()
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if cfg.Certificates.SSLCACertificate == nil {
+		t.Fatal("expected real cert to be preserved, got nil")
+	}
+	_ = realCert
+}
+
+func TestReadAll_ClearsSimplePlaceholders(t *testing.T) {
+	root := newEnclaveDir(t, map[string]string{
+		"global.yaml": "baseDomain: YOUR_BASE_DOMAIN\nclusterName: YOUR_CLUSTER_NAME\ndefaultPrefix: 24\n",
+	})
+	cfg, err := NewReader(root).ReadAll()
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+	if cfg.Global.BaseDomain != "" {
+		t.Errorf("BaseDomain should be empty, got %q", cfg.Global.BaseDomain)
+	}
+	if cfg.Global.ClusterName != "" {
+		t.Errorf("ClusterName should be empty, got %q", cfg.Global.ClusterName)
+	}
+	if cfg.Global.DefaultPrefix != 24 {
+		t.Errorf("DefaultPrefix should be preserved, got %d", cfg.Global.DefaultPrefix)
+	}
+}
+
 func TestReadAll_ReadsCloudInfraDiscoveryHosts(t *testing.T) {
 	root := newEnclaveDir(t, map[string]string{
 		"cloud_infra.yaml": "discovery_hosts:\n  - bmcAddress: 192.168.1.10\n",
@@ -308,6 +374,124 @@ func TestWriteAllThenReadAll_DiscoveryHostsRoundTrip(t *testing.T) {
 	}
 	if got.CloudInfra.DiscoveryHosts[0].Redfish != "192.168.2.10" {
 		t.Errorf("host[0]: got %v", got.CloudInfra.DiscoveryHosts[0])
+	}
+}
+
+func TestWriteAllThenReadAll_OsacPluginRoundTrips(t *testing.T) {
+	root := t.TempDir()
+	profile := "caas"
+	license := "/opt/enclave/config/plugins/manifest.zip"
+
+	want := &models.EnclaveConfig{}
+	want.Global.OsacProfile = &profile
+	want.Global.OsacAapLicenseFile = &license
+
+	if err := NewWriter(root).WriteAll(want); err != nil {
+		t.Fatalf("WriteAll: %v", err)
+	}
+
+	// osac.yaml should exist on disk
+	if _, err := os.Stat(filepath.Join(root, "config", "plugins", "osac.yaml")); err != nil {
+		t.Fatalf("osac.yaml not created: %v", err)
+	}
+
+	got, err := NewReader(root).ReadAll()
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+
+	if got.Global.OsacProfile == nil || *got.Global.OsacProfile != profile {
+		t.Errorf("OsacProfile: want %q, got %v", profile, got.Global.OsacProfile)
+	}
+	if got.Global.OsacAapLicenseFile == nil || *got.Global.OsacAapLicenseFile != license {
+		t.Errorf("OsacAapLicenseFile: want %q, got %v", license, got.Global.OsacAapLicenseFile)
+	}
+}
+
+func TestWriteAllThenReadAll_RhbkPluginRoundTrips(t *testing.T) {
+	root := t.TempDir()
+	instances := 3
+	deploy := true
+	size := "10Gi"
+
+	want := &models.EnclaveConfig{}
+	want.Global.RhbkInstances = &instances
+	want.Global.RhbkDeployDatabase = &deploy
+	want.Global.RhbkDbSize = &size
+
+	if err := NewWriter(root).WriteAll(want); err != nil {
+		t.Fatalf("WriteAll: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(root, "config", "plugins", "rhbk.yaml")); err != nil {
+		t.Fatalf("rhbk.yaml not created: %v", err)
+	}
+
+	got, err := NewReader(root).ReadAll()
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+
+	if got.Global.RhbkInstances == nil || *got.Global.RhbkInstances != instances {
+		t.Errorf("RhbkInstances: want %d, got %v", instances, got.Global.RhbkInstances)
+	}
+	if got.Global.RhbkDeployDatabase == nil || *got.Global.RhbkDeployDatabase != deploy {
+		t.Errorf("RhbkDeployDatabase: want %v, got %v", deploy, got.Global.RhbkDeployDatabase)
+	}
+	if got.Global.RhbkDbSize == nil || *got.Global.RhbkDbSize != size {
+		t.Errorf("RhbkDbSize: want %q, got %v", size, got.Global.RhbkDbSize)
+	}
+}
+
+func TestWriteAll_OsacFieldsNotInGlobalYaml(t *testing.T) {
+	root := t.TempDir()
+	profile := "development"
+
+	cfg := &models.EnclaveConfig{}
+	cfg.Global.BaseDomain = "test.local"
+	cfg.Global.OsacProfile = &profile
+
+	if err := NewWriter(root).WriteAll(cfg); err != nil {
+		t.Fatalf("WriteAll: %v", err)
+	}
+
+	data, _ := os.ReadFile(filepath.Join(root, "config", "global.yaml"))
+	var global map[string]any
+	yaml.Unmarshal(data, &global)
+
+	if _, ok := global["osacProfile"]; ok {
+		t.Error("osacProfile should NOT be in global.yaml (should be in plugins/osac.yaml)")
+	}
+}
+
+func TestWriteAll_NoPluginFiles_WhenFieldsEmpty(t *testing.T) {
+	root := t.TempDir()
+
+	if err := NewWriter(root).WriteAll(&models.EnclaveConfig{}); err != nil {
+		t.Fatalf("WriteAll: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(root, "config", "plugins", "osac.yaml")); !os.IsNotExist(err) {
+		t.Error("osac.yaml should not exist when no OSAC fields are set")
+	}
+	if _, err := os.Stat(filepath.Join(root, "config", "plugins", "rhbk.yaml")); !os.IsNotExist(err) {
+		t.Error("rhbk.yaml should not exist when no RHBK fields are set")
+	}
+}
+
+func TestWriteAll_RemovesPluginFilesWhenFieldsCleared(t *testing.T) {
+	root := t.TempDir()
+	pluginsDir := filepath.Join(root, "config", "plugins")
+	os.MkdirAll(pluginsDir, 0755)
+	os.WriteFile(filepath.Join(pluginsDir, "osac.yaml"), []byte("osacProfile: caas\n"), 0644)
+
+	// Write config WITHOUT osac fields — should remove osac.yaml
+	if err := NewWriter(root).WriteAll(&models.EnclaveConfig{}); err != nil {
+		t.Fatalf("WriteAll: %v", err)
+	}
+
+	if _, err := os.Stat(filepath.Join(pluginsDir, "osac.yaml")); !os.IsNotExist(err) {
+		t.Error("osac.yaml should be removed when no OSAC fields are set")
 	}
 }
 

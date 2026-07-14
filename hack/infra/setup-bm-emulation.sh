@@ -77,6 +77,7 @@ cat > "${NET_XML}" <<EOF
       <hostname>console-openshift-console.apps.${FQDN}</hostname>
       <hostname>oauth-openshift.apps.${FQDN}</hostname>
     </host>
+    <!-- mirror entry added dynamically by deploy-wizard when LZ BMC IP is known -->
   </dns>
   <ip address='${NET_GATEWAY}' netmask='255.255.255.0'>
     <dhcp>
@@ -199,6 +200,79 @@ for m in json.load(sys.stdin)['Members']:
 ")
   echo "  ${VM_NAME}: ${UUID}"
 done
+
+# --- Step 6: Add wildcard DNS to the default libvirt network ---
+# The wizard VM uses the default network's dnsmasq (192.168.122.1) as its resolver.
+# Without this, *.apps routes (quay, console, oauth, etc.) won't resolve from the VM.
+info "Adding wildcard DNS for *.apps.${FQDN} to the default network..."
+
+DEFAULT_XML=$(mktemp)
+virsh net-dumpxml default > "${DEFAULT_XML}" 2>/dev/null
+
+if ! grep -q "apps.${FQDN}" "${DEFAULT_XML}"; then
+  # Add dnsmasq namespace if missing
+  if ! grep -q "dnsmasq:options" "${DEFAULT_XML}"; then
+    sed -i "s|<network>|<network xmlns:dnsmasq='http://libvirt.org/schemas/network/dnsmasq/1.0'>|" "${DEFAULT_XML}"
+    sed -i "s|</network>|  <dnsmasq:options>\n    <dnsmasq:option value=\"address=/apps.${FQDN}/${INGRESS_VIP}\"/>\n  </dnsmasq:options>\n</network>|" "${DEFAULT_XML}"
+  else
+    sed -i "s|</dnsmasq:options>|    <dnsmasq:option value=\"address=/apps.${FQDN}/${INGRESS_VIP}\"/>\n  </dnsmasq:options>|" "${DEFAULT_XML}"
+  fi
+
+  # Add API DNS entries if missing
+  if ! grep -q "api.${FQDN}" "${DEFAULT_XML}"; then
+    sed -i "s|<dns>|<dns>\n    <host ip='${API_VIP}'>\n      <hostname>api.${FQDN}</hostname>\n      <hostname>api-int.${FQDN}</hostname>\n    </host>|" "${DEFAULT_XML}"
+  fi
+
+  virsh net-destroy default 2>/dev/null || true
+  virsh net-undefine default 2>/dev/null || true
+  virsh net-define "${DEFAULT_XML}"
+  virsh net-start default
+  virsh net-autostart default
+  info "  Wildcard DNS added: *.apps.${FQDN} → ${INGRESS_VIP}"
+else
+  info "  Wildcard DNS already present"
+fi
+rm -f "${DEFAULT_XML}"
+
+# --- Step 7: Write params file ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PARAMS_FILE="${SCRIPT_DIR}/../../demo-params.json"
+
+VM_DATA="["
+for i in $(seq 0 $((NUM_MASTERS - 1))); do
+  VM_NAME="${VM_PREFIX}-${i}"
+  VM_MAC="${VM_MAC_PREFIX}:$(printf '%02x' "$i")"
+  VM_UUID=$(virsh domuuid "${VM_NAME}" 2>/dev/null || echo "")
+  VM_IP="192.168.223.$((10 + i))"
+  [ "$i" -gt 0 ] && VM_DATA+=","
+  VM_DATA+="{\"name\":\"${VM_NAME}\",\"mac\":\"${VM_MAC}\",\"uuid\":\"${VM_UUID}\",\"ip\":\"${VM_IP}\"}"
+done
+VM_DATA+="]"
+
+python3 -c "
+import json, os
+path = '${PARAMS_FILE}'
+data = {}
+if os.path.exists(path):
+    with open(path) as f:
+        data = json.load(f)
+data['bmEmulation'] = {
+    'clusterName': '${CLUSTER_NAME}',
+    'baseDomain': '${BASE_DOMAIN}',
+    'fqdn': '${FQDN}',
+    'machineNetwork': '${NET_CIDR}',
+    'apiVIP': '${API_VIP}',
+    'ingressVIP': '${INGRESS_VIP}',
+    'rendezvousIP': '192.168.223.10',
+    'bmcAddress': '${NET_GATEWAY}:${BMC_PORT}',
+    'bmcUser': 'admin',
+    'bmcPassword': 'password',
+    'vms': ${VM_DATA},
+}
+with open(path, 'w') as f:
+    json.dump(data, f, indent=2)
+print(f'  Params written to {os.path.realpath(path)}')
+"
 
 echo ""
 info "Setup complete. VMs are shut off — Ironic will boot them during deployment."
