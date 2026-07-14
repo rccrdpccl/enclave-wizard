@@ -13,7 +13,8 @@ import {
   ModalHeader,
   TextInput,
 } from "@patternfly/react-core";
-import React, { useState } from "react";
+import type React from "react";
+import { useState } from "react";
 import { useAuth } from "./AuthContext.tsx";
 
 const MIN_PASSWORD_LENGTH = 8;
@@ -32,8 +33,10 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
 
-  const tooShort = newPassword.length > 0 && newPassword.length < MIN_PASSWORD_LENGTH;
-  const mismatch = confirmPassword.length > 0 && newPassword !== confirmPassword;
+  const tooShort =
+    newPassword.length > 0 && newPassword.length < MIN_PASSWORD_LENGTH;
+  const mismatch =
+    confirmPassword.length > 0 && newPassword !== confirmPassword;
   const canSubmit =
     newPassword.length >= MIN_PASSWORD_LENGTH &&
     newPassword === confirmPassword &&
@@ -49,7 +52,9 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
     try {
       await changePassword(currentPassword, newPassword);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to change password");
+      setError(
+        err instanceof Error ? err.message : "Failed to change password",
+      );
     } finally {
       setSubmitting(false);
     }
@@ -78,11 +83,7 @@ export const ChangePasswordDialog: React.FC<ChangePasswordDialogProps> = ({
         )}
 
         <Form id="change-password-form" onSubmit={handleSubmit}>
-          <FormGroup
-            label="New password"
-            fieldId="new-password"
-            isRequired
-          >
+          <FormGroup label="New password" fieldId="new-password" isRequired>
             <TextInput
               id="new-password"
               type="password"

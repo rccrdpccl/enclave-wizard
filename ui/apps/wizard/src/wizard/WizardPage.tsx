@@ -1,3 +1,5 @@
+import { css } from "@emotion/css";
+import { EnclaveConfigToJSON } from "@enclave-wizard-ui/api-client";
 import {
   Alert,
   Button,
@@ -8,22 +10,21 @@ import {
   FlexItem,
   ProgressStep,
   ProgressStepper,
+  Spinner,
   Split,
   SplitItem,
-  Spinner,
   Title,
 } from "@patternfly/react-core";
 import { ListIcon } from "@patternfly/react-icons";
 import type React from "react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
-import { EnclaveConfigToJSON } from "@enclave-wizard-ui/api-client";
 import { useEnclaveApi } from "../api/useEnclaveApi.ts";
 import { RedHatLogo } from "../common/components/RedHatLogo.tsx";
 import {
+  type StepValidationError,
   validateFields,
   validateHostEntries,
-  type StepValidationError,
 } from "../schema/schemaUtils.ts";
 import { useOpenApiSchema } from "../schema/useOpenApiSchema.ts";
 import { STEP_REQUIRED_FIELDS } from "./stepFields.ts";
@@ -31,17 +32,16 @@ import { AAPStep } from "./steps/AAPStep.tsx";
 import { CaasStep } from "./steps/CaasStep.tsx";
 import { DeployStep } from "./steps/DeployStep.tsx";
 import { GpuAiStep } from "./steps/GpuAiStep.tsx";
-import { OsacStep } from "./steps/OsacStep.tsx";
-import { TrustManagerStep } from "./steps/TrustManagerStep.tsx";
 import { HubClusterStep } from "./steps/HubClusterStep.tsx";
 import { LandingZoneStep } from "./steps/LandingZoneStep.tsx";
+import { OsacStep } from "./steps/OsacStep.tsx";
 import { ReviewStep } from "./steps/ReviewStep.tsx";
 import { SelectFlavorStep } from "./steps/SelectFlavorStep.tsx";
 import { StorageStep } from "./steps/StorageStep.tsx";
+import { TrustManagerStep } from "./steps/TrustManagerStep.tsx";
 import { WelcomeStep } from "./steps/WelcomeStep.tsx";
 import { useWizard, WizardProvider } from "./WizardContext.tsx";
 import { wizardStyles as styles } from "./wizardStyles.ts";
-import { css } from "@emotion/css";
 
 const taskNavButton = css`
   display: inline-flex;
@@ -135,9 +135,15 @@ const BASE_CONFIG_SUBSTEPS: ConfigSubStep[] = [
   { id: "hub-cluster", label: "Hub Cluster" },
 ];
 
-function buildConfigSubSteps(selectedFlavors: Set<string>, enabledPlugins: string[]): ConfigSubStep[] {
+function buildConfigSubSteps(
+  selectedFlavors: Set<string>,
+  enabledPlugins: string[],
+): ConfigSubStep[] {
   const subs = [...BASE_CONFIG_SUBSTEPS];
-  const hasOsac = selectedFlavors.has("caas") || selectedFlavors.has("vmaas") || selectedFlavors.has("bmaas");
+  const hasOsac =
+    selectedFlavors.has("caas") ||
+    selectedFlavors.has("vmaas") ||
+    selectedFlavors.has("bmaas");
   if (hasOsac) {
     subs.push({ id: "osac", label: "OSAC Platform" });
   }
@@ -156,7 +162,11 @@ function buildConfigSubSteps(selectedFlavors: Set<string>, enabledPlugins: strin
   return subs;
 }
 
-function SubStepContent({ subStepId }: { subStepId: string }): React.ReactElement {
+function SubStepContent({
+  subStepId,
+}: {
+  subStepId: string;
+}): React.ReactElement {
   switch (subStepId) {
     case "landing-zone":
       return <LandingZoneStep />;
@@ -195,7 +205,12 @@ function ConfigureStep({
       <Title headingLevel="h2" size="xl" style={{ marginBottom: "0.25rem" }}>
         Configure your deployment
       </Title>
-      <p style={{ color: "var(--pf-t--global--text--color--subtle)", marginBottom: "1.5rem" }}>
+      <p
+        style={{
+          color: "var(--pf-t--global--text--color--subtle)",
+          marginBottom: "1.5rem",
+        }}
+      >
         Answer a few questions to set up your chosen services.
       </p>
 
@@ -221,8 +236,15 @@ function ConfigureStep({
         </nav>
 
         <div className={configContent}>
-          <p style={{ color: "var(--pf-t--global--text--color--subtle)", marginBottom: "1rem", fontSize: "0.875rem" }}>
-            Step {activeSubStep + 1} of {subSteps.length} &middot; {currentSub?.label}
+          <p
+            style={{
+              color: "var(--pf-t--global--text--color--subtle)",
+              marginBottom: "1rem",
+              fontSize: "0.875rem",
+            }}
+          >
+            Step {activeSubStep + 1} of {subSteps.length} &middot;{" "}
+            {currentSub?.label}
           </p>
           <SubStepContent subStepId={currentSub?.id ?? ""} />
         </div>
@@ -272,7 +294,9 @@ function WizardContent(): React.ReactElement {
   const [stepErrors, setStepErrors] = useState<StepValidationError[]>([]);
   const [activeSubStep, setActiveSubStep] = useState(0);
 
-  const globalData = (state.configData as Record<string, unknown>).global as Record<string, unknown> | undefined;
+  const globalData = (state.configData as Record<string, unknown>).global as
+    | Record<string, unknown>
+    | undefined;
   const enabledPlugins = Array.isArray(globalData?.enabled_plugins)
     ? (globalData.enabled_plugins as string[])
     : [];
@@ -301,19 +325,40 @@ function WizardContent(): React.ReactElement {
 
         if (defaults.status === "fulfilled") {
           const d = defaults.value;
-          dispatch({ type: "SET_FIELD", path: "global.disconnected", value: d.disconnected });
-          dispatch({ type: "SET_FIELD", path: "global.storage_plugin", value: d.storagePlugin });
-          dispatch({ type: "SET_FIELD", path: "global.defaultPrefix", value: 24 });
-          dispatch({ type: "SET_FIELD", path: "global.quayBackend", value: "LocalStorage" });
-          dispatch({ type: "SET_FIELD", path: "global.enabled_plugins", value: ["lvms"] });
+          dispatch({
+            type: "SET_FIELD",
+            path: "global.storage_plugin",
+            value: d.storagePlugin,
+          });
+          dispatch({
+            type: "SET_FIELD",
+            path: "global.defaultPrefix",
+            value: 24,
+          });
+          dispatch({
+            type: "SET_FIELD",
+            path: "global.quayBackend",
+            value: "LocalStorage",
+          });
+          dispatch({
+            type: "SET_FIELD",
+            path: "global.enabled_plugins",
+            value: ["lvms"],
+          });
         }
 
         if (pluginsResult.status === "fulfilled") {
-          dispatch({ type: "SET_PLUGINS", plugins: pluginsResult.value.plugins ?? [] });
+          dispatch({
+            type: "SET_PLUGINS",
+            plugins: pluginsResult.value.plugins ?? [],
+          });
         }
 
         if (existingConfig.status === "fulfilled") {
-          dispatch({ type: "LOAD_CONFIG", config: EnclaveConfigToJSON(existingConfig.value) });
+          dispatch({
+            type: "LOAD_CONFIG",
+            config: EnclaveConfigToJSON(existingConfig.value),
+          });
         }
       } catch (err) {
         console.warn("Failed to load initial data:", err);
@@ -331,7 +376,9 @@ function WizardContent(): React.ReactElement {
   const isLastSubStep = activeSubStep === configSubSteps.length - 1;
   const isFirstSubStep = activeSubStep === 0;
 
-  const currentSubStepId = isConfigure ? configSubSteps[activeSubStep]?.id : currentStepId;
+  const currentSubStepId = isConfigure
+    ? configSubSteps[activeSubStep]?.id
+    : currentStepId;
 
   const goBack = () => {
     setStepErrors([]);
@@ -349,7 +396,9 @@ function WizardContent(): React.ReactElement {
     dispatch({ type: "SET_STEP", step: Math.max(0, state.currentStep - 1) });
   };
 
-  const skipValidation = new URLSearchParams(window.location.search).has("skip_validation");
+  const skipValidation = new URLSearchParams(window.location.search).has(
+    "skip_validation",
+  );
 
   const validateCurrentSubStep = useCallback((): StepValidationError[] => {
     if (skipValidation || !state.schema || !currentSubStepId) return [];
@@ -358,40 +407,99 @@ function WizardContent(): React.ReactElement {
     let errors: StepValidationError[] = [];
 
     if (fieldsToValidate) {
-      const nonHostFields = fieldsToValidate.filter((f) => f !== "global.agentHosts");
-      errors = validateFields(state.schema, nonHostFields, state.configData as Record<string, unknown>);
+      const nonHostFields = fieldsToValidate.filter(
+        (f) => f !== "global.agentHosts",
+      );
+      errors = validateFields(
+        state.schema,
+        nonHostFields,
+        state.configData as Record<string, unknown>,
+      );
     }
 
     if (currentSubStepId === "storage") {
-      const globalData = ((state.configData as Record<string, unknown>).global ?? {}) as Record<string, unknown>;
+      const globalData = ((state.configData as Record<string, unknown>)
+        .global ?? {}) as Record<string, unknown>;
       const disconnected = globalData.disconnected !== false;
       const backend = globalData.storage_plugin as string;
-      if (backend === "odf" && !((globalData.odfExternalConfig as string) ?? "").trim()) {
-        errors.push({ path: "global.odfExternalConfig", label: "ODF connection details", message: "ODF external Ceph connection details are required" });
+      if (
+        backend === "odf" &&
+        !((globalData.odfExternalConfig as string) ?? "").trim()
+      ) {
+        errors.push({
+          path: "global.odfExternalConfig",
+          label: "ODF connection details",
+          message: "ODF external Ceph connection details are required",
+        });
       }
       if (backend === "vast-csi") {
-        for (const [field, label] of [["vastEndpoint", "Management endpoint"], ["vastAdminUsername", "Admin username"], ["vastAdminPassword", "Admin password"]] as const) {
+        for (const [field, label] of [
+          ["vastEndpoint", "Management endpoint"],
+          ["vastAdminUsername", "Admin username"],
+          ["vastAdminPassword", "Admin password"],
+        ] as const) {
           if (!((globalData[field] as string) ?? "").trim()) {
-            errors.push({ path: `global.${field}`, label, message: `${label} is required for VAST CSI` });
+            errors.push({
+              path: `global.${field}`,
+              label,
+              message: `${label} is required for VAST CSI`,
+            });
           }
         }
-        const pool = globalData.vastVipPool as { subnet_cidr?: number; ip_ranges?: { start: string; end: string }[] } | undefined;
-        if (!pool || !pool.ip_ranges?.length || pool.ip_ranges.some((r) => !r.start.trim() || !r.end.trim())) {
-          errors.push({ path: "global.vastVipPool", label: "VIP pool", message: "VIP pool with at least one complete IP range is required for VAST CSI" });
+        const pool = globalData.vastVipPool as
+          | {
+              subnet_cidr?: number;
+              ip_ranges?: { start: string; end: string }[];
+            }
+          | undefined;
+        if (
+          !pool ||
+          !pool.ip_ranges?.length ||
+          pool.ip_ranges.some((r) => !r.start.trim() || !r.end.trim())
+        ) {
+          errors.push({
+            path: "global.vastVipPool",
+            label: "VIP pool",
+            message:
+              "VIP pool with at least one complete IP range is required for VAST CSI",
+          });
         }
       }
       if (disconnected) {
-        for (const [field, label] of [["quayUser", "Admin username"], ["quayPassword", "Admin password"]] as const) {
+        for (const [field, label] of [
+          ["quayUser", "Admin username"],
+          ["quayPassword", "Admin password"],
+        ] as const) {
           if (!((globalData[field] as string) ?? "").trim()) {
-            errors.push({ path: `global.${field}`, label, message: `Quay ${label} is required` });
+            errors.push({
+              path: `global.${field}`,
+              label,
+              message: `Quay ${label} is required`,
+            });
           }
         }
         const quayBackend = globalData.quayBackend as string;
         if (quayBackend === "RadosGWStorage") {
-          const rgw = (globalData.quayBackendRGWConfiguration ?? {}) as Record<string, unknown>;
-          for (const key of ["access_key", "secret_key", "bucket_name", "hostname"]) {
-            if (!rgw[key] || (typeof rgw[key] === "string" && (rgw[key] as string).trim() === "")) {
-              errors.push({ path: `global.quayBackendRGWConfiguration.${key}`, label: key, message: `${key} is required for RadosGW backend` });
+          const rgw = (globalData.quayBackendRGWConfiguration ?? {}) as Record<
+            string,
+            unknown
+          >;
+          for (const key of [
+            "access_key",
+            "secret_key",
+            "bucket_name",
+            "hostname",
+          ]) {
+            if (
+              !rgw[key] ||
+              (typeof rgw[key] === "string" &&
+                (rgw[key] as string).trim() === "")
+            ) {
+              errors.push({
+                path: `global.quayBackendRGWConfiguration.${key}`,
+                label: key,
+                message: `${key} is required for RadosGW backend`,
+              });
             }
           }
         }
@@ -399,25 +507,45 @@ function WizardContent(): React.ReactElement {
     }
 
     if (currentSubStepId === "osac") {
-      const globalData = ((state.configData as Record<string, unknown>).global ?? {}) as Record<string, unknown>;
+      const globalData = ((state.configData as Record<string, unknown>)
+        .global ?? {}) as Record<string, unknown>;
       if (!((globalData.osacAapLicenseFile as string) ?? "").trim()) {
-        errors.push({ path: "global.osacAapLicenseFile", label: "AAP subscription manifest", message: "AAP subscription manifest is required for OSAC" });
+        errors.push({
+          path: "global.osacAapLicenseFile",
+          label: "AAP subscription manifest",
+          message: "AAP subscription manifest is required for OSAC",
+        });
       }
     }
 
     if (currentSubStepId === "aap") {
-      const globalData = ((state.configData as Record<string, unknown>).global ?? {}) as Record<string, unknown>;
-      const aapDefaults = (globalData.aapDefaults ?? {}) as Record<string, unknown>;
+      const globalData = ((state.configData as Record<string, unknown>)
+        .global ?? {}) as Record<string, unknown>;
+      const aapDefaults = (globalData.aapDefaults ?? {}) as Record<
+        string,
+        unknown
+      >;
       if (!((aapDefaults.aapLicenseFile as string) ?? "").trim()) {
-        errors.push({ path: "global.aapDefaults.aapLicenseFile", label: "Subscription file path", message: "AAP subscription file path is required" });
+        errors.push({
+          path: "global.aapDefaults.aapLicenseFile",
+          label: "Subscription file path",
+          message: "AAP subscription file path is required",
+        });
       }
     }
 
     if (currentSubStepId === "hub-cluster") {
-      const globalData = ((state.configData as Record<string, unknown>).global ?? {}) as Record<string, unknown>;
-      const agentHosts = Array.isArray(globalData.agent_hosts) ? (globalData.agent_hosts as Record<string, unknown>[]) : [];
+      const globalData = ((state.configData as Record<string, unknown>)
+        .global ?? {}) as Record<string, unknown>;
+      const agentHosts = Array.isArray(globalData.agent_hosts)
+        ? (globalData.agent_hosts as Record<string, unknown>[])
+        : [];
       if (agentHosts.length !== 3) {
-        errors.push({ path: "global.agentHosts", label: "Control Plane Nodes", message: `Exactly 3 control plane nodes are required (currently ${agentHosts.length})` });
+        errors.push({
+          path: "global.agentHosts",
+          label: "Control Plane Nodes",
+          message: `Exactly 3 control plane nodes are required (currently ${agentHosts.length})`,
+        });
       } else {
         errors.push(...validateHostEntries(state.schema, agentHosts, "Node"));
       }
@@ -445,12 +573,24 @@ function WizardContent(): React.ReactElement {
 
     setStepErrors([]);
     dispatch({ type: "SET_SHOW_VALIDATION", show: false });
-    dispatch({ type: "SET_STEP", step: Math.min(TOP_STEPS.length - 1, state.currentStep + 1) });
+    dispatch({
+      type: "SET_STEP",
+      step: Math.min(TOP_STEPS.length - 1, state.currentStep + 1),
+    });
 
-    if (state.currentStep + 1 === TOP_STEPS.findIndex((s) => s.id === "configure")) {
+    if (
+      state.currentStep + 1 ===
+      TOP_STEPS.findIndex((s) => s.id === "configure")
+    ) {
       setActiveSubStep(0);
     }
-  }, [isConfigure, isLastSubStep, state.currentStep, dispatch, validateCurrentSubStep]);
+  }, [
+    isConfigure,
+    isLastSubStep,
+    state.currentStep,
+    dispatch,
+    validateCurrentSubStep,
+  ]);
 
   if (schemaLoading) {
     return <Spinner aria-label="Loading wizard..." />;
@@ -480,7 +620,13 @@ function WizardContent(): React.ReactElement {
                   key={step.id}
                   id={step.id}
                   titleId={`step-title-${step.id}`}
-                  variant={i < state.currentStep ? "success" : i === state.currentStep ? "info" : "pending"}
+                  variant={
+                    i < state.currentStep
+                      ? "success"
+                      : i === state.currentStep
+                        ? "info"
+                        : "pending"
+                  }
                   isCurrent={i === state.currentStep}
                   aria-label={step.label}
                 >
@@ -495,7 +641,12 @@ function WizardContent(): React.ReactElement {
       <div className={styles.content}>
         <div className={styles.contentInner}>
           {stepErrors.length > 0 && (
-            <Alert variant="danger" title="Please fill in all required fields" isInline className={styles.errorAlert}>
+            <Alert
+              variant="danger"
+              title="Please fill in all required fields"
+              isInline
+              className={styles.errorAlert}
+            >
               <ul>
                 {stepErrors.map((err) => (
                   <li key={err.path}>{err.message}</li>
@@ -521,7 +672,13 @@ function WizardContent(): React.ReactElement {
           <div className={styles.footerInner}>
             <Flex justifyContent={{ default: "justifyContentSpaceBetween" }}>
               <FlexItem>
-                <Button variant="secondary" onClick={goBack} isDisabled={isFirst}>Back</Button>
+                <Button
+                  variant="secondary"
+                  onClick={goBack}
+                  isDisabled={isFirst}
+                >
+                  Back
+                </Button>
               </FlexItem>
               <FlexItem>
                 <Button variant="primary" onClick={goNext} isDisabled={isLast}>

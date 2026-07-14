@@ -12,9 +12,9 @@ import { MinusCircleIcon, PlusCircleIcon } from "@patternfly/react-icons";
 import type React from "react";
 import { useState } from "react";
 import { SchemaFormRenderer } from "../../schema/SchemaFormRenderer.tsx";
-import { useWizard } from "../WizardContext.tsx";
 import { CertificateField } from "../components/CertificateField.tsx";
-import { HostEntryCard, type HostEntry } from "../components/HostEntryCard.tsx";
+import { type HostEntry, HostEntryCard } from "../components/HostEntryCard.tsx";
+import { useWizard } from "../WizardContext.tsx";
 import { stepStyles } from "./stepStyles.ts";
 
 const CLUSTER_FIELDS = ["global.baseDomain", "global.clusterName"];
@@ -40,10 +40,19 @@ const EMPTY_HOST: HostEntry = {
 };
 
 const HUB_CERTS = [
-  { path: "certificates.sslAPICertificateFullChain", label: "API Certificate (Full Chain)" },
+  {
+    path: "certificates.sslAPICertificateFullChain",
+    label: "API Certificate (Full Chain)",
+  },
   { path: "certificates.sslAPICertificateKey", label: "API Certificate Key" },
-  { path: "certificates.sslIngressCertificateFullChain", label: "Ingress Certificate (Full Chain)" },
-  { path: "certificates.sslIngressCertificateKey", label: "Ingress Certificate Key" },
+  {
+    path: "certificates.sslIngressCertificateFullChain",
+    label: "Ingress Certificate (Full Chain)",
+  },
+  {
+    path: "certificates.sslIngressCertificateKey",
+    label: "Ingress Certificate Key",
+  },
   { path: "certificates.sslCACertificate", label: "Root CA Certificate" },
 ];
 
@@ -101,7 +110,11 @@ export const HubClusterStep: React.FC = () => {
         Hub Cluster
       </Title>
 
-      <Title headingLevel="h3" size="lg" className={stepStyles.firstSectionTitle}>
+      <Title
+        headingLevel="h3"
+        size="lg"
+        className={stepStyles.firstSectionTitle}
+      >
         Cluster Identity
       </Title>
       <SchemaFormRenderer
@@ -130,9 +143,10 @@ export const HubClusterStep: React.FC = () => {
         <TextArea
           id="pull-secret"
           value={
-            typeof globalData.pullSecret === "object" && globalData.pullSecret !== null
+            typeof globalData.pullSecret === "object" &&
+            globalData.pullSecret !== null
               ? JSON.stringify(globalData.pullSecret, null, 2)
-              : (globalData.pullSecret as string) ?? ""
+              : ((globalData.pullSecret as string) ?? "")
           }
           onChange={(_e, v) => {
             try {
@@ -182,7 +196,8 @@ export const HubClusterStep: React.FC = () => {
       </Flex>
       {hostCount === 0 && (
         <p className={stepStyles.emptyHint}>
-          Add 3 control plane nodes to proceed. Click &quot;Add node&quot; to get started.
+          Add 3 control plane nodes to proceed. Click &quot;Add node&quot; to
+          get started.
         </p>
       )}
       {hostCount > 0 && hostCount < 3 && (
@@ -190,10 +205,17 @@ export const HubClusterStep: React.FC = () => {
           {3 - hostCount} more node{3 - hostCount > 1 ? "s" : ""} required.
         </p>
       )}
-      <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }} className={stepStyles.hostSection}>
+      <Flex
+        direction={{ default: "column" }}
+        gap={{ default: "gapMd" }}
+        className={stepStyles.hostSection}
+      >
         {agentHosts.map((host, i) => (
           <FlexItem key={`agent-${i}`}>
-            <Flex alignItems={{ default: "alignItemsFlexStart" }} gap={{ default: "gapSm" }}>
+            <Flex
+              alignItems={{ default: "alignItemsFlexStart" }}
+              gap={{ default: "gapSm" }}
+            >
               <FlexItem grow={{ default: "grow" }}>
                 <HostEntryCard
                   index={i}
@@ -210,7 +232,9 @@ export const HubClusterStep: React.FC = () => {
                 <Button
                   variant="plain"
                   aria-label={`Remove node ${i + 1}`}
-                  onClick={() => setAgentHosts(agentHosts.filter((_, idx) => idx !== i))}
+                  onClick={() =>
+                    setAgentHosts(agentHosts.filter((_, idx) => idx !== i))
+                  }
                   className={stepStyles.removeButton}
                 >
                   <MinusCircleIcon />
@@ -222,7 +246,9 @@ export const HubClusterStep: React.FC = () => {
       </Flex>
 
       <ExpandableSection
-        toggleText={certsOpen ? "Hide TLS certificates" : "TLS certificates (optional)"}
+        toggleText={
+          certsOpen ? "Hide TLS certificates" : "TLS certificates (optional)"
+        }
         isExpanded={certsOpen}
         onToggle={(_e, expanded) => setCertsOpen(expanded)}
         className={stepStyles.sectionTitle}

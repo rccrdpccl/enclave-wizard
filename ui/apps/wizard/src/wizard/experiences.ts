@@ -62,7 +62,5 @@ export const EXPERIENCES: Experience[] = [
 export function getExperiencePlugins(experienceId: string): string[] {
   const exp = EXPERIENCES.find((e) => e.id === experienceId);
   if (!exp) return [];
-  return exp.plugins
-    .sort((a, b) => a.order - b.order)
-    .map((p) => p.name);
+  return exp.plugins.sort((a, b) => a.order - b.order).map((p) => p.name);
 }

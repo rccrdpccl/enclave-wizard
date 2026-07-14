@@ -1,261 +1,31 @@
-import {
-  Alert,
-  Button,
-  DescriptionList,
-  DescriptionListDescription,
-  DescriptionListGroup,
-  DescriptionListTerm,
-  EmptyState,
-  EmptyStateBody,
-  Spinner,
-  Split,
-  SplitItem,
-  Stack,
-  StackItem,
-  Title,
-} from "@patternfly/react-core";
-import { AnsiUp } from "ansi_up";
 import type React from "react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { TaskRun } from "@enclave-wizard-ui/api-client";
-import { useEnclaveApi } from "../../api/useEnclaveApi.ts";
-import { useTasksApi } from "../../api/useTasksApi.ts";
-import { useWizard } from "../WizardContext.tsx";
+import { useCallback } from "react";
+import { useDeployment } from "../../api/useDeployment.ts";
 import { buildFinalConfig } from "../buildFinalConfig.ts";
-import { usePolling } from "../../tasks/hooks/usePolling.ts";
-import { TaskStatusLabel } from "../../tasks/components/TaskStatusLabel.tsx";
-import { tasksStyles as styles } from "../../tasks/tasksStyles.ts";
-
-type DeployStatus = "idle" | "writing" | "deploying" | "error";
-
-function formatDuration(start?: Date | null, end?: Date | null): string {
-  if (!start) return "—";
-  const elapsed = (end ?? new Date()).getTime() - start.getTime();
-  const seconds = Math.floor(elapsed / 1000);
-  const minutes = Math.floor(seconds / 60);
-  const hours = Math.floor(minutes / 60);
-  if (hours > 0) return `${hours}h ${minutes % 60}m`;
-  if (minutes > 0) return `${minutes}m ${seconds % 60}s`;
-  return `${seconds}s`;
-}
+import { useWizard } from "../WizardContext.tsx";
+import { DeployIdle } from "./deploy/DeployIdle.tsx";
+import { DeployProgress } from "./deploy/DeployProgress.tsx";
+import { DeployWriting } from "./deploy/DeployWriting.tsx";
 
 export const DeployStep: React.FC = () => {
-  const { state } = useWizard();
-  const api = useEnclaveApi();
-  const tasksApi = useTasksApi();
-  const [status, setStatus] = useState<DeployStatus>("idle");
-  const [errorMessage, setErrorMessage] = useState("");
-  const [errorDetails, setErrorDetails] = useState<string[]>([]);
-  const [taskId, setTaskId] = useState<string | null>(null);
-  const [taskDone, setTaskDone] = useState(false);
+  const { state: wizardState } = useWizard();
+  const { state: deployment, start } = useDeployment();
 
-  const handleDeploy = useCallback(async () => {
-    setStatus("writing");
-    setErrorMessage("");
-    setErrorDetails([]);
-    try {
-      await api.writeConfig(buildFinalConfig(state));
-      setStatus("deploying");
-      const task = await tasksApi.startDeploy();
-      setTaskId(task.id);
-    } catch (err: unknown) {
-      setStatus("error");
-      const details: string[] = [];
-      if (err && typeof err === "object" && "response" in err) {
-        try {
-          const body = await (err as { response: Response }).response.json();
-          if (body.errors && Array.isArray(body.errors)) {
-            for (const e of body.errors) {
-              details.push(e.message ?? String(e));
-            }
-          } else if (body.detail) {
-            details.push(body.detail);
-          }
-        } catch {
-          // response not JSON
-        }
-      }
-      setErrorDetails(details);
-      setErrorMessage(
-        details.length > 0
-          ? "Configuration validation failed"
-          : err instanceof Error ? err.message : "Failed to start deployment",
-      );
-    }
-  }, [api, tasksApi, state]);
-
-  // Poll task status
-  const fetchTask = useCallback(
-    () => (taskId ? tasksApi.getTask(taskId) : Promise.resolve(null)),
-    [tasksApi, taskId],
+  const handleDeploy = useCallback(
+    () => start(buildFinalConfig(wizardState)),
+    [start, wizardState],
   );
-  const { data: task } = usePolling(fetchTask, 3000, !!taskId && !taskDone);
 
-  const isRunning = task?.status === "running";
-
-  useEffect(() => {
-    if (task != null && !isRunning) {
-      setTaskDone(true);
-    }
-  }, [task, isRunning]);
-
-  // Poll logs
-  const fetchLogs = useCallback(
-    () => (taskId ? tasksApi.getTaskLogs(taskId) : Promise.resolve("")),
-    [tasksApi, taskId],
-  );
-  const { data: logs } = usePolling(fetchLogs, 2000, !!taskId && !taskDone);
-
-  const ansiUp = useMemo(() => {
-    const instance = new AnsiUp();
-    instance.use_classes = false;
-    return instance;
-  }, []);
-
-  const logsHtml = useMemo(() => {
-    if (!logs) return "";
-    return ansiUp.ansi_to_html(logs);
-  }, [logs, ansiUp]);
-
-  const logsEndRef = useRef<HTMLDivElement>(null);
-  const [follow, setFollow] = useState(true);
-
-  useEffect(() => {
-    if (follow && isRunning && logsEndRef.current) {
-      logsEndRef.current.scrollIntoView({ behavior: "smooth" });
-    }
-  }, [logsHtml, follow, isRunning]);
-
-  if (status === "writing") {
-    return (
-      <EmptyState
-        variant="lg"
-        titleText="Writing configuration..."
-        headingLevel="h2"
-        icon={Spinner}
-      >
-        <EmptyStateBody>
-          Writing config files before starting deployment.
-        </EmptyStateBody>
-      </EmptyState>
-    );
+  if (deployment.phase === "writing") {
+    return <DeployWriting />;
   }
 
-  if (status === "idle" || (status === "error" && !taskId)) {
-    return (
-      <div>
-        <Title headingLevel="h2" size="xl">
-          Deploy
-        </Title>
-
-        {status === "error" && (
-          <Alert
-            variant="danger"
-            title={errorMessage}
-            isInline
-            style={{ margin: "1rem 0" }}
-          >
-            {errorDetails.length > 0 && (
-              <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>
-                {errorDetails.map((d, i) => (
-                  <li key={i}>{d}</li>
-                ))}
-              </ul>
-            )}
-          </Alert>
-        )}
-
-        <p style={{ margin: "1rem 0" }}>
-          Write the configuration and start a full deployment (all 7 phases).
-        </p>
-
-        <Button variant="primary" size="lg" onClick={handleDeploy}>
-          Deploy
-        </Button>
-      </div>
-    );
+  if (
+    deployment.phase === "idle" ||
+    (deployment.phase === "error" && !deployment.taskId)
+  ) {
+    return <DeployIdle error={deployment.error} onDeploy={handleDeploy} />;
   }
 
-  // Deploying — show task output
-  return (
-    <Stack hasGutter>
-      <StackItem>
-        <Title headingLevel="h2" size="xl">
-          Deployment
-        </Title>
-      </StackItem>
-
-      {task && (
-        <StackItem>
-          <DescriptionList isHorizontal isCompact>
-            <DescriptionListGroup>
-              <DescriptionListTerm>Status</DescriptionListTerm>
-              <DescriptionListDescription>
-                <TaskStatusLabel status={task.status} />
-              </DescriptionListDescription>
-            </DescriptionListGroup>
-            <DescriptionListGroup>
-              <DescriptionListTerm>Duration</DescriptionListTerm>
-              <DescriptionListDescription>
-                {formatDuration(task.startedAt, task.endedAt)}
-                {isRunning && (
-                  <Spinner size="sm" style={{ marginLeft: "0.5rem" }} />
-                )}
-              </DescriptionListDescription>
-            </DescriptionListGroup>
-            {task.exitCode != null && (
-              <DescriptionListGroup>
-                <DescriptionListTerm>Exit Code</DescriptionListTerm>
-                <DescriptionListDescription>
-                  {task.exitCode}
-                </DescriptionListDescription>
-              </DescriptionListGroup>
-            )}
-          </DescriptionList>
-        </StackItem>
-      )}
-
-      {task?.error && (
-        <StackItem>
-          <Alert variant="danger" title="Error" isInline>
-            {task.error}
-          </Alert>
-        </StackItem>
-      )}
-
-      <StackItem>
-        <Split hasGutter>
-          <SplitItem isFilled>
-            <Title headingLevel="h3" size="md">
-              Output
-            </Title>
-          </SplitItem>
-          {isRunning && (
-            <SplitItem>
-              <Button
-                variant="link"
-                isInline
-                onClick={() => setFollow((f) => !f)}
-              >
-                {follow ? "Unfollow" : "Follow"}
-              </Button>
-            </SplitItem>
-          )}
-        </Split>
-      </StackItem>
-
-      <StackItem>
-        <div className={styles.logsContainer}>
-          {logsHtml ? (
-            <div dangerouslySetInnerHTML={{ __html: logsHtml }} />
-          ) : isRunning ? (
-            "Waiting for output..."
-          ) : (
-            "No output available."
-          )}
-          <div ref={logsEndRef} />
-        </div>
-      </StackItem>
-    </Stack>
-  );
+  return <DeployProgress state={deployment} />;
 };

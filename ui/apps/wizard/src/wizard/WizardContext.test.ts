@@ -1,37 +1,72 @@
 import { describe, expect, it } from "vitest";
-import { initialWizardState, wizardReducer } from "./WizardContext.tsx";
+import {
+  configReducer,
+  initialConfigState,
+} from "./contexts/ConfigContext.tsx";
+import { EXPERIENCES } from "./experiences.ts";
+import { FLAVORS } from "./flavors.ts";
 
-describe("wizardReducer", () => {
-  it("sets the current step", () => {
-    const state = wizardReducer(initialWizardState, {
-      type: "SET_STEP",
-      step: 3,
-    });
-    expect(state.currentStep).toBe(3);
-  });
-
+describe("configReducer", () => {
   it("toggles a flavor on", () => {
-    const state = wizardReducer(initialWizardState, {
+    const state = configReducer(initialConfigState, {
       type: "TOGGLE_FLAVOR",
-      flavor: "cluster",
+      flavor: "caas",
+      experiences: EXPERIENCES,
+      flavors: FLAVORS,
     });
-    expect(state.selectedFlavors.has("cluster")).toBe(true);
+    expect(state.selectedFlavors.has("caas")).toBe(true);
   });
 
   it("toggles a flavor off", () => {
-    let state = wizardReducer(initialWizardState, {
+    let state = configReducer(initialConfigState, {
       type: "TOGGLE_FLAVOR",
-      flavor: "cluster",
+      flavor: "caas",
+      experiences: EXPERIENCES,
+      flavors: FLAVORS,
     });
-    state = wizardReducer(state, {
+    state = configReducer(state, {
       type: "TOGGLE_FLAVOR",
-      flavor: "cluster",
+      flavor: "caas",
+      experiences: EXPERIENCES,
+      flavors: FLAVORS,
     });
-    expect(state.selectedFlavors.has("cluster")).toBe(false);
+    expect(state.selectedFlavors.has("caas")).toBe(false);
+  });
+
+  it("sets enabled_plugins when toggling a flavor on", () => {
+    const state = configReducer(initialConfigState, {
+      type: "TOGGLE_FLAVOR",
+      flavor: "caas",
+      experiences: EXPERIENCES,
+      flavors: FLAVORS,
+    });
+    const plugins = (state.configData.global as Record<string, unknown>)
+      ?.enabled_plugins as string[];
+    expect(plugins).toContain("osac");
+    expect(plugins).toContain("aap");
+    expect(plugins).toContain("trust-manager");
+  });
+
+  it("sets osacProfile to development when multiple flavors selected", () => {
+    let state = configReducer(initialConfigState, {
+      type: "TOGGLE_FLAVOR",
+      flavor: "caas",
+      experiences: EXPERIENCES,
+      flavors: FLAVORS,
+    });
+    state = configReducer(state, {
+      type: "TOGGLE_FLAVOR",
+      flavor: "vmaas",
+      experiences: EXPERIENCES,
+      flavors: FLAVORS,
+    });
+    const profile = (state.configData.global as Record<string, unknown>)
+      ?.osacProfile;
+    expect(profile).toBe("development");
   });
 
   it("sets a top-level config field via dot path", () => {
-    const state = wizardReducer(initialWizardState, {
+    const state = configReducer(initialConfigState, {
       type: "SET_FIELD",
       path: "global.baseDomain",
       value: "enclave.example.com",
@@ -40,23 +75,24 @@ describe("wizardReducer", () => {
   });
 
   it("sets a nested config field via dot path", () => {
-    const state = wizardReducer(initialWizardState, {
+    const state = configReducer(initialConfigState, {
       type: "SET_FIELD",
       path: "global.quayBackendRGWConfiguration.hostname",
       value: "rgw.example.com",
     });
-    expect(state.configData.global?.quayBackendRGWConfiguration?.hostname).toBe(
-      "rgw.example.com",
-    );
+    expect(
+      (state.configData.global as Record<string, unknown>)
+        ?.quayBackendRGWConfiguration,
+    ).toEqual({ hostname: "rgw.example.com" });
   });
 
   it("preserves existing fields when setting a new one", () => {
-    let state = wizardReducer(initialWizardState, {
+    let state = configReducer(initialConfigState, {
       type: "SET_FIELD",
       path: "global.baseDomain",
       value: "example.com",
     });
-    state = wizardReducer(state, {
+    state = configReducer(state, {
       type: "SET_FIELD",
       path: "global.clusterName",
       value: "mgmt",
@@ -71,19 +107,10 @@ describe("wizardReducer", () => {
       certificates: {},
       cloudInfra: { discovery_hosts: [] },
     };
-    const state = wizardReducer(initialWizardState, {
+    const state = configReducer(initialConfigState, {
       type: "LOAD_CONFIG",
       config: config as never,
     });
     expect(state.configData.global?.baseDomain).toBe("test.com");
-  });
-
-  it("sets validation errors", () => {
-    const errors = [{ field: "global.baseDomain", message: "Required" }];
-    const state = wizardReducer(initialWizardState, {
-      type: "SET_VALIDATION_ERRORS",
-      errors,
-    });
-    expect(state.validationErrors).toEqual(errors);
   });
 });

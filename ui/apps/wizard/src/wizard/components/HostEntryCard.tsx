@@ -34,10 +34,7 @@ const MAC_RE = /^([0-9A-Fa-f]{2}:){5}[0-9A-Fa-f]{2}$/;
 const IP_RE =
   /^((25[0-5]|2[0-4]\d|[01]?\d\d?)\.){3}(25[0-5]|2[0-4]\d|[01]?\d\d?)$/;
 
-function validateField(
-  value: string,
-  pattern?: RegExp,
-): "default" | "error" {
+function validateField(value: string, pattern?: RegExp): "default" | "error" {
   if (!value) return "default";
   if (pattern && !pattern.test(value)) return "error";
   return "default";
@@ -161,8 +158,8 @@ export const HostEntryCard: React.FC<HostEntryCardProps> = ({
               <FormHelperText>
                 <HelperText>
                   <HelperTextItem>
-                    Block device path for OS installation (e.g.
-                    /dev/sda, /dev/disk/by-path/...)
+                    Block device path for OS installation (e.g. /dev/sda,
+                    /dev/disk/by-path/...)
                   </HelperTextItem>
                 </HelperText>
               </FormHelperText>
