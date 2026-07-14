@@ -1,23 +1,17 @@
 import type React from "react";
 import { createContext, useContext, useState } from "react";
 import type { Experience } from "../experiences.ts";
-
-export interface PluginInfo {
-  name: string;
-  [key: string]: unknown;
-}
+import type { FlavorDefinition } from "../flavors.ts";
 
 export interface CatalogState {
-  schema: unknown | null;
-  plugins: PluginInfo[];
   experiences: Experience[];
+  flavors: FlavorDefinition[];
   loading: boolean;
 }
 
-const initialCatalogState: CatalogState = {
-  schema: null,
-  plugins: [],
+const INITIAL_CATALOG: CatalogState = {
   experiences: [],
+  flavors: [],
   loading: true,
 };
 
@@ -31,7 +25,7 @@ const CatalogContext = createContext<CatalogContextValue | null>(null);
 export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
-  const [state, setState] = useState<CatalogState>(initialCatalogState);
+  const [state, setState] = useState<CatalogState>(INITIAL_CATALOG);
   return (
     <CatalogContext.Provider value={{ state, setState }}>
       {children}
@@ -39,10 +33,12 @@ export const CatalogProvider: React.FC<{ children: React.ReactNode }> = ({
   );
 };
 
-export function useCatalog(): CatalogContextValue {
+export function useCatalog(): CatalogState & {
+  setState: React.Dispatch<React.SetStateAction<CatalogState>>;
+} {
   const context = useContext(CatalogContext);
   if (context === null) {
     throw new Error("useCatalog must be used within a CatalogProvider.");
   }
-  return context;
+  return { ...context.state, setState: context.setState };
 }

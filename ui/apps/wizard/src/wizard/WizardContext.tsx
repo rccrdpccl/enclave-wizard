@@ -1,41 +1,19 @@
-/**
- * Backward-compatibility shim.
- *
- * All new code should import from contexts/ConfigContext, contexts/WizardNavContext,
- * or contexts/CatalogContext directly. This module re-exports the combined
- * WizardState / WizardAction / useWizard() interfaces so existing step components
- * keep compiling during the incremental migration.
- */
 import type React from "react";
-import { useMemo } from "react";
-import { CatalogProvider, useCatalog } from "./contexts/CatalogContext.tsx";
-import {
-  type ConfigData,
-  ConfigProvider,
-  configReducer,
-  initialConfigState,
-  setNestedField,
-  useConfig,
-} from "./contexts/ConfigContext.tsx";
-import {
-  useWizardNav,
-  WizardNavProvider,
-} from "./contexts/WizardNavContext.tsx";
-import { EXPERIENCES } from "./experiences.ts";
-import type { FlavorId } from "./flavors.ts";
-import { FLAVORS } from "./flavors.ts";
-
-// Re-export for buildFinalConfig and tests
-export type { ConfigData };
+import { createContext, useContext, useReducer } from "react";
+import { FLAVORS, getFlavorPlugins, type FlavorId } from "./flavors.ts";
+import type { Experience } from "./experiences.ts";
 
 export interface ValidationError {
   field: string;
   message: string;
 }
 
-/**
- * Legacy combined state. Step components that still call useWizard() see this shape.
- */
+interface ConfigData {
+  global?: Record<string, unknown>;
+  certificates?: Record<string, unknown>;
+  cloudInfra?: Record<string, unknown>;
+}
+
 export interface WizardState {
   currentStep: number;
   selectedFlavors: Set<FlavorId>;
@@ -48,7 +26,7 @@ export interface WizardState {
 
 export type WizardAction =
   | { type: "SET_STEP"; step: number }
-  | { type: "TOGGLE_FLAVOR"; flavor: FlavorId }
+  | { type: "TOGGLE_FLAVOR"; flavor: FlavorId; experiences?: Experience[] }
   | { type: "SET_FIELD"; path: string; value: unknown }
   | { type: "SET_SCHEMA"; schema: unknown }
   | { type: "SET_PLUGINS"; plugins: unknown[] }
@@ -66,96 +44,110 @@ export const initialWizardState: WizardState = {
   plugins: [],
 };
 
-// Re-export the config reducer internals used by tests
-export { configReducer as wizardReducer, initialConfigState, setNestedField };
+function setNestedField(
+  obj: Record<string, unknown>,
+  keys: string[],
+  value: unknown,
+): Record<string, unknown> {
+  if (keys.length === 0) return obj;
+  if (keys.length === 1) {
+    return { ...obj, [keys[0]]: value };
+  }
+  const [head, ...rest] = keys;
+  const child = (obj[head] as Record<string, unknown>) ?? {};
+  return { ...obj, [head]: setNestedField({ ...child }, rest, value) };
+}
+
+function toggleFlavor(flavors: Set<FlavorId>, id: FlavorId): Set<FlavorId> {
+  const next = new Set(flavors);
+  if (next.has(id)) {
+    next.delete(id);
+  } else {
+    next.add(id);
+  }
+  return next;
+}
+
+export function wizardReducer(
+  state: WizardState,
+  action: WizardAction,
+): WizardState {
+  switch (action.type) {
+    case "SET_STEP":
+      return { ...state, currentStep: action.step };
+    case "TOGGLE_FLAVOR": {
+      const nextFlavors = toggleFlavor(state.selectedFlavors, action.flavor);
+      const allPlugins = new Set(
+        ((state.configData as Record<string, unknown>).global as Record<string, unknown> | undefined)
+          ?.enabled_plugins as string[] ?? [],
+      );
+      for (const f of FLAVORS) {
+        for (const p of getFlavorPlugins(f, action.experiences)) {
+          if (nextFlavors.has(f.id)) allPlugins.add(p);
+          else allPlugins.delete(p);
+        }
+      }
+      const selected = FLAVORS.filter((f) => nextFlavors.has(f.id));
+      let osacProfile = "";
+      if (selected.length > 1) osacProfile = "development";
+      else if (selected.length === 1) osacProfile = selected[0].osacProfile;
+
+      let updated = setNestedField(
+        { ...state.configData } as Record<string, unknown>,
+        ["global", "enabled_plugins"],
+        [...allPlugins],
+      );
+      if (osacProfile) {
+        updated = setNestedField(updated, ["global", "osacProfile"], osacProfile);
+      }
+      return { ...state, selectedFlavors: nextFlavors, configData: updated as ConfigData };
+    }
+    case "SET_FIELD": {
+      const keys = action.path.split(".");
+      const configData = setNestedField(
+        { ...state.configData } as Record<string, unknown>,
+        keys,
+        action.value,
+      ) as ConfigData;
+      return { ...state, configData };
+    }
+    case "SET_SCHEMA":
+      return { ...state, schema: action.schema };
+    case "SET_PLUGINS":
+      return { ...state, plugins: action.plugins };
+    case "SET_VALIDATION_ERRORS":
+      return { ...state, validationErrors: action.errors };
+    case "SET_SHOW_VALIDATION":
+      return { ...state, showValidation: action.show };
+    case "LOAD_CONFIG":
+      return { ...state, configData: action.config };
+    default:
+      return state;
+  }
+}
 
 interface WizardContextValue {
   state: WizardState;
   dispatch: React.Dispatch<WizardAction>;
 }
 
-/**
- * Composite provider that wraps all three new context providers.
- */
+const WizardContext = createContext<WizardContextValue | null>(null);
+
 export const WizardProvider: React.FC<{ children: React.ReactNode }> = ({
   children,
 }) => {
+  const [state, dispatch] = useReducer(wizardReducer, initialWizardState);
   return (
-    <CatalogProvider>
-      <ConfigProvider>
-        <WizardNavProvider>{children}</WizardNavProvider>
-      </ConfigProvider>
-    </CatalogProvider>
+    <WizardContext.Provider value={{ state, dispatch }}>
+      {children}
+    </WizardContext.Provider>
   );
 };
 
-/**
- * Legacy hook: assembles state from the three contexts and returns a
- * dispatch function that routes actions to the appropriate context.
- */
 export function useWizard(): WizardContextValue {
-  const { state: config, dispatch: configDispatch } = useConfig();
-  const { state: nav, dispatch: navDispatch } = useWizardNav();
-  const { state: catalog, setState: setCatalog } = useCatalog();
-
-  const state: WizardState = useMemo(
-    () => ({
-      currentStep: nav.currentStep,
-      selectedFlavors: config.selectedFlavors as Set<FlavorId>,
-      configData: config.configData,
-      validationErrors: nav.validationErrors as ValidationError[],
-      showValidation: nav.showValidation,
-      schema: catalog.schema,
-      plugins: catalog.plugins,
-    }),
-    [config, nav, catalog],
-  );
-
-  const dispatch = useMemo(() => {
-    return (action: WizardAction) => {
-      switch (action.type) {
-        case "SET_STEP":
-          navDispatch(action);
-          break;
-        case "TOGGLE_FLAVOR":
-          configDispatch({
-            type: "TOGGLE_FLAVOR",
-            flavor: action.flavor,
-            experiences: EXPERIENCES,
-            flavors: FLAVORS,
-          });
-          break;
-        case "SET_FIELD":
-          configDispatch(action);
-          break;
-        case "SET_SCHEMA":
-          setCatalog((prev) => ({ ...prev, schema: action.schema }));
-          break;
-        case "SET_PLUGINS":
-          setCatalog((prev) => ({
-            ...prev,
-            plugins: action.plugins as Array<{ name: string }>,
-          }));
-          break;
-        case "SET_VALIDATION_ERRORS":
-          navDispatch({
-            type: "SET_VALIDATION_ERRORS",
-            errors: action.errors.map((e) => ({
-              path: e.field ?? "",
-              label: "",
-              message: e.message,
-            })),
-          });
-          break;
-        case "SET_SHOW_VALIDATION":
-          navDispatch(action);
-          break;
-        case "LOAD_CONFIG":
-          configDispatch(action);
-          break;
-      }
-    };
-  }, [configDispatch, navDispatch, setCatalog]);
-
-  return { state, dispatch };
+  const context = useContext(WizardContext);
+  if (context === null) {
+    throw new Error("useWizard must be used within a WizardProvider.");
+  }
+  return context;
 }
