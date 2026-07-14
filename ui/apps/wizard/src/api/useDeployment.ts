@@ -1,20 +1,14 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import { usePolling } from "../tasks/hooks/usePolling.ts";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { EnclaveConfig, TaskRun } from "@enclave-wizard-ui/api-client";
 import { useEnclaveApi } from "./useEnclaveApi.ts";
-import { type SSEEvent, useSSE } from "./useSSE.ts";
 import { useTasksApi } from "./useTasksApi.ts";
-
-export interface DeploymentProgress {
-  percentage: number;
-  currentTask: string;
-}
 
 export interface DeploymentError {
   message: string;
   details: string[];
 }
 
-export type DeploymentPhase =
+export type DeployPhase =
   | "idle"
   | "writing"
   | "deploying"
@@ -23,251 +17,300 @@ export type DeploymentPhase =
   | "error";
 
 export interface DeploymentState {
-  phase: DeploymentPhase;
-  progress: DeploymentProgress | null;
-  logs: string;
-  startTime: Date | null;
-  error: DeploymentError | null;
+  phase: DeployPhase;
+  deploymentId: string | null;
   taskId: string | null;
+  task: TaskRun | null;
+  logs: string;
+  error: DeploymentError | null;
 }
 
 export interface UseDeploymentReturn {
   state: DeploymentState;
-  start: (config: unknown) => Promise<void>;
+  start: (config: EnclaveConfig) => Promise<void>;
+  cancel: () => Promise<void>;
 }
 
 const INITIAL_STATE: DeploymentState = {
   phase: "idle",
-  progress: null,
-  logs: "",
-  startTime: null,
-  error: null,
+  deploymentId: null,
   taskId: null,
+  task: null,
+  logs: "",
+  error: null,
 };
 
-function stripAnsi(text: string): string {
-  // biome-ignore lint/suspicious/noControlCharactersInRegex: ANSI escape codes are control characters by definition
-  return text.replace(/\x1b\[[0-9;]*m/g, "").replace(/\r/g, "");
+/** Try a fetch; return the Response on success, null on 404. Throws on other errors. */
+async function fetchWithFallback(
+  url: string,
+  init?: RequestInit,
+): Promise<Response | null> {
+  const resp = await fetch(url, init);
+  if (resp.status === 404) return null;
+  if (!resp.ok) {
+    const text = await resp.text().catch(() => "");
+    throw new Error(`${resp.status}: ${text}`);
+  }
+  return resp;
+}
+
+async function extractErrorDetails(err: unknown): Promise<DeploymentError> {
+  const details: string[] = [];
+  if (err && typeof err === "object" && "response" in err) {
+    try {
+      const body = await (err as { response: Response }).response.json();
+      if (body.errors && Array.isArray(body.errors)) {
+        for (const e of body.errors) {
+          details.push(e.message ?? String(e));
+        }
+      } else if (body.detail) {
+        details.push(body.detail);
+      }
+    } catch {
+      // response not JSON
+    }
+  }
+  return {
+    message:
+      details.length > 0
+        ? "Configuration validation failed"
+        : err instanceof Error
+          ? err.message
+          : "Failed to start deployment",
+    details,
+  };
 }
 
 export function useDeployment(): UseDeploymentReturn {
   const api = useEnclaveApi();
   const tasksApi = useTasksApi();
   const [state, setState] = useState<DeploymentState>(INITIAL_STATE);
-  const [useSSETransport, setUseSSETransport] = useState(true);
-  const [sseFailed, setSseFailed] = useState(false);
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const mountedRef = useRef(true);
 
-  // --- SSE transport ---
-  const sseUrl =
-    state.taskId && useSSETransport && !sseFailed
-      ? `/api/v1/tasks/${state.taskId}/stream`
-      : null;
-
-  const handleSSEEvent = useCallback((event: SSEEvent) => {
-    try {
-      const data = JSON.parse(event.data);
-      switch (event.type) {
-        case "status":
-          setState((prev) => ({
-            ...prev,
-            phase: data.phase ?? data.status ?? prev.phase,
-          }));
-          break;
-        case "progress":
-          setState((prev) => ({
-            ...prev,
-            progress: {
-              percentage: data.percentage ?? 0,
-              currentTask: data.currentTask ?? "",
-            },
-          }));
-          break;
-        case "log":
-          setState((prev) => ({
-            ...prev,
-            logs: prev.logs + stripAnsi(data.line ?? data.message ?? ""),
-          }));
-          break;
-        case "done":
-          setState((prev) => ({
-            ...prev,
-            phase: data.status === "failed" ? "failed" : "complete",
-            progress: prev.progress
-              ? { ...prev.progress, percentage: 100 }
-              : { percentage: 100, currentTask: "" },
-          }));
-          break;
-      }
-    } catch {
-      // Ignore JSON parse errors
-    }
-  }, []);
-
-  const handleSSEError = useCallback(() => {
-    // If SSE fails, fall back to polling
-    setSseFailed(true);
-    setUseSSETransport(false);
-  }, []);
-
-  useSSE(sseUrl, {
-    onEvent: handleSSEEvent,
-    onError: handleSSEError,
-  });
-
-  // --- Polling transport (fallback) ---
-  const pollingEnabled =
-    !!state.taskId && sseFailed && state.phase === "deploying";
-
-  const fetchTask = useCallback(
-    () =>
-      state.taskId ? tasksApi.getTask(state.taskId) : Promise.resolve(null),
-    [tasksApi, state.taskId],
-  );
-
-  const fetchProgress = useCallback(async () => {
-    try {
-      const res = await fetch("/api/v1/deployment/progress");
-      if (!res.ok) return null;
-      return res.json();
-    } catch {
-      return null;
-    }
-  }, []);
-
-  const fetchLogs = useCallback(
-    () =>
-      state.taskId ? tasksApi.getTaskLogs(state.taskId) : Promise.resolve(""),
-    [tasksApi, state.taskId],
-  );
-
-  const { data: polledTask } = usePolling(fetchTask, 3000, pollingEnabled);
-  const { data: polledProgress } = usePolling(
-    fetchProgress,
-    3000,
-    pollingEnabled,
-  );
-  const { data: polledLogs } = usePolling(fetchLogs, 2000, pollingEnabled);
-
-  // Apply polled data to state
-  const prevPolledTaskRef = useRef(polledTask);
+  // Cleanup on unmount
   useEffect(() => {
-    if (!pollingEnabled || polledTask === prevPolledTaskRef.current) return;
-    prevPolledTaskRef.current = polledTask;
-    if (!polledTask) return;
-
-    const isRunning = polledTask.status === "running";
-    if (!isRunning) {
-      setState((prev) => ({
-        ...prev,
-        phase: polledTask.status === "failed" ? "failed" : "complete",
-      }));
-    }
-  }, [polledTask, pollingEnabled]);
-
-  useEffect(() => {
-    if (!pollingEnabled || !polledProgress) return;
-    setState((prev) => ({
-      ...prev,
-      progress: {
-        percentage: polledProgress.percentage ?? 0,
-        currentTask: polledProgress.currentTask ?? "",
-      },
-    }));
-  }, [polledProgress, pollingEnabled]);
-
-  useEffect(() => {
-    if (!pollingEnabled || polledLogs === null || polledLogs === undefined)
-      return;
-    setState((prev) => ({
-      ...prev,
-      logs: stripAnsi(polledLogs),
-    }));
-  }, [polledLogs, pollingEnabled]);
-
-  // --- Mount reconnection ---
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const res = await fetch("/api/v1/deployment");
-        if (!res.ok || cancelled) return;
-        const dep = await res.json();
-        if (cancelled) return;
-        if (dep.status !== "running" && dep.status !== "pending") return;
-        if (!dep.id) return;
-        setState((prev) => ({
-          ...prev,
-          taskId: dep.id,
-          startTime: new Date(),
-          phase: "deploying",
-        }));
-      } catch {
-        /* no deployment */
-      }
-    })();
+    mountedRef.current = true;
     return () => {
-      cancelled = true;
+      mountedRef.current = false;
+      if (pollRef.current) clearInterval(pollRef.current);
     };
   }, []);
 
-  // --- Start deployment ---
+  const stopPolling = useCallback(() => {
+    if (pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+  }, []);
+
+  const pollDeployment = useCallback(
+    (deploymentId: string | null, taskId: string) => {
+      stopPolling();
+
+      const tick = async () => {
+        if (!mountedRef.current) return;
+
+        try {
+          // Try new progress endpoint first, fall back to task status
+          let task: TaskRun | null = null;
+          if (deploymentId) {
+            const resp = await fetchWithFallback(
+              `/api/v1/deployments/${deploymentId}/progress`,
+            );
+            if (resp) {
+              task = await resp.json();
+            }
+          }
+
+          if (!task) {
+            task = await tasksApi.getTask(taskId);
+          }
+
+          // Fetch logs
+          let logs = "";
+          try {
+            logs = await tasksApi.getTaskLogs(taskId);
+          } catch {
+            // logs may not be available yet
+          }
+
+          if (!mountedRef.current) return;
+
+          const isRunning = task.status === "running";
+          const isFailed = task.status === "failed" || task.status === "error";
+          const phase: DeployPhase = isRunning
+            ? "deploying"
+            : isFailed
+              ? "failed"
+              : "complete";
+
+          setState((prev) => ({
+            ...prev,
+            phase,
+            task,
+            logs,
+            error: task?.error
+              ? { message: task.error, details: [] }
+              : prev.error,
+          }));
+
+          if (!isRunning) {
+            stopPolling();
+          }
+        } catch {
+          // Polling errors are transient; keep trying
+        }
+      };
+
+      tick();
+      pollRef.current = setInterval(tick, 3000);
+    },
+    [tasksApi, stopPolling],
+  );
+
   const start = useCallback(
-    async (config: unknown) => {
+    async (config: EnclaveConfig) => {
       setState({
         ...INITIAL_STATE,
         phase: "writing",
       });
-      setSseFailed(false);
-      setUseSSETransport(true);
 
       try {
-        await api.writeConfig(config as Parameters<typeof api.writeConfig>[0]);
+        // Write config
+        await api.writeConfig(config);
+
+        if (!mountedRef.current) return;
+        setState((prev) => ({ ...prev, phase: "deploying" }));
+
+        // Try new deployment endpoint first
+        let deploymentId: string | null = null;
+        let taskId: string | null = null;
+
+        const resp = await fetchWithFallback("/api/v1/deployments", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({}),
+        });
+
+        if (resp) {
+          const body = await resp.json();
+          deploymentId = body.id ?? null;
+          taskId = body.taskId ?? body.id ?? null;
+        }
+
+        // Fall back to old endpoint
+        if (!taskId) {
+          const task = await tasksApi.startDeploy();
+          taskId = task.id;
+        }
+
+        if (!mountedRef.current) return;
         setState((prev) => ({
           ...prev,
-          phase: "deploying",
-          startTime: new Date(),
+          deploymentId,
+          taskId,
         }));
 
-        const run = await tasksApi.startDeploy();
+        pollDeployment(deploymentId, taskId);
+      } catch (err: unknown) {
+        if (!mountedRef.current) return;
+        const error = await extractErrorDetails(err);
         setState((prev) => ({
           ...prev,
-          taskId: run.id,
-        }));
-      } catch (err: unknown) {
-        const details: string[] = [];
-        const resp =
-          err && typeof err === "object" && "response" in err
-            ? (err as { response: Response }).response
-            : null;
-        if (resp) {
-          try {
-            const body = await resp.json();
-            if (body.errors && Array.isArray(body.errors)) {
-              for (const e of body.errors) {
-                details.push(e.message ?? String(e));
-              }
-            } else if (body.detail) {
-              details.push(body.detail);
-            }
-          } catch {
-            /* response not JSON */
-          }
-        }
-        const message =
-          details.length > 0
-            ? "Configuration validation failed"
-            : err instanceof Error
-              ? err.message
-              : "Failed to start deployment";
-        setState({
-          ...INITIAL_STATE,
           phase: "error",
-          error: { message, details },
-        });
+          error,
+        }));
       }
     },
-    [api, tasksApi],
+    [api, tasksApi, pollDeployment],
   );
 
-  return { state, start };
+  const cancel = useCallback(async () => {
+    const { deploymentId, taskId } = state;
+    stopPolling();
+
+    try {
+      if (deploymentId) {
+        const resp = await fetchWithFallback(
+          `/api/v1/deployments/${deploymentId}`,
+          { method: "DELETE" },
+        );
+        if (resp) {
+          setState(INITIAL_STATE);
+          return;
+        }
+      }
+
+      // Fall back: delete the task via old API
+      if (taskId) {
+        await tasksApi.deleteTask(taskId);
+      }
+
+      setState(INITIAL_STATE);
+    } catch (err: unknown) {
+      setState((prev) => ({
+        ...prev,
+        phase: "error",
+        error: {
+          message:
+            err instanceof Error ? err.message : "Failed to cancel deployment",
+          details: [],
+        },
+      }));
+    }
+  }, [state, tasksApi, stopPolling]);
+
+  // Reconnect to an in-progress deployment on mount
+  useEffect(() => {
+    const reconnect = async () => {
+      try {
+        // Try new endpoint first
+        const resp = await fetchWithFallback("/api/v1/deployments/current");
+        if (resp) {
+          const body = await resp.json();
+          const deploymentId = body.id ?? null;
+          const taskId = body.taskId ?? body.id ?? null;
+          if (taskId) {
+            setState((prev) => ({
+              ...prev,
+              phase: "deploying",
+              deploymentId,
+              taskId,
+            }));
+            pollDeployment(deploymentId, taskId);
+          }
+          return;
+        }
+      } catch {
+        // New endpoint not available
+      }
+
+      // Fall back: check old deployment endpoint
+      try {
+        const resp = await fetch("/api/v1/deployment");
+        if (resp.ok) {
+          const body = await resp.json();
+          if (body.taskId && body.status === "running") {
+            setState((prev) => ({
+              ...prev,
+              phase: "deploying",
+              taskId: body.taskId,
+            }));
+            pollDeployment(null, body.taskId);
+          }
+        }
+      } catch {
+        // No active deployment
+      }
+    };
+
+    reconnect();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return useMemo(
+    () => ({ state, start, cancel }),
+    [state, start, cancel],
+  );
 }

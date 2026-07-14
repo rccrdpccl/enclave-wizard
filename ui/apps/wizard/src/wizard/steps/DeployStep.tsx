@@ -1,12 +1,12 @@
 import {
   Alert,
   Button,
+  DescriptionList,
+  DescriptionListDescription,
+  DescriptionListGroup,
+  DescriptionListTerm,
   EmptyState,
   EmptyStateBody,
-  ExpandableSection,
-  Progress,
-  ProgressMeasureLocation,
-  ProgressVariant,
   Spinner,
   Split,
   SplitItem,
@@ -14,16 +14,18 @@ import {
   StackItem,
   Title,
 } from "@patternfly/react-core";
+import { AnsiUp } from "ansi_up";
 import type React from "react";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useDeployment } from "../../api/useDeployment.ts";
-import { tasksStyles as styles } from "../../tasks/tasksStyles.ts";
-import { buildFinalConfig } from "../buildFinalConfig.ts";
 import { useWizard } from "../WizardContext.tsx";
+import { buildFinalConfig } from "../buildFinalConfig.ts";
+import { TaskStatusLabel } from "../../tasks/components/TaskStatusLabel.tsx";
+import { tasksStyles as styles } from "../../tasks/tasksStyles.ts";
 
-function formatDuration(start?: Date | null): string {
+function formatDuration(start?: Date | null, end?: Date | null): string {
   if (!start) return "—";
-  const elapsed = Date.now() - start.getTime();
+  const elapsed = (end ?? new Date()).getTime() - start.getTime();
   const seconds = Math.floor(elapsed / 1000);
   const minutes = Math.floor(seconds / 60);
   const hours = Math.floor(minutes / 60);
@@ -34,36 +36,33 @@ function formatDuration(start?: Date | null): string {
 
 export const DeployStep: React.FC = () => {
   const { state: wizardState } = useWizard();
-  const { state: deployment, start } = useDeployment();
+  const { state: deployment, start, cancel } = useDeployment();
 
-  const handleDeploy = async () => {
-    await start(buildFinalConfig(wizardState));
-  };
+  const handleDeploy = useCallback(() => {
+    start(buildFinalConfig(wizardState));
+  }, [start, wizardState]);
 
-  const isRunning = deployment.phase === "deploying";
-  const isComplete =
-    deployment.phase === "complete" || deployment.phase === "failed";
-  const isFailed = deployment.phase === "failed";
+  const ansiUp = useMemo(() => {
+    const instance = new AnsiUp();
+    instance.use_classes = false;
+    return instance;
+  }, []);
+
+  const logsHtml = useMemo(() => {
+    if (!deployment.logs) return "";
+    return ansiUp.ansi_to_html(deployment.logs);
+  }, [deployment.logs, ansiUp]);
 
   const logsEndRef = useRef<HTMLDivElement>(null);
   const [follow, setFollow] = useState(true);
-  const [logsOpen, setLogsOpen] = useState(false);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: deployment.logs triggers scroll-to-bottom
+  const isRunning = deployment.phase === "deploying";
+
   useEffect(() => {
     if (follow && isRunning && logsEndRef.current) {
       logsEndRef.current.scrollIntoView({ behavior: "smooth" });
     }
-  }, [deployment.logs, follow, isRunning]);
-
-  // Duration ticker
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    if (isComplete) return;
-    if (!deployment.taskId) return;
-    const id = setInterval(() => setTick((t) => t + 1), 1000);
-    return () => clearInterval(id);
-  }, [isComplete, deployment.taskId]);
+  }, [logsHtml, follow, isRunning]);
 
   if (deployment.phase === "writing") {
     return (
@@ -80,12 +79,16 @@ export const DeployStep: React.FC = () => {
     );
   }
 
-  if (deployment.phase === "idle" || deployment.phase === "error") {
+  if (
+    deployment.phase === "idle" ||
+    (deployment.phase === "error" && !deployment.taskId)
+  ) {
     return (
       <div>
         <Title headingLevel="h2" size="xl">
           Deploy
         </Title>
+
         {deployment.phase === "error" && deployment.error && (
           <Alert
             variant="danger"
@@ -95,16 +98,18 @@ export const DeployStep: React.FC = () => {
           >
             {deployment.error.details.length > 0 && (
               <ul style={{ margin: 0, paddingLeft: "1.25rem" }}>
-                {deployment.error.details.map((d) => (
-                  <li key={d}>{d}</li>
+                {deployment.error.details.map((d, i) => (
+                  <li key={i}>{d}</li>
                 ))}
               </ul>
             )}
           </Alert>
         )}
+
         <p style={{ margin: "1rem 0" }}>
-          Write the configuration and start a full deployment.
+          Write the configuration and start a full deployment (all 7 phases).
         </p>
+
         <Button variant="primary" size="lg" onClick={handleDeploy}>
           Deploy
         </Button>
@@ -112,109 +117,100 @@ export const DeployStep: React.FC = () => {
     );
   }
 
-  // Deploying / complete / failed
-  const progressVariant = isFailed
-    ? ProgressVariant.danger
-    : isComplete
-      ? ProgressVariant.success
-      : undefined;
+  // Deploying / complete / failed — show task output
+  const task = deployment.task;
 
   return (
     <Stack hasGutter>
       <StackItem>
+        <Title headingLevel="h2" size="xl">
+          Deployment
+        </Title>
+      </StackItem>
+
+      {task && (
+        <StackItem>
+          <DescriptionList isHorizontal isCompact>
+            <DescriptionListGroup>
+              <DescriptionListTerm>Status</DescriptionListTerm>
+              <DescriptionListDescription>
+                <TaskStatusLabel status={task.status} />
+              </DescriptionListDescription>
+            </DescriptionListGroup>
+            <DescriptionListGroup>
+              <DescriptionListTerm>Duration</DescriptionListTerm>
+              <DescriptionListDescription>
+                {formatDuration(task.startedAt, task.endedAt)}
+                {isRunning && (
+                  <Spinner size="sm" style={{ marginLeft: "0.5rem" }} />
+                )}
+              </DescriptionListDescription>
+            </DescriptionListGroup>
+            {task.exitCode != null && (
+              <DescriptionListGroup>
+                <DescriptionListTerm>Exit Code</DescriptionListTerm>
+                <DescriptionListDescription>
+                  {task.exitCode}
+                </DescriptionListDescription>
+              </DescriptionListGroup>
+            )}
+          </DescriptionList>
+        </StackItem>
+      )}
+
+      {deployment.error && (
+        <StackItem>
+          <Alert variant="danger" title="Error" isInline>
+            {deployment.error.message}
+          </Alert>
+        </StackItem>
+      )}
+
+      <StackItem>
         <Split hasGutter>
           <SplitItem isFilled>
-            <Title headingLevel="h2" size="xl">
-              Deployment
+            <Title headingLevel="h3" size="md">
+              Output
             </Title>
           </SplitItem>
-          <SplitItem>
-            <span
-              style={{
-                color: "var(--pf-t--global--text--color--subtle)",
-                fontSize: "0.875rem",
-              }}
-            >
-              {formatDuration(deployment.startTime)}
-              {isRunning && (
-                <Spinner size="sm" style={{ marginLeft: "0.5rem" }} />
-              )}
-            </span>
-          </SplitItem>
+          {isRunning && (
+            <>
+              <SplitItem>
+                <Button
+                  variant="link"
+                  isInline
+                  onClick={() => setFollow((f) => !f)}
+                >
+                  {follow ? "Unfollow" : "Follow"}
+                </Button>
+              </SplitItem>
+              <SplitItem>
+                <Button
+                  variant="danger"
+                  isInline
+                  onClick={cancel}
+                  data-testid="cancel-deploy"
+                >
+                  Cancel
+                </Button>
+              </SplitItem>
+            </>
+          )}
         </Split>
       </StackItem>
 
       <StackItem>
-        <Progress
-          value={isComplete ? 100 : (deployment.progress?.percentage ?? 0)}
-          title={
-            deployment.progress?.currentTask || (isRunning ? "Starting..." : "")
-          }
-          measureLocation={ProgressMeasureLocation.top}
-          variant={progressVariant}
-        />
+        <div className={styles.logsContainer}>
+          {logsHtml ? (
+            <div dangerouslySetInnerHTML={{ __html: logsHtml }} />
+          ) : isRunning ? (
+            "Waiting for output..."
+          ) : (
+            "No output available."
+          )}
+          <div ref={logsEndRef} />
+        </div>
       </StackItem>
-
-      {/* Logs */}
-      <StackItem>
-        <ExpandableSection
-          toggleText={logsOpen ? "Hide output" : "Show output"}
-          isExpanded={logsOpen}
-          onToggle={(_e, expanded) => setLogsOpen(expanded)}
-        >
-          <Stack hasGutter>
-            <StackItem>
-              {isRunning && (
-                <div style={{ textAlign: "right", marginBottom: "0.5rem" }}>
-                  <Button
-                    variant="link"
-                    isInline
-                    onClick={() => setFollow((f) => !f)}
-                  >
-                    {follow ? "Unfollow" : "Follow"}
-                  </Button>
-                </div>
-              )}
-              <div className={styles.logsContainer}>
-                {deployment.logs ? (
-                  <pre
-                    style={{
-                      margin: 0,
-                      whiteSpace: "pre-wrap",
-                      wordBreak: "break-word",
-                    }}
-                  >
-                    {deployment.logs}
-                  </pre>
-                ) : isRunning ? (
-                  "Waiting for output..."
-                ) : (
-                  "No output available."
-                )}
-                <div ref={logsEndRef} />
-              </div>
-            </StackItem>
-          </Stack>
-        </ExpandableSection>
-      </StackItem>
-
-      {isComplete && !isFailed && (
-        <StackItem>
-          <Alert
-            variant="success"
-            title="Deployment completed successfully"
-            isInline
-          />
-        </StackItem>
-      )}
-
-      {isFailed && (
-        <StackItem>
-          <Alert variant="danger" title="Deployment failed" isInline>
-            Check the output above for details.
-          </Alert>
-        </StackItem>
-      )}
     </Stack>
   );
 };
