@@ -1,16 +1,8 @@
 export const STEP_REQUIRED_FIELDS: Record<string, string[]> = {
-  "landing-zone": [
-    "global.lzBmcIP",
-  ],
-  "storage": [
-    "global.storage_plugin",
-  ],
-  "aap": [
-    "global.aapDefaults.aapLicenseFile",
-  ],
-  "osac": [
-    "global.osacAapLicenseFile",
-  ],
+  "landing-zone": ["global.lzBmcIP"],
+  storage: ["global.storage_plugin"],
+  aap: ["global.aapDefaults.aapLicenseFile"],
+  osac: ["global.osacAapLicenseFile"],
   "hub-cluster": [
     "global.baseDomain",
     "global.clusterName",

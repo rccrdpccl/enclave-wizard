@@ -1,3 +1,4 @@
+import { css } from "@emotion/css";
 import {
   Alert,
   Button,
@@ -8,8 +9,8 @@ import {
   TextInput,
   Title,
 } from "@patternfly/react-core";
-import { css } from "@emotion/css";
-import React, { useEffect, useState } from "react";
+import type React from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { RedHatLogo } from "../common/components/RedHatLogo.tsx";
 import { useAuth } from "./AuthContext.tsx";

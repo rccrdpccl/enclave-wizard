@@ -1,3 +1,4 @@
+import { css } from "@emotion/css";
 import {
   Button,
   Content,
@@ -6,9 +7,8 @@ import {
   FlexItem,
   Title,
 } from "@patternfly/react-core";
-import { css } from "@emotion/css";
-import React from "react";
 import type { ReactNode } from "react";
+import React from "react";
 import { RedHatLogo } from "../../common/components/RedHatLogo.tsx";
 import {
   BootstrapGlyph,
@@ -31,12 +31,9 @@ const highlights: Highlight[] = [
       "Image distribution and infrastructure setup, fully automated.",
   },
   {
-    icon: (
-      <DisconnectedGlyph style={{ width: "2.25rem", height: "2.25rem" }} />
-    ),
+    icon: <DisconnectedGlyph style={{ width: "2.25rem", height: "2.25rem" }} />,
     title: "Fully Disconnected",
-    description:
-      "Air-gapped by design for sovereign and secure environments.",
+    description: "Air-gapped by design for sovereign and secure environments.",
   },
   {
     icon: <ShieldGlyph style={{ width: "2.25rem", height: "2.25rem" }} />,

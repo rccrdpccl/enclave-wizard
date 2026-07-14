@@ -1,14 +1,5 @@
-import {
-  Content,
-  Flex,
-  FlexItem,
-  Title,
-} from "@patternfly/react-core";
-import {
-  ClusterIcon,
-  CubesIcon,
-  ServerIcon,
-} from "@patternfly/react-icons";
+import { Content, Flex, FlexItem, Title } from "@patternfly/react-core";
+import { ClusterIcon, CubesIcon, ServerIcon } from "@patternfly/react-icons";
 import type React from "react";
 import type { ReactNode } from "react";
 import { FlavorCard } from "../components/FlavorCard.tsx";
@@ -38,7 +29,11 @@ export const SelectFlavorStep: React.FC = () => {
         </Content>
       </FlexItem>
       <FlexItem>
-        <Flex gap={{ default: "gapMd" }} flexWrap={{ default: "wrap" }} alignItems={{ default: "alignItemsStretch" }}>
+        <Flex
+          gap={{ default: "gapMd" }}
+          flexWrap={{ default: "wrap" }}
+          alignItems={{ default: "alignItemsStretch" }}
+        >
           {FLAVORS.map((flavor) => (
             <FlexItem key={flavor.id} style={{ minWidth: 240, flex: "1 1 0" }}>
               <FlavorCard

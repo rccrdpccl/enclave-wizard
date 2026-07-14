@@ -1,10 +1,10 @@
-import { useInjection } from "@enclave-wizard-ui/ioc";
 import type {
-  TasksApiInterface,
   ListTasksOutputBody,
-  TaskRun,
   TaskEventsOutputBody,
+  TaskRun,
+  TasksApiInterface,
 } from "@enclave-wizard-ui/api-client";
+import { useInjection } from "@enclave-wizard-ui/ioc";
 import { useCallback } from "react";
 import { Symbols } from "../main/Symbols.ts";
 
@@ -22,10 +22,7 @@ export interface TasksApiClient {
 export function useTasksApi(): TasksApiClient {
   const tasksApi = useInjection<TasksApiInterface>(Symbols.TasksApi);
 
-  const listTasks = useCallback(
-    () => tasksApi.listTasks(),
-    [tasksApi],
-  );
+  const listTasks = useCallback(() => tasksApi.listTasks(), [tasksApi]);
 
   const getTask = useCallback(
     (id: string) => tasksApi.getTask({ id }),
@@ -42,10 +39,7 @@ export function useTasksApi(): TasksApiClient {
     [tasksApi],
   );
 
-  const startDeploy = useCallback(
-    () => tasksApi.startDeploy(),
-    [tasksApi],
-  );
+  const startDeploy = useCallback(() => tasksApi.startDeploy(), [tasksApi]);
 
   const startDeployPhase = useCallback(
     (phase: number) => tasksApi.startDeployPhase({ phase }),

@@ -139,10 +139,7 @@ export function extractFieldMeta(
   };
 }
 
-function getValueByPath(
-  obj: Record<string, unknown>,
-  path: string,
-): unknown {
+function getValueByPath(obj: Record<string, unknown>, path: string): unknown {
   const keys = path.split(".");
   let current: unknown = obj;
   for (const key of keys) {
@@ -165,10 +162,7 @@ export interface StepValidationError {
   message: string;
 }
 
-function validateSingleField(
-  meta: FieldMeta,
-  value: unknown,
-): string | null {
+function validateSingleField(meta: FieldMeta, value: unknown): string | null {
   if (meta.required && isFieldEmpty(value)) {
     return `${meta.label} is required`;
   }
