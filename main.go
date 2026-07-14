@@ -65,12 +65,16 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store, opts
 	reader := config.NewReader(enclaveDir)
 	writer := config.NewWriter(enclaveDir)
 
-	loadedPlugins, err := plugins.LoadFromDir(enclaveDir)
+	loadResult, err := plugins.LoadFromDirWithSchemas(enclaveDir)
 	if err != nil {
 		slog.Warn("plugin discovery failed, using empty registry", "error", err)
+		loadResult = &plugins.LoadResult{Schemas: make(map[string][]byte)}
 	}
-	registry := plugins.NewRegistry(loadedPlugins)
-	slog.Info("plugins loaded", "count", len(loadedPlugins))
+	registry := plugins.NewRegistry(loadResult.Plugins)
+	for name, schema := range loadResult.Schemas {
+		registry.SetSchema(name, schema)
+	}
+	slog.Info("plugins loaded", "count", len(loadResult.Plugins), "schemas", len(loadResult.Schemas))
 
 	runner, err := initRunner(opts, enclaveDir)
 	if err != nil {
@@ -79,6 +83,7 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store, opts
 
 	if runner != nil {
 		api.NewTasksHandler(runner, registry, reader, writer, enclaveDir).Register(humaAPI)
+		api.NewDeployHandler(runner, registry, reader, writer, enclaveDir).Register(humaAPI)
 		api.NewStreamHandler(runner).Register(mux)
 	}
 
