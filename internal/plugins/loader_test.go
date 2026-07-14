@@ -170,6 +170,24 @@ order: 10
 	}
 }
 
+func TestLoadFromDirWithSchemas_EmptyYAMLSchema(t *testing.T) {
+	dir := t.TempDir()
+	writePlugin(t, dir, "emptyplugin", `---
+name: emptyplugin
+type: addon
+order: 100
+`)
+	writeSchema(t, dir, "emptyplugin", "config.yaml", "")
+
+	result, err := LoadFromDirWithSchemas(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, ok := result.Schemas["emptyplugin"]; ok {
+		t.Error("empty YAML schema file should not produce a schema entry")
+	}
+}
+
 func TestLoadFromDirWithSchemas_FromTestdata(t *testing.T) {
 	result, err := LoadFromDirWithSchemas("testdata")
 	if err != nil {

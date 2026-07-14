@@ -56,6 +56,9 @@ func TestStartDeployment_CreatesAndReturns(t *testing.T) {
 	json.NewDecoder(resp.Body).Decode(&got)
 	assertEqual(t, "id", "run-123", got.ID)
 	assertEqual(t, "status", models.TaskStatusRunning, got.Status)
+	if got.StartedAt.IsZero() {
+		t.Error("StartedAt should be set")
+	}
 	if len(got.Phases) != 1 {
 		t.Fatalf("expected 1 phase, got %d", len(got.Phases))
 	}

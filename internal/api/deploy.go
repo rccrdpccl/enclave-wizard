@@ -139,6 +139,7 @@ func (h *DeployHandler) startDeployment(_ context.Context, _ *struct{}) (*StartD
 		Status:     models.TaskStatusRunning,
 		Phases:     []models.DeploymentPhase{{Name: "main", TaskID: run.ID, Status: models.TaskStatusRunning}},
 		TotalTasks: 350,
+		StartedAt:  time.Now(),
 	}
 
 	h.mu.Lock()

@@ -104,6 +104,9 @@ func loadSchema(schemasDir string) []byte {
 	if yaml.Unmarshal(data, &parsed) != nil {
 		return nil
 	}
+	if parsed == nil {
+		return nil
+	}
 
 	jsonData, err := json.Marshal(parsed)
 	if err != nil {
