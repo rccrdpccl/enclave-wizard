@@ -151,6 +151,93 @@ describe("configReducer", () => {
         .enabled_plugins as string[];
       expect(plugins).toContain("cnv");
     });
+
+    it("keeps shared plugins when toggling off one of two flavors", () => {
+      let state = configReducer(initialConfigState, {
+        type: "TOGGLE_FLAVOR",
+        flavor: "caas",
+        experiences: EXPERIENCES,
+        flavors: FLAVORS,
+      });
+      state = configReducer(state, {
+        type: "TOGGLE_FLAVOR",
+        flavor: "vmaas",
+        experiences: EXPERIENCES,
+        flavors: FLAVORS,
+      });
+      // Toggle caas OFF — shared plugins should remain via vmaas
+      state = configReducer(state, {
+        type: "TOGGLE_FLAVOR",
+        flavor: "caas",
+        experiences: EXPERIENCES,
+        flavors: FLAVORS,
+      });
+      const plugins = (state.configData.global as Record<string, unknown>)
+        .enabled_plugins as string[];
+      expect(plugins).toContain("osac");
+      expect(plugins).toContain("aap");
+      expect(plugins).toContain("trust-manager");
+      expect(plugins).toContain("cnv");
+      expect(state.selectedFlavors.has("vmaas")).toBe(true);
+      expect(state.selectedFlavors.has("caas")).toBe(false);
+    });
+
+    it("clears osacProfile when all flavors are deselected", () => {
+      let state = configReducer(initialConfigState, {
+        type: "TOGGLE_FLAVOR",
+        flavor: "caas",
+        experiences: EXPERIENCES,
+        flavors: FLAVORS,
+      });
+      expect(
+        (state.configData.global as Record<string, unknown>).osacProfile,
+      ).toBe("caas");
+      state = configReducer(state, {
+        type: "TOGGLE_FLAVOR",
+        flavor: "caas",
+        experiences: EXPERIENCES,
+        flavors: FLAVORS,
+      });
+      expect(
+        (state.configData.global as Record<string, unknown>).osacProfile,
+      ).toBeUndefined();
+    });
+
+    it("clears flavor-managed plugins when all flavors are deselected", () => {
+      let state = configReducer(initialConfigState, {
+        type: "TOGGLE_FLAVOR",
+        flavor: "caas",
+        experiences: EXPERIENCES,
+        flavors: FLAVORS,
+      });
+      state = configReducer(state, {
+        type: "TOGGLE_FLAVOR",
+        flavor: "caas",
+        experiences: EXPERIENCES,
+        flavors: FLAVORS,
+      });
+      const plugins = (state.configData.global as Record<string, unknown>)
+        .enabled_plugins as string[];
+      expect(plugins).toEqual([]);
+    });
+
+    it("preserves non-flavor plugins when toggling flavors", () => {
+      let state = configReducer(initialConfigState, {
+        type: "SET_FIELD",
+        path: "global.enabled_plugins",
+        value: ["lvms"],
+      });
+      state = configReducer(state, {
+        type: "TOGGLE_FLAVOR",
+        flavor: "caas",
+        experiences: EXPERIENCES,
+        flavors: FLAVORS,
+      });
+      const plugins = (state.configData.global as Record<string, unknown>)
+        .enabled_plugins as string[];
+      expect(plugins).toContain("lvms");
+      expect(plugins).toContain("osac");
+    });
   });
 
   describe("LOAD_CONFIG", () => {

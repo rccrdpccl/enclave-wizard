@@ -1,14 +1,13 @@
-import { describe, expect, it } from "vitest";
-
-// The validation logic is extracted as a pure function for testing purposes.
-// We test the validation rules directly rather than through the hook,
-// since the hook just wraps useCallback around the same logic.
+import { renderHook } from "@testing-library/react";
+import type React from "react";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   validateFields,
   validateHostEntries,
 } from "../../schema/schemaUtils.ts";
 import { STEP_REQUIRED_FIELDS } from "../stepFields.ts";
+import { useStepValidation } from "./useStepValidation.ts";
 
 // Minimal schema structure that validates required fields
 const MOCK_SCHEMA = {
@@ -73,6 +72,22 @@ const MOCK_SCHEMA = {
   },
 };
 
+// Mock context hooks so useStepValidation can be called via renderHook
+let mockConfigState: Record<string, unknown> = {};
+let mockCatalogState: Record<string, unknown> = {};
+
+vi.mock("../contexts/ConfigContext.tsx", () => ({
+  useConfig: () => ({ state: mockConfigState }),
+}));
+
+vi.mock("../contexts/CatalogContext.tsx", () => ({
+  useCatalog: () => ({ state: mockCatalogState }),
+}));
+
+function renderValidation(subStepId: string) {
+  return renderHook(() => useStepValidation(subStepId));
+}
+
 describe("step validation rules", () => {
   describe("landing-zone required fields", () => {
     it("returns errors for missing required fields", () => {
@@ -105,7 +120,6 @@ describe("step validation rules", () => {
         (f) => f !== "global.agentHosts",
       );
       const errors = validateFields(MOCK_SCHEMA, fields, { global: {} });
-      // Should have errors for baseDomain, clusterName, machineNetwork, etc.
       expect(errors.length).toBeGreaterThanOrEqual(5);
     });
 
@@ -136,7 +150,6 @@ describe("step validation rules", () => {
     it("validates required host entry fields", () => {
       const hosts = [{ name: "", macAddress: "", ipAddress: "" }];
       const errors = validateHostEntries(MOCK_SCHEMA, hosts, "Node");
-      // Missing required fields should produce errors
       expect(errors.length).toBeGreaterThan(0);
     });
 
@@ -154,6 +167,139 @@ describe("step validation rules", () => {
       ];
       const errors = validateHostEntries(MOCK_SCHEMA, hosts, "Node");
       expect(errors).toHaveLength(0);
+    });
+  });
+});
+
+describe("useStepValidation custom rules", () => {
+  describe("hub-cluster 3-node check", () => {
+    it("requires exactly 3 control plane nodes", () => {
+      mockConfigState = { configData: { global: { agent_hosts: [] } } };
+      mockCatalogState = { schema: MOCK_SCHEMA };
+      const { result } = renderValidation("hub-cluster");
+      const errors = result.current();
+      expect(
+        errors.some((e) => e.message.includes("Exactly 3 control plane")),
+      ).toBe(true);
+    });
+
+    it("rejects 2 nodes", () => {
+      const twoHosts = [
+        { name: "cp-0", macAddress: "aa", ipAddress: "10.0.0.1", redfish: "r", redfishUser: "u", redfishPassword: "p", rootDisk: "/dev/sda" },
+        { name: "cp-1", macAddress: "bb", ipAddress: "10.0.0.2", redfish: "r", redfishUser: "u", redfishPassword: "p", rootDisk: "/dev/sda" },
+      ];
+      mockConfigState = { configData: { global: { agent_hosts: twoHosts } } };
+      mockCatalogState = { schema: MOCK_SCHEMA };
+      const { result } = renderValidation("hub-cluster");
+      const errors = result.current();
+      expect(errors.some((e) => e.path === "global.agentHosts")).toBe(true);
+    });
+  });
+
+  describe("storage ODF validation", () => {
+    it("requires ODF external config when backend is odf", () => {
+      mockConfigState = {
+        configData: { global: { storage_plugin: "odf", odfExternalConfig: "" } },
+      };
+      mockCatalogState = { schema: MOCK_SCHEMA };
+      const { result } = renderValidation("storage");
+      const errors = result.current();
+      expect(
+        errors.some((e) => e.path === "global.odfExternalConfig"),
+      ).toBe(true);
+    });
+  });
+
+  describe("storage VAST CSI validation", () => {
+    it("requires VAST fields when backend is vast-csi", () => {
+      mockConfigState = {
+        configData: { global: { storage_plugin: "vast-csi" } },
+      };
+      mockCatalogState = { schema: MOCK_SCHEMA };
+      const { result } = renderValidation("storage");
+      const errors = result.current();
+      expect(errors.some((e) => e.path === "global.vastEndpoint")).toBe(true);
+      expect(errors.some((e) => e.path === "global.vastAdminUsername")).toBe(true);
+      expect(errors.some((e) => e.path === "global.vastAdminPassword")).toBe(true);
+      expect(errors.some((e) => e.path === "global.vastVipPool")).toBe(true);
+    });
+
+    it("accepts valid VAST fields", () => {
+      mockConfigState = {
+        configData: {
+          global: {
+            storage_plugin: "vast-csi",
+            vastEndpoint: "https://vast.local",
+            vastAdminUsername: "admin",
+            vastAdminPassword: "secret",
+            vastVipPool: {
+              subnet_cidr: 24,
+              ip_ranges: [{ start: "10.0.0.1", end: "10.0.0.10" }],
+            },
+          },
+        },
+      };
+      mockCatalogState = { schema: MOCK_SCHEMA };
+      const { result } = renderValidation("storage");
+      const errors = result.current();
+      const vastErrors = errors.filter(
+        (e) => e.path.includes("vast") || e.path.includes("Vast"),
+      );
+      expect(vastErrors).toHaveLength(0);
+    });
+  });
+
+  describe("OSAC license validation", () => {
+    it("requires AAP subscription manifest for OSAC step", () => {
+      mockConfigState = { configData: { global: {} } };
+      mockCatalogState = { schema: MOCK_SCHEMA };
+      const { result } = renderValidation("osac");
+      const errors = result.current();
+      expect(
+        errors.some((e) => e.path === "global.osacAapLicenseFile"),
+      ).toBe(true);
+    });
+
+    it("passes when OSAC license is provided", () => {
+      mockConfigState = {
+        configData: { global: { osacAapLicenseFile: "/path/to/manifest.zip" } },
+      };
+      mockCatalogState = { schema: MOCK_SCHEMA };
+      const { result } = renderValidation("osac");
+      const errors = result.current();
+      const osacErrors = errors.filter((e) =>
+        e.path.includes("osacAapLicenseFile"),
+      );
+      expect(osacErrors).toHaveLength(0);
+    });
+  });
+
+  describe("AAP license validation", () => {
+    it("requires AAP subscription file for standalone AAP step", () => {
+      mockConfigState = { configData: { global: { aapDefaults: {} } } };
+      mockCatalogState = { schema: MOCK_SCHEMA };
+      const { result } = renderValidation("aap");
+      const errors = result.current();
+      expect(
+        errors.some((e) => e.path === "global.aapDefaults.aapLicenseFile"),
+      ).toBe(true);
+    });
+
+    it("passes when AAP license is provided", () => {
+      mockConfigState = {
+        configData: {
+          global: {
+            aapDefaults: { aapLicenseFile: "/uploads/manifest.zip" },
+          },
+        },
+      };
+      mockCatalogState = { schema: MOCK_SCHEMA };
+      const { result } = renderValidation("aap");
+      const errors = result.current();
+      const aapErrors = errors.filter((e) =>
+        e.path.includes("aapLicenseFile"),
+      );
+      expect(aapErrors).toHaveLength(0);
     });
   });
 });

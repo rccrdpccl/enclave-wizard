@@ -102,13 +102,11 @@ export function configReducer(
         ["global", "enabled_plugins"],
         [...allPlugins],
       );
-      if (osacProfile) {
-        updated = setNestedField(
-          updated,
-          ["global", "osacProfile"],
-          osacProfile,
-        );
-      }
+      updated = setNestedField(
+        updated,
+        ["global", "osacProfile"],
+        osacProfile || undefined,
+      );
       return {
         ...state,
         selectedFlavors: nextFlavors,

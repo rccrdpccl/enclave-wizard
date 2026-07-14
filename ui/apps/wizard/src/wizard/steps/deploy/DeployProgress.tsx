@@ -43,7 +43,7 @@ export const DeployProgress: React.FC<{
   useEffect(() => {
     if (!follow || !isRunning || !logsEndRef.current) return;
     logsEndRef.current.scrollIntoView({ behavior: "smooth" });
-  }, [follow, isRunning]);
+  }, [follow, isRunning, logsHtml]);
 
   return (
     <Stack hasGutter>
