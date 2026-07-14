@@ -8,13 +8,18 @@ import (
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
 )
 
-
 var (
 	ErrBusy      = errors.New("a task is already running")
 	ErrNotFound  = errors.New("run not found")
 	ErrRunnerBin = errors.New("ansible-runner binary not found in PATH")
 	ErrRunning   = errors.New("task is still running")
 )
+
+// Event represents an SSE event sent on a task stream.
+type Event struct {
+	Type string // "status", "progress", "log", "done"
+	Data string // JSON-encoded payload
+}
 
 type StartRequest struct {
 	Type      models.TaskType
@@ -32,6 +37,7 @@ type Runner interface {
 	List() ([]models.TaskRun, error)
 	Logs(id string) ([]byte, error)
 	Events(id string) ([]json.RawMessage, error)
+	Stream(id string) (<-chan Event, error)
 	Delete(id string) error
 	Shutdown(ctx context.Context) error
 	Recover() error

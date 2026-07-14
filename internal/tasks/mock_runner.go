@@ -159,6 +159,21 @@ func (mr *MockRunnerMockRecorder) Start(req any) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockRunner)(nil).Start), req)
 }
 
+// Stream mocks base method.
+func (m *MockRunner) Stream(id string) (<-chan Event, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "Stream", id)
+	ret0, _ := ret[0].(<-chan Event)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// Stream indicates an expected call of Stream.
+func (mr *MockRunnerMockRecorder) Stream(id any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Stream", reflect.TypeOf((*MockRunner)(nil).Stream), id)
+}
+
 func (m *MockRunner) RunSync(ctx context.Context, req StartRequest) (*models.TaskRun, []byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "RunSync", ctx, req)

@@ -346,6 +346,104 @@ func (r *AnsibleRunner) Events(id string) ([]json.RawMessage, error) {
 	return artifactEvents(r.artifactsDir, id)
 }
 
+// Stream returns a channel of SSE events for the given task run. For completed
+// tasks, all events are emitted immediately and the channel is closed. For
+// running tasks, events are polled until the task finishes.
+func (r *AnsibleRunner) Stream(id string) (<-chan Event, error) {
+	run, err := r.Get(id)
+	if err != nil {
+		return nil, err
+	}
+
+	ch := make(chan Event, 64)
+	go r.streamEvents(ch, run)
+	return ch, nil
+}
+
+func (r *AnsibleRunner) streamEvents(ch chan<- Event, run *models.TaskRun) {
+	defer close(ch)
+
+	emitJSON := func(eventType string, v any) {
+		data, err := json.Marshal(v)
+		if err != nil {
+			return
+		}
+		ch <- Event{Type: eventType, Data: string(data)}
+	}
+
+	// Emit initial status.
+	emitJSON("status", map[string]string{"status": string(run.Status)})
+
+	// For completed tasks, emit all events then done.
+	if run.Status != models.TaskStatusRunning {
+		r.emitCompletedEvents(ch, run, emitJSON)
+		return
+	}
+
+	// For running tasks, poll for new events until done.
+	var lastEventCount int
+	for {
+		events, _ := r.Events(run.ID)
+		for i := lastEventCount; i < len(events); i++ {
+			r.emitAnsibleEvent(ch, events[i], emitJSON)
+		}
+		lastEventCount = len(events)
+
+		updated, err := r.Get(run.ID)
+		if err != nil {
+			return
+		}
+		if updated.Status != models.TaskStatusRunning {
+			// Emit any final events we missed.
+			events, _ = r.Events(run.ID)
+			for i := lastEventCount; i < len(events); i++ {
+				r.emitAnsibleEvent(ch, events[i], emitJSON)
+			}
+			r.emitDone(ch, updated, emitJSON)
+			return
+		}
+
+		time.Sleep(500 * time.Millisecond)
+	}
+}
+
+func (r *AnsibleRunner) emitCompletedEvents(ch chan<- Event, run *models.TaskRun, emitJSON func(string, any)) {
+	events, _ := r.Events(run.ID)
+	for _, raw := range events {
+		r.emitAnsibleEvent(ch, raw, emitJSON)
+	}
+	r.emitDone(ch, run, emitJSON)
+}
+
+func (r *AnsibleRunner) emitAnsibleEvent(ch chan<- Event, raw json.RawMessage, emitJSON func(string, any)) {
+	var ev struct {
+		Event     string `json:"event"`
+		EventData struct {
+			Task string `json:"task"`
+		} `json:"event_data"`
+		Stdout string `json:"stdout"`
+	}
+	if json.Unmarshal(raw, &ev) != nil {
+		return
+	}
+
+	if ev.Stdout != "" {
+		emitJSON("log", map[string]string{"line": ev.Stdout})
+	}
+
+	if strings.HasPrefix(ev.Event, "runner_on_") && ev.EventData.Task != "" {
+		emitJSON("progress", map[string]string{"currentTask": ev.EventData.Task})
+	}
+}
+
+func (r *AnsibleRunner) emitDone(ch chan<- Event, run *models.TaskRun, emitJSON func(string, any)) {
+	done := map[string]any{"status": string(run.Status)}
+	if run.ExitCode != nil {
+		done["exitCode"] = *run.ExitCode
+	}
+	emitJSON("done", done)
+}
+
 func (r *AnsibleRunner) Delete(id string) error {
 	r.mu.Lock()
 	active := r.activeRun

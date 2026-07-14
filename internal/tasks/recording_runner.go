@@ -91,6 +91,10 @@ func (r *RecordingRunner) Events(id string) ([]json.RawMessage, error) {
 	return r.inner.Events(id)
 }
 
+func (r *RecordingRunner) Stream(id string) (<-chan Event, error) {
+	return r.inner.Stream(id)
+}
+
 func (r *RecordingRunner) Delete(id string) error {
 	return r.inner.Delete(id)
 }
