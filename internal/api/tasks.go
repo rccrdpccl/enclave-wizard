@@ -14,7 +14,7 @@ import (
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/config"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
-	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tasks"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/runner"
 )
 
 var phasePlaybooks = map[int]string{
@@ -28,15 +28,15 @@ var phasePlaybooks = map[int]string{
 }
 
 type TasksHandler struct {
-	runner       tasks.Runner
+	runner       runner.Runner
 	registry     *plugins.Registry
 	configReader *config.Reader
 	configWriter *config.Writer
 	enclaveDir   string
 }
 
-func NewTasksHandler(runner tasks.Runner, registry *plugins.Registry, configReader *config.Reader, configWriter *config.Writer, enclaveDir string) *TasksHandler {
-	return &TasksHandler{runner: runner, registry: registry, configReader: configReader, configWriter: configWriter, enclaveDir: enclaveDir}
+func NewTasksHandler(r runner.Runner, registry *plugins.Registry, configReader *config.Reader, configWriter *config.Writer, enclaveDir string) *TasksHandler {
+	return &TasksHandler{runner: r, registry: registry, configReader: configReader, configWriter: configWriter, enclaveDir: enclaveDir}
 }
 
 // --- Request / Response types ---
@@ -181,7 +181,7 @@ func (h *TasksHandler) Register(api huma.API) {
 func (h *TasksHandler) startDeploy(ctx context.Context, _ *StartDeployInput) (*StartTaskOutput, error) {
 	addonPlugins := h.addonPluginsFromConfig()
 
-	run, err := h.runner.Start(tasks.StartRequest{
+	run, err := h.runner.Start(runner.StartRequest{
 		Type:     models.TaskTypeDeploy,
 		Playbook: "playbooks/main.yaml",
 		ExtraVars: map[string]string{
@@ -249,7 +249,7 @@ func (h *TasksHandler) chainAddonPlugins(mainRunID string, pluginNames []string)
 			continue
 		}
 		if mainRun.Status != models.TaskStatusSuccessful {
-			slog.Warn("skipping addon plugins — main deploy did not succeed",
+			slog.Warn("skipping addon plugins -- main deploy did not succeed",
 				"run_id", mainRunID, "status", mainRun.Status)
 			return
 		}
@@ -260,7 +260,7 @@ func (h *TasksHandler) chainAddonPlugins(mainRunID string, pluginNames []string)
 
 	for _, name := range pluginNames {
 		slog.Info("deploying addon plugin", "plugin", name)
-		run, _, err := h.runner.RunSync(context.Background(), tasks.StartRequest{
+		run, _, err := h.runner.RunSync(context.Background(), runner.StartRequest{
 			Type:     models.TaskTypeDeployPlugin,
 			Playbook: "playbooks/deploy-plugin.yaml",
 			ExtraVars: map[string]string{
@@ -287,7 +287,7 @@ func (h *TasksHandler) startDeployPhase(ctx context.Context, input *StartDeployP
 	if !ok {
 		return nil, huma.Error400BadRequest(fmt.Sprintf("invalid phase: %d", input.Phase))
 	}
-	run, err := h.runner.Start(tasks.StartRequest{
+	run, err := h.runner.Start(runner.StartRequest{
 		Type:     models.TaskTypeDeployPhase,
 		Playbook: playbook,
 		ExtraVars: map[string]string{
@@ -304,7 +304,7 @@ func (h *TasksHandler) startDeployPlugin(ctx context.Context, input *StartDeploy
 	if _, ok := h.registry.Get(input.Name); !ok {
 		return nil, huma.Error404NotFound("unknown plugin: " + input.Name)
 	}
-	run, err := h.runner.Start(tasks.StartRequest{
+	run, err := h.runner.Start(runner.StartRequest{
 		Type:     models.TaskTypeDeployPlugin,
 		Playbook: "playbooks/deploy-plugin.yaml",
 		ExtraVars: map[string]string{
@@ -367,7 +367,7 @@ func (h *TasksHandler) deleteTask(_ context.Context, input *DeleteTaskInput) (*s
 type StartValidateInput struct{}
 
 func (h *TasksHandler) startValidate(ctx context.Context, _ *StartValidateInput) (*StartTaskOutput, error) {
-	run, err := h.runner.Start(tasks.StartRequest{
+	run, err := h.runner.Start(runner.StartRequest{
 		Type:     models.TaskTypeValidate,
 		Playbook: "validations.sh",
 	})
@@ -379,11 +379,11 @@ func (h *TasksHandler) startValidate(ctx context.Context, _ *StartValidateInput)
 
 func mapTaskError(err error) error {
 	switch {
-	case errors.Is(err, tasks.ErrBusy):
+	case errors.Is(err, runner.ErrBusy):
 		return huma.Error409Conflict("a task is already running")
-	case errors.Is(err, tasks.ErrRunning):
+	case errors.Is(err, runner.ErrRunning):
 		return huma.Error409Conflict("task is still running")
-	case errors.Is(err, tasks.ErrNotFound):
+	case errors.Is(err, runner.ErrNotFound):
 		return huma.Error404NotFound("run not found")
 	default:
 		return huma.Error500InternalServerError("task operation failed", err)

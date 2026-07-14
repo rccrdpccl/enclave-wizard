@@ -13,16 +13,16 @@ import (
 
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/config"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
-	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tasks"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/runner"
 )
 
 type Validator struct {
 	enclaveDir string
-	runner     tasks.Runner
+	runner     runner.Runner
 	available  bool
 }
 
-func NewValidator(enclaveDir string, runner tasks.Runner) *Validator {
+func NewValidator(enclaveDir string, runner runner.Runner) *Validator {
 	if runner == nil {
 		fmt.Println("WARNING: schema validation unavailable (task runner not available)")
 		return &Validator{enclaveDir: enclaveDir}
@@ -119,7 +119,7 @@ func (v *Validator) runPlaybook(ctx context.Context, cfg *models.EnclaveConfig, 
 		return []models.ValidationError{{Message: fmt.Sprintf("failed to write config: %v", err)}}
 	}
 
-	run, _, err := v.runner.RunSync(ctx, tasks.StartRequest{
+	run, _, err := v.runner.RunSync(ctx, runner.StartRequest{
 		Type:     models.TaskTypeValidate,
 		Playbook: playbook,
 		Tags:     tags,
