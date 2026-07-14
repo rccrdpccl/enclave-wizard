@@ -23,7 +23,7 @@ import (
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/config"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/logger"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
-	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tasks"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/runner"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/validation"
 )
 
@@ -47,7 +47,7 @@ type Options struct {
 	DevOptions
 }
 
-func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store, opts *Options) (huma.API, tasks.Runner, error) {
+func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store, opts *Options) (huma.API, runner.Runner, error) {
 	apiConfig := huma.DefaultConfig("Enclave Configuration Wizard", "0.1.0")
 	apiConfig.Info.Description = "API for managing Enclave deployment configuration files on the Landing Zone."
 
