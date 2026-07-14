@@ -7,7 +7,8 @@ import (
 	"log/slog"
 	"path/filepath"
 
-	"github.com/rh-ecosystem-edge/enclave-wizard/internal/runner"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tasks"
 )
 
 type DevOptions struct {
@@ -17,16 +18,24 @@ type DevOptions struct {
 	Speed          int  `help:"Demo replay speed factor (0=instant, 1=real-time, 10=10x faster)" default:"10"`
 }
 
-func applyRunnerMode(opts *Options, r runner.Runner, enclaveDir string) (runner.Runner, error) {
+func applyRunnerMode(opts *Options, runner tasks.Runner, enclaveDir string) (tasks.Runner, error) {
 	artifactsDir := filepath.Join(enclaveDir, "artifacts")
 	recordingsDir, _ := filepath.Abs("fixtures/recordings")
 
-	hasDemoTypes := opts.DemoDeploy || opts.DemoValidation
+	demoTypes := map[models.TaskType]bool{}
+	if opts.DemoDeploy {
+		demoTypes[models.TaskTypeDeploy] = true
+		demoTypes[models.TaskTypeDeployPhase] = true
+		demoTypes[models.TaskTypeDeployPlugin] = true
+	}
+	if opts.DemoValidation {
+		demoTypes[models.TaskTypeValidate] = true
+	}
 
-	if hasDemoTypes {
-		replay, err := runner.NewReplayRunner(enclaveDir, recordingsDir, float64(opts.Speed))
+	if len(demoTypes) > 0 {
+		r, err := tasks.NewDemoRunner(enclaveDir, recordingsDir, float64(opts.Speed), demoTypes)
 		if err != nil {
-			return nil, fmt.Errorf("replay runner init: %w", err)
+			return nil, fmt.Errorf("demo runner init: %w", err)
 		}
 		slog.Info("demo mode enabled",
 			"recordings", recordingsDir,
@@ -34,11 +43,11 @@ func applyRunnerMode(opts *Options, r runner.Runner, enclaveDir string) (runner.
 			"deploy", opts.DemoDeploy,
 			"validation", opts.DemoValidation,
 		)
-		return replay, nil
+		return r, nil
 	}
 
-	if r != nil && opts.Record {
-		rec, err := runner.NewRecordingRunner(r, artifactsDir, recordingsDir)
+	if runner != nil && opts.Record {
+		rec, err := tasks.NewRecordingRunner(runner, artifactsDir, recordingsDir)
 		if err != nil {
 			return nil, fmt.Errorf("recording runner init: %w", err)
 		}
@@ -46,5 +55,5 @@ func applyRunnerMode(opts *Options, r runner.Runner, enclaveDir string) (runner.
 		return rec, nil
 	}
 
-	return r, nil
+	return runner, nil
 }

@@ -1,9 +1,9 @@
-import { yaml } from "@codemirror/lang-yaml";
 import { EditorState } from "@codemirror/state";
-import { css } from "@emotion/css";
-import { basicSetup, EditorView } from "codemirror";
+import { EditorView, basicSetup } from "codemirror";
+import { yaml } from "@codemirror/lang-yaml";
 import type React from "react";
 import { useEffect, useRef } from "react";
+import { css } from "@emotion/css";
 
 const editorStyles = {
   container: css`

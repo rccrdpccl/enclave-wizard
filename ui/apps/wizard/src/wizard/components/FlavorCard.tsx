@@ -58,37 +58,22 @@ export const FlavorCard: React.FC<FlavorCardProps> = ({
             </FlexItem>
             <FlexItem>
               {isSelected ? (
-                <Label color="blue" icon={<CheckCircleIcon />}>
-                  Selected
-                </Label>
+                <Label color="blue" icon={<CheckCircleIcon />}>Selected</Label>
               ) : (
-                <Label color="grey" variant="outline">
-                  Click to select
-                </Label>
+                <Label color="grey" variant="outline">Click to select</Label>
               )}
             </FlexItem>
           </Flex>
           <FlexItem>
-            <Title headingLevel="h3" size="xl">
-              {title}
-            </Title>
+            <Title headingLevel="h3" size="xl">{title}</Title>
             {subtitle && (
-              <Content
-                component="p"
-                style={{
-                  fontSize: "0.875rem",
-                  color: "#6a6e73",
-                  marginTop: "0.25rem",
-                }}
-              >
+              <Content component="p" style={{ fontSize: "0.875rem", color: "#6a6e73", marginTop: "0.25rem" }}>
                 {subtitle}
               </Content>
             )}
           </FlexItem>
           <FlexItem>
-            <Content component="p" className={styles.description}>
-              {description}
-            </Content>
+            <Content component="p" className={styles.description}>{description}</Content>
           </FlexItem>
         </Flex>
       </CardBody>

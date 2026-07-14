@@ -13,21 +13,21 @@ describe("wizardReducer", () => {
   it("toggles a flavor on", () => {
     const state = wizardReducer(initialWizardState, {
       type: "TOGGLE_FLAVOR",
-      flavor: "caas",
+      flavor: "cluster",
     });
-    expect(state.selectedFlavors.has("caas")).toBe(true);
+    expect(state.selectedFlavors.has("cluster")).toBe(true);
   });
 
   it("toggles a flavor off", () => {
     let state = wizardReducer(initialWizardState, {
       type: "TOGGLE_FLAVOR",
-      flavor: "caas",
+      flavor: "cluster",
     });
     state = wizardReducer(state, {
       type: "TOGGLE_FLAVOR",
-      flavor: "caas",
+      flavor: "cluster",
     });
-    expect(state.selectedFlavors.has("caas")).toBe(false);
+    expect(state.selectedFlavors.has("cluster")).toBe(false);
   });
 
   it("sets a top-level config field via dot path", () => {

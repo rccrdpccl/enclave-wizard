@@ -1,10 +1,8 @@
 import type { EnclaveConfig } from "@enclave-wizard-ui/api-client";
 import { EnclaveConfigFromJSON } from "@enclave-wizard-ui/api-client";
-import type { ConfigData } from "./contexts/ConfigContext.tsx";
+import type { WizardState } from "./WizardContext.ts";
 
-export function buildFinalConfig(state: {
-  configData: ConfigData;
-}): EnclaveConfig {
+export function buildFinalConfig(state: WizardState): EnclaveConfig {
   const globalData = (state.configData.global ?? {}) as Record<string, unknown>;
 
   const raw = {
@@ -12,6 +10,7 @@ export function buildFinalConfig(state: {
     global: {
       ...globalData,
       workingDir: globalData.workingDir || "/home/enclave",
+      disconnected: false,
     },
     certificates: state.configData.certificates ?? {},
     cloudInfra: state.configData.cloudInfra ?? { discovery_hosts: [] },

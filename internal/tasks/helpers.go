@@ -1,8 +1,9 @@
-package runner
+package tasks
 
 import (
 	"crypto/rand"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -13,6 +14,8 @@ import (
 
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
 )
+
+var ErrNoRecording = errors.New("no recording found for this playbook/tags combination")
 
 func artifactGet(artifactsDir, id string) (*models.TaskRun, error) {
 	runDir := filepath.Join(artifactsDir, id)
@@ -115,16 +118,7 @@ func writeRunJSON(runDir string, run *models.TaskRun) error {
 	if err != nil {
 		return err
 	}
-	path := filepath.Join(runDir, "run.json")
-	tmpPath := path + ".tmp"
-	if err := os.WriteFile(tmpPath, data, 0640); err != nil {
-		return err
-	}
-	if err := os.Rename(tmpPath, path); err != nil {
-		os.Remove(tmpPath)
-		return err
-	}
-	return nil
+	return os.WriteFile(filepath.Join(runDir, "run.json"), data, 0640)
 }
 
 func readAnsibleRunnerStatus(runDir string) string {

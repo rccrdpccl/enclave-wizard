@@ -1,8 +1,8 @@
 import "@patternfly/react-core/dist/styles/base.css";
 
 import {
-  ConfigApi,
   Configuration,
+  ConfigApi,
   DefaultsApi,
   PluginsApi,
   TasksApi,

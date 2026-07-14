@@ -8,8 +8,8 @@ import {
 } from "@patternfly/react-core";
 import { MinusCircleIcon, PlusCircleIcon } from "@patternfly/react-icons";
 import type React from "react";
-import { type HostEntry, HostEntryCard } from "../components/HostEntryCard.tsx";
 import { useWizard } from "../WizardContext.tsx";
+import { HostEntryCard, type HostEntry } from "../components/HostEntryCard.tsx";
 import { stepStyles } from "./stepStyles.ts";
 
 const EMPTY_HOST: HostEntry = {
@@ -46,10 +46,10 @@ export const CaasStep: React.FC = () => {
         Bare Metal Hosts
       </Title>
       <Content component="p">
-        Register bare metal machines that form the resource pool for CaaS. The
-        platform draws from this pool when provisioning managed clusters. Each
-        machine is enrolled via its BMC (Redfish/IPMI) interface. You can add
-        machines later through the management interface.
+        Register bare metal machines that form the resource pool for CaaS.
+        The platform draws from this pool when provisioning managed clusters.
+        Each machine is enrolled via its BMC (Redfish/IPMI) interface.
+        You can add machines later through the management interface.
       </Content>
 
       <Flex
@@ -66,9 +66,7 @@ export const CaasStep: React.FC = () => {
           <Button
             variant="link"
             icon={<PlusCircleIcon />}
-            onClick={() =>
-              setDiscoveryHosts([...discoveryHosts, { ...EMPTY_HOST }])
-            }
+            onClick={() => setDiscoveryHosts([...discoveryHosts, { ...EMPTY_HOST }])}
           >
             Add host
           </Button>
@@ -77,22 +75,15 @@ export const CaasStep: React.FC = () => {
 
       {discoveryHosts.length === 0 && (
         <p className={stepStyles.emptyHint}>
-          No hosts registered yet. Click &quot;Add host&quot; to register bare
-          metal hosts, or skip this step to add them later.
+          No hosts registered yet. Click &quot;Add host&quot; to register
+          bare metal hosts, or skip this step to add them later.
         </p>
       )}
 
-      <Flex
-        direction={{ default: "column" }}
-        gap={{ default: "gapMd" }}
-        className={stepStyles.hostSection}
-      >
+      <Flex direction={{ default: "column" }} gap={{ default: "gapMd" }} className={stepStyles.hostSection}>
         {discoveryHosts.map((host, i) => (
           <FlexItem key={`discovery-${i}`}>
-            <Flex
-              alignItems={{ default: "alignItemsFlexStart" }}
-              gap={{ default: "gapSm" }}
-            >
+            <Flex alignItems={{ default: "alignItemsFlexStart" }} gap={{ default: "gapSm" }}>
               <FlexItem grow={{ default: "grow" }}>
                 <HostEntryCard
                   index={i}
@@ -110,9 +101,7 @@ export const CaasStep: React.FC = () => {
                   variant="plain"
                   aria-label={`Remove host ${i + 1}`}
                   onClick={() =>
-                    setDiscoveryHosts(
-                      discoveryHosts.filter((_, idx) => idx !== i),
-                    )
+                    setDiscoveryHosts(discoveryHosts.filter((_, idx) => idx !== i))
                   }
                   className={stepStyles.removeButton}
                 >

@@ -1,23 +1,22 @@
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import type { DeploymentState } from "../../api/useDeployment.ts";
+import { describe, expect, it, vi, beforeEach } from "vitest";
 import { DeployStep } from "./DeployStep.tsx";
 
-const mockStart = vi.fn();
-let mockDeploymentState: DeploymentState = {
-  phase: "idle",
-  progress: null,
-  logs: "",
-  startTime: null,
-  error: null,
-  taskId: null,
-};
+const mockWriteConfig = vi.fn();
+const mockStartDeploy = vi.fn();
+const mockGetTask = vi.fn();
+const mockGetTaskLogs = vi.fn();
 
-vi.mock("../../api/useDeployment.ts", () => ({
-  useDeployment: () => ({
-    state: mockDeploymentState,
-    start: mockStart,
+vi.mock("../../api/useEnclaveApi.ts", () => ({
+  useEnclaveApi: () => ({ writeConfig: mockWriteConfig }),
+}));
+
+vi.mock("../../api/useTasksApi.ts", () => ({
+  useTasksApi: () => ({
+    startDeploy: mockStartDeploy,
+    getTask: mockGetTask,
+    getTaskLogs: mockGetTaskLogs,
   }),
 }));
 
@@ -42,14 +41,9 @@ vi.mock("../buildFinalConfig.ts", () => ({
 describe("DeployStep", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    mockDeploymentState = {
-      phase: "idle",
-      progress: null,
-      logs: "",
-      startTime: null,
-      error: null,
-      taskId: null,
-    };
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(null, { status: 404 }),
+    );
     Element.prototype.scrollIntoView = vi.fn();
   });
 
@@ -58,103 +52,60 @@ describe("DeployStep", () => {
     expect(screen.getByRole("button", { name: "Deploy" })).toBeInTheDocument();
   });
 
-  it("calls start on deploy button click", async () => {
-    mockStart.mockResolvedValue(undefined);
+  it("calls writeConfig then startDeploy on click", async () => {
+    mockWriteConfig.mockResolvedValue(undefined);
+    mockStartDeploy.mockResolvedValue({ id: "run-1", status: "running" });
 
     render(<DeployStep />);
     await userEvent.click(screen.getByRole("button", { name: "Deploy" }));
 
-    expect(mockStart).toHaveBeenCalledTimes(1);
+    expect(mockWriteConfig).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(mockStartDeploy).toHaveBeenCalledTimes(1));
   });
 
-  it("shows writing state", () => {
-    mockDeploymentState = {
-      ...mockDeploymentState,
-      phase: "writing",
-    };
+  it("shows error page when startDeploy fails", async () => {
+    mockWriteConfig.mockResolvedValue(undefined);
+    mockStartDeploy.mockRejectedValue(new Error("deploy failed"));
 
     render(<DeployStep />);
-    expect(screen.getByText("Writing configuration...")).toBeInTheDocument();
-  });
+    await userEvent.click(screen.getByRole("button", { name: "Deploy" }));
 
-  it("shows error state with message", () => {
-    mockDeploymentState = {
-      ...mockDeploymentState,
-      phase: "error",
-      error: { message: "deploy failed", details: [] },
-    };
-
-    render(<DeployStep />);
-    expect(screen.getByText("deploy failed")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Deploy" })).toBeInTheDocument();
-  });
-
-  it("shows error state with validation details", () => {
-    mockDeploymentState = {
-      ...mockDeploymentState,
-      phase: "error",
-      error: {
-        message: "Configuration validation failed",
-        details: ["field X is required", "field Y is invalid"],
-      },
-    };
-
-    render(<DeployStep />);
-    expect(screen.getByText("field X is required")).toBeInTheDocument();
-    expect(screen.getByText("field Y is invalid")).toBeInTheDocument();
-  });
-
-  it("shows deploying state with progress", () => {
-    mockDeploymentState = {
-      ...mockDeploymentState,
-      phase: "deploying",
-      taskId: "task-1",
-      startTime: new Date(),
-      progress: { percentage: 42, currentTask: "Installing OSAC" },
-    };
-
-    render(<DeployStep />);
-    expect(screen.getByText("Deployment")).toBeInTheDocument();
-    expect(screen.getByText("Installing OSAC")).toBeInTheDocument();
-  });
-
-  it("shows success alert when complete", () => {
-    mockDeploymentState = {
-      ...mockDeploymentState,
-      phase: "complete",
-      taskId: "task-1",
-      progress: { percentage: 100, currentTask: "" },
-    };
-
-    render(<DeployStep />);
+    await waitFor(() =>
+      expect(screen.getByText("deploy failed")).toBeInTheDocument(),
+    );
     expect(
-      screen.getByText("Deployment completed successfully"),
+      screen.getByRole("button", { name: "Deploy" }),
     ).toBeInTheDocument();
   });
 
-  it("shows failure alert when failed", () => {
-    mockDeploymentState = {
-      ...mockDeploymentState,
-      phase: "failed",
-      taskId: "task-1",
-      progress: { percentage: 50, currentTask: "" },
-    };
+  it("shows error page when writeConfig fails", async () => {
+    mockWriteConfig.mockRejectedValue(new Error("write failed"));
 
     render(<DeployStep />);
-    expect(screen.getByText("Deployment failed")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Deploy" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("write failed")).toBeInTheDocument(),
+    );
+    expect(
+      screen.getByRole("button", { name: "Deploy" }),
+    ).toBeInTheDocument();
   });
 
-  it("renders logs when available", () => {
-    mockDeploymentState = {
-      ...mockDeploymentState,
-      phase: "deploying",
-      taskId: "task-1",
-      logs: "PLAY [Setup]\nTASK [install] ok",
-    };
+  it("enters deploying state and polls task logs", async () => {
+    mockWriteConfig.mockResolvedValue(undefined);
+    mockStartDeploy.mockResolvedValue({ id: "run-1", status: "running" });
+    mockGetTask.mockResolvedValue({ id: "run-1", status: "running" });
+    mockGetTaskLogs.mockResolvedValue("PLAY [Prepare] ***");
 
     render(<DeployStep />);
-    // Logs are inside expandable section, need to open it
-    const toggle = screen.getByText("Show output");
-    userEvent.click(toggle);
+    await userEvent.click(screen.getByRole("button", { name: "Deploy" }));
+
+    await waitFor(() =>
+      expect(screen.getByText("Deployment")).toBeInTheDocument(),
+    );
+    await waitFor(() =>
+      expect(mockGetTaskLogs).toHaveBeenCalledWith("run-1"),
+    );
   });
 });

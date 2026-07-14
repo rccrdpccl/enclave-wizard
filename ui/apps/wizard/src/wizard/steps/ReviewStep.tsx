@@ -1,6 +1,3 @@
-import { css } from "@emotion/css";
-import type { EnclaveConfig } from "@enclave-wizard-ui/api-client";
-import { EnclaveConfigToJSON } from "@enclave-wizard-ui/api-client";
 import {
   Alert,
   Button,
@@ -17,13 +14,16 @@ import {
   CopyIcon,
   DownloadIcon,
 } from "@patternfly/react-icons";
+import { css } from "@emotion/css";
 import jsYaml from "js-yaml";
 import type React from "react";
 import { useCallback, useMemo, useState } from "react";
+import type { EnclaveConfig } from "@enclave-wizard-ui/api-client";
+import { EnclaveConfigToJSON } from "@enclave-wizard-ui/api-client";
 import { useEnclaveApi } from "../../api/useEnclaveApi.ts";
+import { useWizard } from "../WizardContext.tsx";
 import { buildFinalConfig } from "../buildFinalConfig.ts";
 import { YamlEditor } from "../components/YamlEditor.tsx";
-import { useWizard } from "../WizardContext.tsx";
 
 const styles = {
   toolbar: css`
@@ -76,11 +76,7 @@ function extractPluginConfig(
   const result: Record<string, unknown> = {};
   let hasValue = false;
   for (const key of keys) {
-    if (
-      globalData[key] != null &&
-      globalData[key] !== "" &&
-      globalData[key] !== false
-    ) {
+    if (globalData[key] != null && globalData[key] !== "" && globalData[key] !== false) {
       result[key] = globalData[key];
       hasValue = true;
     }
@@ -99,10 +95,7 @@ function stripPluginKeys(
 }
 
 function configToYaml(data: unknown): string {
-  if (
-    data == null ||
-    (typeof data === "object" && Object.keys(data as object).length === 0)
-  ) {
+  if (data == null || (typeof data === "object" && Object.keys(data as object).length === 0)) {
     return "# (empty)\n";
   }
   try {
@@ -130,10 +123,7 @@ export const ReviewStep: React.FC = () => {
   const [copied, setCopied] = useState(false);
 
   const finalConfig = useMemo(() => buildFinalConfig(state), [state]);
-  const wireConfig = useMemo(
-    () => EnclaveConfigToJSON(finalConfig) as Record<string, unknown>,
-    [finalConfig],
-  );
+  const wireConfig = useMemo(() => EnclaveConfigToJSON(finalConfig) as Record<string, unknown>, [finalConfig]);
 
   const { configFiles, yamlContents } = useMemo(() => {
     const globalData = (wireConfig.global ?? {}) as Record<string, unknown>;
@@ -151,8 +141,7 @@ export const ReviewStep: React.FC = () => {
 
     const contents: Record<string, string> = {};
     for (const file of BASE_CONFIG_FILES) {
-      const data =
-        file.key === "global" ? strippedGlobal : wireConfig[file.path];
+      const data = file.key === "global" ? strippedGlobal : wireConfig[file.path];
       contents[file.key] = configToYaml(data);
     }
     if (osacPlugin) contents.osac = configToYaml(osacPlugin);
@@ -165,10 +154,7 @@ export const ReviewStep: React.FC = () => {
     (fileKey: string, yamlStr: string) => {
       const parsed = yamlToConfig(yamlStr);
       if (parsed === null) {
-        setParseErrors((prev) => ({
-          ...prev,
-          [fileKey]: "Invalid YAML syntax",
-        }));
+        setParseErrors((prev) => ({ ...prev, [fileKey]: "Invalid YAML syntax" }));
       } else {
         setParseErrors((prev) => {
           const next = { ...prev };
@@ -213,8 +199,7 @@ export const ReviewStep: React.FC = () => {
       if (errors.length === 0) {
         errors.push({
           field: "",
-          message:
-            err instanceof Error ? err.message : "Validation request failed",
+          message: err instanceof Error ? err.message : "Validation request failed",
         });
       }
       dispatch({ type: "SET_VALIDATION_ERRORS", errors });
@@ -225,9 +210,9 @@ export const ReviewStep: React.FC = () => {
   }, [api, finalConfig, dispatch]);
 
   const handleCopyAll = useCallback(() => {
-    const allYaml = configFiles
-      .map((f) => `# --- ${f.label} ---\n${yamlContents[f.key]}`)
-      .join("\n");
+    const allYaml = configFiles.map(
+      (f) => `# --- ${f.label} ---\n${yamlContents[f.key]}`,
+    ).join("\n");
     navigator.clipboard.writeText(allYaml);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -253,8 +238,8 @@ export const ReviewStep: React.FC = () => {
         Review & Edit Configuration
       </Title>
       <Content component="p" style={{ marginTop: "0.5rem" }}>
-        Review the generated YAML configuration. Edit directly in the editor if
-        needed.
+        Review the generated YAML configuration. Edit directly in the editor
+        if needed.
       </Content>
 
       <Flex className={styles.toolbar}>
@@ -348,7 +333,9 @@ export const ReviewStep: React.FC = () => {
           readOnly={activeTab === "osac" || activeTab === "rhbk"}
         />
         <div className={styles.statusBar}>
-          <span>{yamlContents[activeTab].split("\n").length} lines</span>
+          <span>
+            {yamlContents[activeTab].split("\n").length} lines
+          </span>
         </div>
       </div>
     </div>

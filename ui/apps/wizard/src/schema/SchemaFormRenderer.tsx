@@ -9,8 +9,8 @@ import {
 } from "@patternfly/react-core";
 import type React from "react";
 import { StringArrayField } from "../wizard/components/StringArrayField.tsx";
-import { stepStyles } from "../wizard/steps/stepStyles.ts";
 import { extractFieldMeta, type FieldMeta } from "./schemaUtils.ts";
+import { stepStyles } from "../wizard/steps/stepStyles.ts";
 
 const PLACEHOLDER_HINTS: Record<string, string> = {
   baseDomain: "example.com",
@@ -56,18 +56,13 @@ function getFieldValidationStatus(
   showValidation: boolean,
 ): "default" | "error" {
   if (!showValidation) return "default";
-  if (
-    meta.required &&
-    (value == null || (typeof value === "string" && value.trim() === ""))
-  ) {
+  if (meta.required && (value == null || (typeof value === "string" && value.trim() === ""))) {
     return "error";
   }
   if (typeof value === "string" && value.trim() !== "" && meta.pattern) {
     try {
       if (!new RegExp(meta.pattern).test(value)) return "error";
-    } catch {
-      /* skip */
-    }
+    } catch { /* skip */ }
   }
   if (typeof value === "number") {
     if (meta.minimum != null && value < meta.minimum) return "error";
@@ -127,8 +122,7 @@ function renderField(
   }
 
   if (meta.type === "integer") {
-    const numValue =
-      typeof value === "number" && value !== 0 ? value : undefined;
+    const numValue = typeof value === "number" && value !== 0 ? value : undefined;
     return (
       <FormGroup
         key={meta.path}
@@ -198,20 +192,12 @@ function renderField(
         validated={validated}
       />
       {validated === "error" && meta.required && isFieldEmpty(value) && (
-        <FormHelperText>
-          <span className={stepStyles.validationError}>
-            This field is required
-          </span>
-        </FormHelperText>
+        <FormHelperText><span className={stepStyles.validationError}>This field is required</span></FormHelperText>
       )}
       {validated === "error" && !isFieldEmpty(value) && meta.pattern && (
-        <FormHelperText>
-          <span className={stepStyles.validationError}>Invalid format</span>
-        </FormHelperText>
+        <FormHelperText><span className={stepStyles.validationError}>Invalid format</span></FormHelperText>
       )}
-      {validated !== "error" && meta.description && (
-        <FormHelperText>{meta.description}</FormHelperText>
-      )}
+      {validated !== "error" && meta.description && <FormHelperText>{meta.description}</FormHelperText>}
     </FormGroup>
   );
 }

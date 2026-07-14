@@ -55,9 +55,7 @@ export const router = createBrowserRouter([
     element: (
       <div style={{ padding: "2rem", textAlign: "center" }}>
         <h1>404 — Page not found</h1>
-        <p>
-          <Link to="/login">Go to login</Link>
-        </p>
+        <p><Link to="/login">Go to login</Link></p>
       </div>
     ),
   },

@@ -34,7 +34,10 @@ export const StringArrayField: React.FC<StringArrayFieldProps> = ({
   return (
     <FormGroup label={label} isRequired={isRequired} fieldId={`field-${label}`}>
       {values.map((value, index) => (
-        <div key={`${label}-${index}`} className={stepStyles.arrayItemRow}>
+        <div
+          key={`${label}-${index}`}
+          className={stepStyles.arrayItemRow}
+        >
           <TextInput
             id={`field-${label}-${index}`}
             value={value}

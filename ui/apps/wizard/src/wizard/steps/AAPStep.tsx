@@ -10,7 +10,7 @@ import {
 } from "@patternfly/react-core";
 import type React from "react";
 import { useState } from "react";
-import { useFileUpload } from "../../api/useFileUpload.ts";
+import { useAuth } from "../../auth/AuthContext.tsx";
 import { useWizard } from "../WizardContext.tsx";
 import { stepStyles } from "./stepStyles.ts";
 
@@ -26,15 +26,16 @@ function getValueByPath(obj: Record<string, unknown>, path: string): unknown {
 
 export const AAPStep: React.FC = () => {
   const { state, dispatch } = useWizard();
+  const { token } = useAuth();
   const [uploadFilename, setUploadFilename] = useState("");
-  const { upload, uploading, error: uploadError } = useFileUpload();
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState("");
 
   const onChange = (path: string, value: unknown) =>
     dispatch({ type: "SET_FIELD", path, value });
 
   const configData = state.configData as Record<string, unknown>;
-  const aapDefaults = (getValueByPath(configData, "global.aapDefaults") ??
-    {}) as Record<string, unknown>;
+  const aapDefaults = (getValueByPath(configData, "global.aapDefaults") ?? {}) as Record<string, unknown>;
   const savedPath = (aapDefaults.aapLicenseFile as string) ?? "";
 
   const setAAP = (field: string, value: unknown) =>
@@ -45,16 +46,35 @@ export const AAPStep: React.FC = () => {
     file: File,
   ) => {
     setUploadFilename(file.name);
+    setUploadError("");
+    setUploading(true);
+
+    const form = new FormData();
+    form.append("file", file);
+    form.append("dest", "plugins/aap");
+
     try {
-      const data = await upload(file, "plugins/aap");
+      const headers: Record<string, string> = {};
+      if (token) {
+        headers.Authorization = `Bearer ${token}`;
+      }
+      const resp = await fetch("/api/v1/files", { method: "POST", headers, body: form });
+      if (!resp.ok) {
+        const text = await resp.text();
+        throw new Error(text || `Upload failed (${resp.status})`);
+      }
+      const data = await resp.json();
       setAAP("aapLicenseFile", data.path);
-    } catch {
-      // error is tracked by useFileUpload
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(false);
     }
   };
 
   const handleClear = () => {
     setUploadFilename("");
+    setUploadError("");
     setAAP("aapLicenseFile", undefined);
   };
 
@@ -64,11 +84,7 @@ export const AAPStep: React.FC = () => {
         Ansible Automation Platform
       </Title>
 
-      <Title
-        headingLevel="h3"
-        size="lg"
-        className={stepStyles.firstSectionTitle}
-      >
+      <Title headingLevel="h3" size="lg" className={stepStyles.firstSectionTitle}>
         Subscription
       </Title>
 
@@ -81,10 +97,7 @@ export const AAPStep: React.FC = () => {
           id="aap-subscription-file"
           type="simple"
           browseButtonText="Upload"
-          filename={
-            uploadFilename ||
-            (savedPath ? (savedPath.split("/").pop() ?? "") : "")
-          }
+          filename={uploadFilename || (savedPath ? savedPath.split("/").pop() ?? "" : "")}
           isLoading={uploading}
           onFileInputChange={handleFileChange}
           onClearClick={handleClear}
@@ -151,11 +164,7 @@ export const AAPStep: React.FC = () => {
           value={(aapDefaults.aap_image_pull_policy as string) ?? ""}
           onChange={(_e, v) => setAAP("aap_image_pull_policy", v || undefined)}
         >
-          <FormSelectOption
-            value=""
-            label="Default (IfNotPresent)"
-            isPlaceholder
-          />
+          <FormSelectOption value="" label="Default (IfNotPresent)" isPlaceholder />
           <FormSelectOption value="Always" label="Always" />
           <FormSelectOption value="IfNotPresent" label="IfNotPresent" />
           <FormSelectOption value="Never" label="Never" />
@@ -169,11 +178,7 @@ export const AAPStep: React.FC = () => {
           value={(aapDefaults.aap_redis_mode as string) ?? ""}
           onChange={(_e, v) => setAAP("aap_redis_mode", v || undefined)}
         >
-          <FormSelectOption
-            value=""
-            label="Default (standalone)"
-            isPlaceholder
-          />
+          <FormSelectOption value="" label="Default (standalone)" isPlaceholder />
           <FormSelectOption value="standalone" label="Standalone" />
           <FormSelectOption value="cluster" label="Cluster" />
         </FormSelect>
@@ -184,9 +189,7 @@ export const AAPStep: React.FC = () => {
           id="aap-tls-termination"
           aria-label="Route TLS termination"
           value={(aapDefaults.aap_route_tls_termination as string) ?? ""}
-          onChange={(_e, v) =>
-            setAAP("aap_route_tls_termination", v || undefined)
-          }
+          onChange={(_e, v) => setAAP("aap_route_tls_termination", v || undefined)}
         >
           <FormSelectOption value="" label="Default (Edge)" isPlaceholder />
           <FormSelectOption value="Edge" label="Edge" />

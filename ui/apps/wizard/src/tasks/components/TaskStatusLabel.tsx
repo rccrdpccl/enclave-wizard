@@ -1,8 +1,8 @@
 import { Label, Spinner } from "@patternfly/react-core";
 import {
-  BanIcon,
   CheckCircleIcon,
   ExclamationCircleIcon,
+  BanIcon,
 } from "@patternfly/react-icons";
 import type React from "react";
 

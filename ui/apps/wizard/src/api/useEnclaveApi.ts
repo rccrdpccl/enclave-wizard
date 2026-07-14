@@ -1,20 +1,24 @@
+import { useInjection } from "@enclave-wizard-ui/ioc";
 import type {
   ConfigApiInterface,
-  Defaults,
   DefaultsApiInterface,
-  EnclaveConfig,
   PluginsApiInterface,
+} from "@enclave-wizard-ui/api-client";
+import type {
+  EnclaveConfig,
+  Defaults,
   PluginsOutputBody,
   ValidateConfigOutputBody,
 } from "@enclave-wizard-ui/api-client";
-import { useInjection } from "@enclave-wizard-ui/ioc";
 import { useCallback } from "react";
 import { Symbols } from "../main/Symbols.ts";
 
 export interface EnclaveApiClient {
   getConfig: () => Promise<EnclaveConfig>;
   writeConfig: (config: EnclaveConfig) => Promise<void>;
-  validateConfig: (config: EnclaveConfig) => Promise<ValidateConfigOutputBody>;
+  validateConfig: (
+    config: EnclaveConfig,
+  ) => Promise<ValidateConfigOutputBody>;
   getDefaults: () => Promise<Defaults>;
   getPlugins: () => Promise<PluginsOutputBody>;
 }
@@ -24,10 +28,14 @@ export function useEnclaveApi(): EnclaveApiClient {
   const defaultsApi = useInjection<DefaultsApiInterface>(Symbols.DefaultsApi);
   const pluginsApi = useInjection<PluginsApiInterface>(Symbols.PluginsApi);
 
-  const getConfig = useCallback(() => configApi.getConfig(), [configApi]);
+  const getConfig = useCallback(
+    () => configApi.getConfig(),
+    [configApi],
+  );
 
   const writeConfig = useCallback(
-    (config: EnclaveConfig) => configApi.writeConfig({ enclaveConfig: config }),
+    (config: EnclaveConfig) =>
+      configApi.writeConfig({ enclaveConfig: config }),
     [configApi],
   );
 
@@ -42,7 +50,10 @@ export function useEnclaveApi(): EnclaveApiClient {
     [defaultsApi],
   );
 
-  const getPlugins = useCallback(() => pluginsApi.listPlugins(), [pluginsApi]);
+  const getPlugins = useCallback(
+    () => pluginsApi.listPlugins(),
+    [pluginsApi],
+  );
 
   return { getConfig, writeConfig, validateConfig, getDefaults, getPlugins };
 }

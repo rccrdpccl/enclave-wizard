@@ -1,5 +1,3 @@
-import type { TaskRun } from "@enclave-wizard-ui/api-client";
-import { ResponseError } from "@enclave-wizard-ui/api-client";
 import {
   Alert,
   Button,
@@ -16,6 +14,8 @@ import {
 } from "@patternfly/react-core";
 import type React from "react";
 import { useState } from "react";
+import type { TaskRun } from "@enclave-wizard-ui/api-client";
+import { ResponseError } from "@enclave-wizard-ui/api-client";
 import type { TasksApiClient } from "../../api/useTasksApi.ts";
 
 interface StartTaskModalProps {
@@ -80,12 +80,7 @@ export const StartTaskModal: React.FC<StartTaskModalProps> = ({
       <ModalHeader title="Run Task" />
       <ModalBody>
         {error && (
-          <Alert
-            variant="danger"
-            title={error}
-            isInline
-            style={{ marginBottom: "1rem" }}
-          />
+          <Alert variant="danger" title={error} isInline style={{ marginBottom: "1rem" }} />
         )}
         <Form>
           <FormGroup label="Task type" fieldId="task-mode" isRequired>
@@ -126,10 +121,7 @@ export const StartTaskModal: React.FC<StartTaskModalProps> = ({
                 <FormSelectOption value={4} label="Phase 4 — Post-install" />
                 <FormSelectOption value={5} label="Phase 5 — Operators" />
                 <FormSelectOption value={6} label="Phase 6 — Day 2" />
-                <FormSelectOption
-                  value={7}
-                  label="Phase 7 — Configure Discovery"
-                />
+                <FormSelectOption value={7} label="Phase 7 — Configure Discovery" />
               </FormSelect>
             </FormGroup>
           )}

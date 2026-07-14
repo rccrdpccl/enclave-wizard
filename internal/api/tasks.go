@@ -7,14 +7,18 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sort"
+	"strings"
+	"sync"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/config"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
-	"github.com/rh-ecosystem-edge/enclave-wizard/internal/runner"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tasks"
 )
 
 var phasePlaybooks = map[int]string{
@@ -28,15 +32,18 @@ var phasePlaybooks = map[int]string{
 }
 
 type TasksHandler struct {
-	runner       runner.Runner
+	runner       tasks.Runner
 	registry     *plugins.Registry
 	configReader *config.Reader
 	configWriter *config.Writer
 	enclaveDir   string
+
+	deployMu   sync.Mutex
+	deployment *models.Deployment
 }
 
-func NewTasksHandler(r runner.Runner, registry *plugins.Registry, configReader *config.Reader, configWriter *config.Writer, enclaveDir string) *TasksHandler {
-	return &TasksHandler{runner: r, registry: registry, configReader: configReader, configWriter: configWriter, enclaveDir: enclaveDir}
+func NewTasksHandler(runner tasks.Runner, registry *plugins.Registry, configReader *config.Reader, configWriter *config.Writer, enclaveDir string) *TasksHandler {
+	return &TasksHandler{runner: runner, registry: registry, configReader: configReader, configWriter: configWriter, enclaveDir: enclaveDir}
 }
 
 // --- Request / Response types ---
@@ -174,16 +181,57 @@ func (h *TasksHandler) Register(api huma.API) {
 		Description: "Runs the enclave operational validation script that checks DNS, Redfish, certificates, and registry connectivity.",
 		Tags:        []string{"Tasks"},
 	}, h.startValidate)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "get-deployment",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/deployment",
+		Summary:     "Get current deployment state",
+		Description: "Returns the full deployment chain state including main playbook and all addon plugin phases.",
+		Tags:        []string{"Deployment"},
+	}, h.getDeployment)
+
+	huma.Register(api, huma.Operation{
+		OperationID: "get-deployment-progress",
+		Method:      http.MethodGet,
+		Path:        "/api/v1/deployment/progress",
+		Summary:     "Get deployment progress",
+		Description: "Returns live progress with completed task count, percentage, and current phase/task.",
+		Tags:        []string{"Deployment"},
+	}, h.getDeploymentProgress)
 }
 
 // --- Handlers ---
 
 func (h *TasksHandler) startDeploy(ctx context.Context, _ *StartDeployInput) (*StartTaskOutput, error) {
+	cfg, err := h.configReader.ReadAll()
+	if err != nil {
+		return nil, huma.Error500InternalServerError("failed to read config", err)
+	}
+
+	// WORKAROUND: force connected mode until disconnected support is ready
+	f := false
+	cfg.Global.Disconnected = &f
+
+	if err := h.configWriter.WriteAll(cfg); err != nil {
+		return nil, huma.Error500InternalServerError("failed to write config before deploy", err)
+	}
+
 	addonPlugins := h.addonPluginsFromConfig()
 
-	run, err := h.runner.Start(runner.StartRequest{
+	playbook := "playbooks/main.yaml"
+	if len(addonPlugins) > 0 {
+		generated, err := h.generateDeployPlaybook(addonPlugins)
+		if err != nil {
+			return nil, huma.Error500InternalServerError("failed to generate deploy playbook", err)
+		}
+		playbook = generated
+		slog.Info("generated deploy playbook with addon plugins", "playbook", playbook, "plugins", addonPlugins)
+	}
+
+	run, err := h.runner.Start(tasks.StartRequest{
 		Type:     models.TaskTypeDeploy,
-		Playbook: "playbooks/main.yaml",
+		Playbook: playbook,
 		ExtraVars: map[string]string{
 			"workingDir": h.enclaveDir,
 		},
@@ -192,12 +240,45 @@ func (h *TasksHandler) startDeploy(ctx context.Context, _ *StartDeployInput) (*S
 		return nil, mapTaskError(err)
 	}
 
-	if len(addonPlugins) > 0 {
-		slog.Info("deploy with addon plugins queued", "plugins", addonPlugins)
-		go h.chainAddonPlugins(run.ID, addonPlugins)
+	phases := []models.DeploymentPhase{
+		{Name: "main", TaskID: run.ID, Status: models.TaskStatusRunning},
+	}
+	for _, p := range addonPlugins {
+		phases = append(phases, models.DeploymentPhase{Name: p, TaskID: run.ID, Status: models.TaskStatusPending})
 	}
 
+	h.deployMu.Lock()
+	h.deployment = &models.Deployment{
+		ID:         run.ID,
+		Status:     models.TaskStatusRunning,
+		Phases:     phases,
+		TotalTasks: 300 + len(addonPlugins)*30,
+	}
+	h.deployMu.Unlock()
+
+	go h.watchDeploy(run.ID)
+
 	return &StartTaskOutput{Body: *run}, nil
+}
+
+func (h *TasksHandler) generateDeployPlaybook(addonPlugins []string) (string, error) {
+	var buf strings.Builder
+	buf.WriteString("---\n# Auto-generated: main deploy + addon plugins\n")
+	buf.WriteString("- ansible.builtin.import_playbook: main.yaml\n")
+	for _, name := range addonPlugins {
+		fmt.Fprintf(&buf, "- ansible.builtin.import_playbook: deploy-plugin.yaml\n")
+		fmt.Fprintf(&buf, "  vars:\n")
+		fmt.Fprintf(&buf, "    plugin_name: %s\n", name)
+		fmt.Fprintf(&buf, "    plugin_mirror: true\n")
+	}
+
+	dir := filepath.Join(h.enclaveDir, "playbooks")
+	os.MkdirAll(dir, 0750)
+	path := filepath.Join(dir, "deploy-all.yaml")
+	if err := os.WriteFile(path, []byte(buf.String()), 0640); err != nil {
+		return "", fmt.Errorf("writing deploy-all.yaml: %w", err)
+	}
+	return "playbooks/deploy-all.yaml", nil
 }
 
 func (h *TasksHandler) addonPluginsFromConfig() []string {
@@ -230,56 +311,24 @@ func (h *TasksHandler) addonPluginsFromConfig() []string {
 	return result
 }
 
-func (h *TasksHandler) chainAddonPlugins(mainRunID string, pluginNames []string) {
-	defer func() {
-		if r := recover(); r != nil {
-			slog.Error("addon plugin chain panicked", "error", r)
-		}
-	}()
-
-	slog.Info("waiting for main deploy to complete before addon plugins", "plugins", pluginNames)
-
+func (h *TasksHandler) watchDeploy(runID string) {
 	for {
 		time.Sleep(10 * time.Second)
-		mainRun, err := h.runner.Get(mainRunID)
+		run, err := h.runner.Get(runID)
 		if err != nil {
 			continue
 		}
-		if mainRun.Status == models.TaskStatusRunning {
+		if run.Status == models.TaskStatusRunning {
 			continue
 		}
-		if mainRun.Status != models.TaskStatusSuccessful {
-			slog.Warn("skipping addon plugins -- main deploy did not succeed",
-				"run_id", mainRunID, "status", mainRun.Status)
-			return
+
+		h.deployMu.Lock()
+		if h.deployment != nil {
+			h.deployment.Status = run.Status
 		}
-		break
+		h.deployMu.Unlock()
+		return
 	}
-
-	slog.Info("main deploy completed, deploying addon plugins", "plugins", pluginNames)
-
-	for _, name := range pluginNames {
-		slog.Info("deploying addon plugin", "plugin", name)
-		run, _, err := h.runner.RunSync(context.Background(), runner.StartRequest{
-			Type:     models.TaskTypeDeployPlugin,
-			Playbook: "playbooks/deploy-plugin.yaml",
-			ExtraVars: map[string]string{
-				"plugin_name": name,
-				"workingDir":  h.enclaveDir,
-			},
-		})
-		if err != nil {
-			slog.Error("addon plugin deploy failed to start", "plugin", name, "error", err)
-			return
-		}
-		if run.Status != models.TaskStatusSuccessful {
-			slog.Error("addon plugin deploy failed", "plugin", name, "status", run.Status)
-			return
-		}
-		slog.Info("addon plugin deployed successfully", "plugin", name)
-	}
-
-	slog.Info("all addon plugins deployed successfully")
 }
 
 func (h *TasksHandler) startDeployPhase(ctx context.Context, input *StartDeployPhaseInput) (*StartTaskOutput, error) {
@@ -287,7 +336,7 @@ func (h *TasksHandler) startDeployPhase(ctx context.Context, input *StartDeployP
 	if !ok {
 		return nil, huma.Error400BadRequest(fmt.Sprintf("invalid phase: %d", input.Phase))
 	}
-	run, err := h.runner.Start(runner.StartRequest{
+	run, err := h.runner.Start(tasks.StartRequest{
 		Type:     models.TaskTypeDeployPhase,
 		Playbook: playbook,
 		ExtraVars: map[string]string{
@@ -304,7 +353,7 @@ func (h *TasksHandler) startDeployPlugin(ctx context.Context, input *StartDeploy
 	if _, ok := h.registry.Get(input.Name); !ok {
 		return nil, huma.Error404NotFound("unknown plugin: " + input.Name)
 	}
-	run, err := h.runner.Start(runner.StartRequest{
+	run, err := h.runner.Start(tasks.StartRequest{
 		Type:     models.TaskTypeDeployPlugin,
 		Playbook: "playbooks/deploy-plugin.yaml",
 		ExtraVars: map[string]string{
@@ -367,7 +416,7 @@ func (h *TasksHandler) deleteTask(_ context.Context, input *DeleteTaskInput) (*s
 type StartValidateInput struct{}
 
 func (h *TasksHandler) startValidate(ctx context.Context, _ *StartValidateInput) (*StartTaskOutput, error) {
-	run, err := h.runner.Start(runner.StartRequest{
+	run, err := h.runner.Start(tasks.StartRequest{
 		Type:     models.TaskTypeValidate,
 		Playbook: "validations.sh",
 	})
@@ -377,13 +426,91 @@ func (h *TasksHandler) startValidate(ctx context.Context, _ *StartValidateInput)
 	return &StartTaskOutput{Body: *run}, nil
 }
 
+// --- Deployment endpoints ---
+
+type GetDeploymentOutput struct {
+	Body models.Deployment
+}
+
+func (h *TasksHandler) getDeployment(_ context.Context, _ *struct{}) (*GetDeploymentOutput, error) {
+	h.deployMu.Lock()
+	defer h.deployMu.Unlock()
+
+	if h.deployment == nil {
+		return nil, huma.Error404NotFound("no active deployment")
+	}
+	return &GetDeploymentOutput{Body: *h.deployment}, nil
+}
+
+type GetDeploymentProgressOutput struct {
+	Body models.DeploymentProgress
+}
+
+func (h *TasksHandler) getDeploymentProgress(_ context.Context, _ *struct{}) (*GetDeploymentProgressOutput, error) {
+	h.deployMu.Lock()
+	dep := h.deployment
+	h.deployMu.Unlock()
+
+	if dep == nil {
+		return nil, huma.Error404NotFound("no active deployment")
+	}
+
+	completedTasks := 0
+	currentTask := ""
+
+	events, err := h.runner.Events(dep.ID)
+	if err == nil {
+		for _, raw := range events {
+			var ev struct {
+				Event     string `json:"event"`
+				EventData struct {
+					Task string `json:"task"`
+					Play string `json:"play"`
+				} `json:"event_data"`
+			}
+			if json.Unmarshal(raw, &ev) != nil {
+				continue
+			}
+			switch {
+			case strings.HasPrefix(ev.Event, "runner_on_"):
+				completedTasks++
+				currentTask = ev.EventData.Task
+			case ev.Event == "playbook_on_task_start" && ev.EventData.Task != "":
+				currentTask = ev.EventData.Task
+			}
+		}
+	}
+
+	total := dep.TotalTasks
+	if total == 0 {
+		total = 350
+	}
+	pct := completedTasks * 100 / total
+	if pct > 99 && dep.Status == models.TaskStatusRunning {
+		pct = 99
+	}
+	if dep.Status == models.TaskStatusSuccessful {
+		pct = 100
+	}
+
+	return &GetDeploymentProgressOutput{
+		Body: models.DeploymentProgress{
+			Completed:    completedTasks,
+			Total:        total,
+			Percentage:   pct,
+			CurrentPhase: "",
+			CurrentTask:  currentTask,
+		},
+	}, nil
+}
+
 func mapTaskError(err error) error {
 	switch {
-	case errors.Is(err, runner.ErrBusy):
+	case errors.Is(err, tasks.ErrBusy):
 		return huma.Error409Conflict("a task is already running")
-	case errors.Is(err, runner.ErrRunning):
+	case errors.Is(err, tasks.ErrRunning):
 		return huma.Error409Conflict("task is still running")
-	case errors.Is(err, runner.ErrNotFound):
+	case errors.Is(err, tasks.ErrNotFound):
 		return huma.Error404NotFound("run not found")
 	default:
 		return huma.Error500InternalServerError("task operation failed", err)

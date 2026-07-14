@@ -1,10 +1,18 @@
-import { Content, Flex, FlexItem, Title } from "@patternfly/react-core";
-import { ClusterIcon, CubesIcon, ServerIcon } from "@patternfly/react-icons";
+import {
+  Content,
+  Flex,
+  FlexItem,
+  Title,
+} from "@patternfly/react-core";
+import {
+  ClusterIcon,
+  CubesIcon,
+  ServerIcon,
+} from "@patternfly/react-icons";
 import type React from "react";
 import type { ReactNode } from "react";
 import { FlavorCard } from "../components/FlavorCard.tsx";
-import { useCatalog } from "../contexts/CatalogContext.tsx";
-import type { FlavorId } from "../flavors.ts";
+import { FLAVORS, type FlavorId } from "../flavors.ts";
 import { useWizard } from "../WizardContext.tsx";
 import { stepStyles } from "./stepStyles.ts";
 
@@ -16,7 +24,6 @@ const FLAVOR_ICONS: Record<FlavorId, ReactNode> = {
 
 export const SelectFlavorStep: React.FC = () => {
   const { state, dispatch } = useWizard();
-  const { flavors, experiences } = useCatalog();
 
   return (
     <Flex direction={{ default: "column" }} gap={{ default: "gapLg" }}>
@@ -31,12 +38,8 @@ export const SelectFlavorStep: React.FC = () => {
         </Content>
       </FlexItem>
       <FlexItem>
-        <Flex
-          gap={{ default: "gapMd" }}
-          flexWrap={{ default: "wrap" }}
-          alignItems={{ default: "alignItemsStretch" }}
-        >
-          {flavors.map((flavor) => (
+        <Flex gap={{ default: "gapMd" }} flexWrap={{ default: "wrap" }} alignItems={{ default: "alignItemsStretch" }}>
+          {FLAVORS.map((flavor) => (
             <FlexItem key={flavor.id} style={{ minWidth: 240, flex: "1 1 0" }}>
               <FlavorCard
                 title={flavor.title}
@@ -45,11 +48,7 @@ export const SelectFlavorStep: React.FC = () => {
                 icon={FLAVOR_ICONS[flavor.id]}
                 isSelected={state.selectedFlavors.has(flavor.id)}
                 onSelect={() =>
-                  dispatch({
-                    type: "TOGGLE_FLAVOR",
-                    flavor: flavor.id,
-                    experiences,
-                  })
+                  dispatch({ type: "TOGGLE_FLAVOR", flavor: flavor.id })
                 }
               />
             </FlexItem>

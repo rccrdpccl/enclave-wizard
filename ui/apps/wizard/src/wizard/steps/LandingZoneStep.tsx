@@ -6,19 +6,15 @@ import {
 } from "@patternfly/react-core";
 import type React from "react";
 import { useState } from "react";
-import { FEATURES } from "../../features.ts";
 import { SchemaFormRenderer } from "../../schema/SchemaFormRenderer.tsx";
-import { CertificateField } from "../components/CertificateField.tsx";
 import { useWizard } from "../WizardContext.tsx";
+import { CertificateField } from "../components/CertificateField.tsx";
 import { stepStyles } from "./stepStyles.ts";
 
 const LZ_FIELDS = ["global.lzBmcIP", "global.lzBmcHostname"];
 
 const IRONIC_CERTS = [
-  {
-    path: "certificates.ironicHTTPSCertificate",
-    label: "Ironic HTTPS Certificate",
-  },
+  { path: "certificates.ironicHTTPSCertificate", label: "Ironic HTTPS Certificate" },
   { path: "certificates.ironicHTTPSKey", label: "Ironic HTTPS Key" },
 ];
 
@@ -32,7 +28,9 @@ function getValueByPath(obj: Record<string, unknown>, path: string): unknown {
   return current;
 }
 
-export const LZ_REQUIRED_FIELDS = ["global.lzBmcIP"];
+export const LZ_REQUIRED_FIELDS = [
+  "global.lzBmcIP",
+];
 
 export const LandingZoneStep: React.FC = () => {
   const { state, dispatch } = useWizard();
@@ -47,21 +45,7 @@ export const LandingZoneStep: React.FC = () => {
 
   const configData = state.configData as Record<string, unknown>;
   const globalData = (configData.global ?? {}) as Record<string, unknown>;
-  const disconnected = (globalData.disconnected as boolean) ?? false;
-
-  const toggleDisconnected = (checked: boolean) => {
-    onChange("global.disconnected", checked);
-    if (!checked) {
-      onChange("global.quayUser", "");
-      onChange("global.quayPassword", "");
-      onChange("global.quayBackend", "");
-      onChange("global.quayBackendRGWConfiguration", undefined);
-      return;
-    }
-    if (!globalData.quayBackend) {
-      onChange("global.quayBackend", "LocalStorage");
-    }
-  };
+  const disconnected = false;
 
   return (
     <Form>
@@ -69,11 +53,7 @@ export const LandingZoneStep: React.FC = () => {
         Landing Zone
       </Title>
 
-      <Title
-        headingLevel="h3"
-        size="lg"
-        className={stepStyles.firstSectionTitle}
-      >
+      <Title headingLevel="h3" size="lg" className={stepStyles.firstSectionTitle}>
         Landing Zone Network
       </Title>
       <SchemaFormRenderer
@@ -91,19 +71,12 @@ export const LandingZoneStep: React.FC = () => {
         id="disconnected-toggle"
         label="Disconnected (air-gapped) deployment"
         isChecked={disconnected}
-        isDisabled={!FEATURES.disconnected}
-        onChange={(_e, checked) => toggleDisconnected(checked)}
-        description={
-          FEATURES.disconnected
-            ? "When enabled, a local Quay mirror registry is configured for image distribution."
-            : "Disconnected (air-gapped) mode will be available in a future release."
-        }
+        isDisabled
+        description="Disconnected (air-gapped) mode will be available in a future release."
       />
 
       <ExpandableSection
-        toggleText={
-          certsOpen ? "Hide TLS certificates" : "TLS certificates (optional)"
-        }
+        toggleText={certsOpen ? "Hide TLS certificates" : "TLS certificates (optional)"}
         isExpanded={certsOpen}
         onToggle={(_e, expanded) => setCertsOpen(expanded)}
         className={stepStyles.sectionTitle}
