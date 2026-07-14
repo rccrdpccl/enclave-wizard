@@ -191,4 +191,27 @@ describe("useSSE", () => {
     expect(result.current.connected).toBe(false);
     expect(result.current.error).toBeNull();
   });
+
+  it("recovers connected state after error then reconnect", () => {
+    const { result } = renderHook(() => useSSE("/api/v1/tasks/1/stream", {}));
+
+    const es = MockEventSource.instances[0];
+
+    act(() => {
+      es.simulateOpen();
+    });
+    expect(result.current.connected).toBe(true);
+
+    act(() => {
+      es.simulateError();
+    });
+    expect(result.current.connected).toBe(false);
+    expect(result.current.error).toBeInstanceOf(Error);
+
+    act(() => {
+      es.simulateOpen();
+    });
+    expect(result.current.connected).toBe(true);
+    expect(result.current.error).toBeNull();
+  });
 });

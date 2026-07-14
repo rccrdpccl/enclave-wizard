@@ -286,6 +286,28 @@ describe("useDeployment", () => {
       expect(result.current.state.progress?.percentage).toBe(100);
     });
 
+    it("ignores SSE events with invalid JSON", async () => {
+      mockWriteConfig.mockResolvedValue(undefined);
+      mockStartDeploy.mockResolvedValue({ id: "task-bad", status: "running" });
+
+      const { result } = renderHook(() => useDeployment());
+
+      await act(async () => {
+        await result.current.start({ global: {} });
+      });
+
+      const es = MockEventSource.instances.find(
+        (e) => e.url === "/api/v1/tasks/task-bad/stream",
+      );
+
+      await act(async () => {
+        es?.simulateEvent("status", "not valid json{{{");
+      });
+
+      expect(result.current.state.phase).toBe("deploying");
+      expect(result.current.state.logs).toBe("");
+    });
+
     it("handles done event with failure", async () => {
       mockWriteConfig.mockResolvedValue(undefined);
       mockStartDeploy.mockResolvedValue({ id: "task-6", status: "running" });
