@@ -80,6 +80,7 @@ func SetupAPI(mux *http.ServeMux, enclaveDir string, authStore *auth.Store, opts
 	api.NewAuthHandler(authStore, opts.NoAuth).Register(humaAPI)
 	api.NewConfigHandler(reader, writer, validator).Register(humaAPI)
 	api.NewDefaultsHandler(enclaveDir).Register(humaAPI)
+	api.NewFileUploadHandler(enclaveDir).Register(humaAPI)
 	api.NewPluginsHandler(registry).Register(humaAPI)
 
 	return humaAPI, runner, nil
@@ -159,15 +160,7 @@ func main() {
 		}
 		setupUIHandler(mux)
 
-		fileUpload := api.NewFileUploadHandler(opts.EnclaveDir)
-		var rootHandler http.Handler = http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if r.URL.Path == "/api/v1/files" {
-				fileUpload.ServeHTTP(w, r)
-				return
-			}
-			mux.ServeHTTP(w, r)
-		})
-		handler := api.LoggingMiddleware(api.BearerAuthMiddleware(authStore, opts.NoAuth)(rootHandler))
+		handler := api.LoggingMiddleware(api.BearerAuthMiddleware(authStore, opts.NoAuth)(mux))
 
 		httpsServer := &http.Server{
 			Addr:    fmt.Sprintf(":%d", opts.HTTPSPort),
