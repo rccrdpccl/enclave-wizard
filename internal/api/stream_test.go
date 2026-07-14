@@ -200,6 +200,33 @@ func TestStream_MultipleEvents(t *testing.T) {
 	assertEqual(t, "event[4].type", "done", events[4].Type)
 }
 
+func TestStream_PreClosedChannel(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	m := tasks.NewMockRunner(ctrl)
+
+	ch := make(chan tasks.Event)
+	close(ch)
+
+	m.EXPECT().Stream("already-done").Return((<-chan tasks.Event)(ch), nil)
+
+	srv := setupStreamServer(m)
+	defer srv.Close()
+
+	resp, err := http.Get(srv.URL + "/api/v1/tasks/already-done/stream")
+	if err != nil {
+		t.Fatalf("GET: %v", err)
+	}
+	defer resp.Body.Close()
+
+	assertEqual(t, "status", http.StatusOK, resp.StatusCode)
+	assertEqual(t, "content-type", "text/event-stream", resp.Header.Get("Content-Type"))
+
+	events := readSSEEvents(t, resp)
+	if len(events) != 0 {
+		t.Errorf("expected 0 events from pre-closed channel, got %d", len(events))
+	}
+}
+
 func TestExtractTaskID(t *testing.T) {
 	tests := []struct {
 		path string

@@ -103,6 +103,93 @@ func TestLoadFromDir_SkipsMissingYAML(t *testing.T) {
 	}
 }
 
+func TestLoadFromDir_PluginOrderPreserved(t *testing.T) {
+	dir := t.TempDir()
+	expDir := filepath.Join(dir, "experiences", "ordered")
+	os.MkdirAll(expDir, 0755)
+	os.WriteFile(filepath.Join(expDir, "experience.yaml"), []byte(`
+id: ordered
+name: Ordered Experience
+description: test plugin ordering
+plugins:
+  - name: zeta
+    order: 300
+  - name: alpha
+    order: 100
+  - name: beta
+    order: 200
+`), 0644)
+
+	experiences, err := LoadFromDir(dir)
+	if err != nil {
+		t.Fatalf("LoadFromDir: %v", err)
+	}
+	if len(experiences) != 1 {
+		t.Fatalf("expected 1 experience, got %d", len(experiences))
+	}
+	plugins := experiences[0].Plugins
+	if len(plugins) != 3 {
+		t.Fatalf("expected 3 plugins, got %d", len(plugins))
+	}
+	assertEqual(t, "plugin[0]", "zeta", plugins[0].Name)
+	assertEqual(t, "plugin[0].order", 300, plugins[0].Order)
+	assertEqual(t, "plugin[1]", "alpha", plugins[1].Name)
+	assertEqual(t, "plugin[1].order", 100, plugins[1].Order)
+	assertEqual(t, "plugin[2]", "beta", plugins[2].Name)
+	assertEqual(t, "plugin[2].order", 200, plugins[2].Order)
+}
+
+func TestLoadFromDir_ExtraFieldsIgnored(t *testing.T) {
+	dir := t.TempDir()
+	expDir := filepath.Join(dir, "experiences", "extra")
+	os.MkdirAll(expDir, 0755)
+	os.WriteFile(filepath.Join(expDir, "experience.yaml"), []byte(`
+id: extra
+name: Extra Fields
+description: has unknown fields
+version: "2.0"
+author: someone
+plugins:
+  - name: foo
+    order: 1
+    custom_field: bar
+`), 0644)
+
+	experiences, err := LoadFromDir(dir)
+	if err != nil {
+		t.Fatalf("LoadFromDir: %v", err)
+	}
+	if len(experiences) != 1 {
+		t.Fatalf("expected 1 experience, got %d", len(experiences))
+	}
+	assertEqual(t, "id", "extra", experiences[0].ID)
+	assertEqual(t, "name", "Extra Fields", experiences[0].Name)
+	if len(experiences[0].Plugins) != 1 {
+		t.Errorf("expected 1 plugin, got %d", len(experiences[0].Plugins))
+	}
+}
+
+func TestLoadFromDir_DuplicateIDs(t *testing.T) {
+	dir := t.TempDir()
+	// Two directories with experience.yaml files specifying the same ID.
+	for _, sub := range []string{"aaa-first", "zzz-second"} {
+		expDir := filepath.Join(dir, "experiences", sub)
+		os.MkdirAll(expDir, 0755)
+		os.WriteFile(filepath.Join(expDir, "experience.yaml"), []byte("id: same-id\nname: "+sub+"\ndescription: dup test\n"), 0644)
+	}
+
+	experiences, err := LoadFromDir(dir)
+	if err != nil {
+		t.Fatalf("LoadFromDir: %v", err)
+	}
+	// Both are loaded; the loader does not deduplicate.
+	if len(experiences) != 2 {
+		t.Fatalf("expected 2 experiences (no dedup), got %d", len(experiences))
+	}
+	assertEqual(t, "both.id", "same-id", experiences[0].ID)
+	assertEqual(t, "both.id", "same-id", experiences[1].ID)
+}
+
 func assertEqual[T comparable](t *testing.T, field string, want, got T) {
 	t.Helper()
 	if want != got {
