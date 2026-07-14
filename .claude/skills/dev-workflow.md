@@ -1,6 +1,6 @@
 ---
 name: dev-workflow
-description: Development workflow for enclave-wizard using Make targets. Use when building, running, testing, or starting the demo environment. Also use when asked about how to run the project or what make targets are available.
+description: Development workflow for enclave-wizard — building, running, testing, demo environment, and local dev modes. Use when building, running, testing, starting demo or dev mode, refreshing the local environment, or when asked about make targets, how to run the project, or how to test changes.
 ---
 
 # Development Workflow
@@ -154,9 +154,40 @@ make demo            # handles everything
 make run             # requires ../enclave directory with real ansible playbooks
 ```
 
+## Dev Mode (enclave-mock)
+
+An alternative to demo mode that runs against `enclave-mock/` — noop'd ansible tasks from the real enclave repo. Use this when testing config writes or validation flows (demo mode replays recordings, dev mode runs real playbooks with noop tasks).
+
+| Mode | Command | Backend | Use for |
+|------|---------|---------|---------|
+| Demo | `make demo` | Recorded replays at 10x speed | UI dev, manual walkthrough |
+| Dev | `make dev` | Noop ansible tasks | Config write, validation flows |
+| Real | `make run` | Real ansible (requires `../enclave`) | Full integration |
+
+### Setup enclave-mock (first time)
+
+```bash
+make enclave-mock
+```
+
+To regenerate from a specific branch:
+```bash
+make clean-enclave-mock
+make enclave-mock ENCLAVE_MOCK_BRANCH=<branch>
+```
+
+### Start dev mode
+
+```bash
+make dev
+```
+
+Runs in the foreground with `--no-auth` against `enclave-mock/`.
+
 ## Notes
 
 - Go and Node.js run inside `distrobox enter osac` — they're not installed on the host
 - The `dev` build tag enables demo/recording runner modes; production builds omit them
 - `--no-auth` skips bearer token checks but the login screen still appears in the UI (use any password shown at startup)
 - Config validation requires `ansible-runner` which is only available in the real enclave environment
+- `enclave-mock/` is gitignored
