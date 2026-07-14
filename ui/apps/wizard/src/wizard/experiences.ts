@@ -10,7 +10,8 @@ export interface Experience {
   plugins: ExperiencePlugin[];
 }
 
-export const EXPERIENCES: Experience[] = [
+/** Hardcoded fallback used when GET /api/v1/experiences is unavailable */
+export const FALLBACK_EXPERIENCES: Experience[] = [
   {
     id: "caas",
     name: "Containers as a Service",
@@ -59,10 +60,14 @@ export const EXPERIENCES: Experience[] = [
   },
 ];
 
-export function getExperiencePlugins(experienceId: string): string[] {
-  const exp = EXPERIENCES.find((e) => e.id === experienceId);
+/** @deprecated Use FALLBACK_EXPERIENCES instead */
+export const EXPERIENCES = FALLBACK_EXPERIENCES;
+
+export function getExperiencePlugins(
+  experienceId: string,
+  experiences: Experience[] = FALLBACK_EXPERIENCES,
+): string[] {
+  const exp = experiences.find((e) => e.id === experienceId);
   if (!exp) return [];
-  return exp.plugins
-    .sort((a, b) => a.order - b.order)
-    .map((p) => p.name);
+  return exp.plugins.sort((a, b) => a.order - b.order).map((p) => p.name);
 }

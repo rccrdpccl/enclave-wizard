@@ -19,6 +19,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { EnclaveConfigToJSON } from "@enclave-wizard-ui/api-client";
 import { useEnclaveApi } from "../api/useEnclaveApi.ts";
+import { AboutDialog } from "../common/components/AboutDialog.tsx";
 import { RedHatLogo } from "../common/components/RedHatLogo.tsx";
 import {
   validateFields,
@@ -39,6 +40,8 @@ import { ReviewStep } from "./steps/ReviewStep.tsx";
 import { SelectFlavorStep } from "./steps/SelectFlavorStep.tsx";
 import { StorageStep } from "./steps/StorageStep.tsx";
 import { WelcomeStep } from "./steps/WelcomeStep.tsx";
+import { CatalogProvider } from "./contexts/CatalogContext.tsx";
+import { useWizardInit } from "./hooks/useWizardInit.ts";
 import { useWizard, WizardProvider } from "./WizardContext.tsx";
 import { wizardStyles as styles } from "./wizardStyles.ts";
 import { css } from "@emotion/css";
@@ -265,6 +268,7 @@ function StepContent({
 }
 
 function WizardContent(): React.ReactElement {
+  useWizardInit();
   const { state, dispatch } = useWizard();
   const { schema, loading: schemaLoading } = useOpenApiSchema();
   const api = useEnclaveApi();
@@ -301,7 +305,6 @@ function WizardContent(): React.ReactElement {
 
         if (defaults.status === "fulfilled") {
           const d = defaults.value;
-          dispatch({ type: "SET_FIELD", path: "global.disconnected", value: d.disconnected });
           dispatch({ type: "SET_FIELD", path: "global.storage_plugin", value: d.storagePlugin });
           dispatch({ type: "SET_FIELD", path: "global.defaultPrefix", value: 24 });
           dispatch({ type: "SET_FIELD", path: "global.quayBackend", value: "LocalStorage" });
@@ -315,6 +318,9 @@ function WizardContent(): React.ReactElement {
         if (existingConfig.status === "fulfilled") {
           dispatch({ type: "LOAD_CONFIG", config: EnclaveConfigToJSON(existingConfig.value) });
         }
+
+        // Always connected mode (disconnected greyed out in UI)
+        dispatch({ type: "SET_FIELD", path: "global.disconnected", value: false });
       } catch (err) {
         console.warn("Failed to load initial data:", err);
       }
@@ -469,6 +475,9 @@ function WizardContent(): React.ReactElement {
                 <ListIcon /> Tasks
               </Link>
             </SplitItem>
+            <SplitItem>
+              <AboutDialog />
+            </SplitItem>
           </Split>
         </div>
         <Divider />
@@ -538,8 +547,10 @@ function WizardContent(): React.ReactElement {
 
 export const WizardPage: React.FC = () => {
   return (
-    <WizardProvider>
-      <WizardContent />
-    </WizardProvider>
+    <CatalogProvider>
+      <WizardProvider>
+        <WizardContent />
+      </WizardProvider>
+    </CatalogProvider>
   );
 };
