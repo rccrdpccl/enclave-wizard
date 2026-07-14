@@ -26,6 +26,16 @@ func (r *statusRecorder) Write(b []byte) (int, error) {
 	return r.ResponseWriter.Write(b)
 }
 
+func (r *statusRecorder) Flush() {
+	if f, ok := r.ResponseWriter.(http.Flusher); ok {
+		f.Flush()
+	}
+}
+
+func (r *statusRecorder) Unwrap() http.ResponseWriter {
+	return r.ResponseWriter
+}
+
 // LoggingMiddleware logs every HTTP request at TRACE (start + end) and then
 // at the appropriate level based on method and response status:
 //

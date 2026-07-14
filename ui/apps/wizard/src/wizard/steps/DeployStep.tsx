@@ -7,6 +7,9 @@ import {
   DescriptionListTerm,
   EmptyState,
   EmptyStateBody,
+  Progress,
+  ProgressMeasureLocation,
+  ProgressVariant,
   Spinner,
   Split,
   SplitItem,
@@ -155,6 +158,22 @@ export const DeployStep: React.FC = () => {
               </DescriptionListGroup>
             )}
           </DescriptionList>
+        </StackItem>
+      )}
+
+      {deployment.progress && (
+        <StackItem>
+          <Progress
+            value={deployment.phase === "complete" ? 100 : (deployment.progress.percentage ?? 0)}
+            title={deployment.progress.currentTask || (isRunning ? "Starting..." : "")}
+            measureLocation={ProgressMeasureLocation.top}
+            variant={
+              deployment.phase === "failed" ? ProgressVariant.danger
+              : deployment.phase === "complete" ? ProgressVariant.success
+              : undefined
+            }
+            aria-label="Deployment progress"
+          />
         </StackItem>
       )}
 

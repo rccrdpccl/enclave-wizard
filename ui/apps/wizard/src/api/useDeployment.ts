@@ -16,11 +16,17 @@ export type DeployPhase =
   | "failed"
   | "error";
 
+export interface DeploymentProgress {
+  percentage: number;
+  currentTask: string;
+}
+
 export interface DeploymentState {
   phase: DeployPhase;
   deploymentId: string | null;
   taskId: string | null;
   task: TaskRun | null;
+  progress: DeploymentProgress | null;
   logs: string;
   error: DeploymentError | null;
 }
@@ -36,6 +42,7 @@ const INITIAL_STATE: DeploymentState = {
   deploymentId: null,
   taskId: null,
   task: null,
+  progress: null,
   logs: "",
   error: null,
 };
@@ -112,19 +119,23 @@ export function useDeployment(): UseDeploymentReturn {
         if (!mountedRef.current) return;
 
         try {
-          // Try new progress endpoint first, fall back to task status
-          let task: TaskRun | null = null;
-          if (deploymentId) {
-            const resp = await fetchWithFallback(
-              `/api/v1/deployments/${deploymentId}/progress`,
-            );
-            if (resp) {
-              task = await resp.json();
-            }
-          }
+          // Always get task metadata (status, startedAt, etc.)
+          const task = await tasksApi.getTask(taskId);
 
-          if (!task) {
-            task = await tasksApi.getTask(taskId);
+          // Fetch progress
+          let progress: DeploymentProgress | null = null;
+          if (deploymentId) {
+            try {
+              const resp = await fetchWithFallback(
+                `/api/v1/deployments/${deploymentId}/progress`,
+              );
+              if (resp) {
+                const body = await resp.json();
+                progress = { percentage: body.percentage ?? 0, currentTask: body.currentTask ?? "" };
+              }
+            } catch {
+              // progress not available
+            }
           }
 
           // Fetch logs
@@ -149,6 +160,7 @@ export function useDeployment(): UseDeploymentReturn {
             ...prev,
             phase,
             task,
+            progress: isRunning ? progress : (isFailed ? progress : { percentage: 100, currentTask: "" }),
             logs,
             error: task?.error
               ? { message: task.error, details: [] }
