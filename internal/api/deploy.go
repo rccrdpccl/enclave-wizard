@@ -2,14 +2,13 @@ package api
 
 import (
 	"context"
-	"encoding/json"
 	"net/http"
-	"strings"
 	"sync"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/config"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/deploy"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/runner"
@@ -186,7 +185,8 @@ func (h *DeployHandler) getDeploymentProgressByID(_ context.Context, input *GetD
 		return nil, huma.Error404NotFound("deployment not found: " + input.ID)
 	}
 
-	progress := h.calculateProgress(dep)
+	events, _ := h.runner.Events(dep.ID)
+	progress := deploy.CalculateProgress(dep, events)
 	return &GetDeploymentProgressByIDOutput{Body: progress}, nil
 }
 
@@ -232,49 +232,3 @@ func (h *DeployHandler) watchDeployment(deployID string) {
 	}
 }
 
-func (h *DeployHandler) calculateProgress(dep *models.Deployment) models.DeploymentProgress {
-	completedTasks := 0
-	currentTask := ""
-
-	events, err := h.runner.Events(dep.ID)
-	if err == nil {
-		for _, raw := range events {
-			var ev struct {
-				Event     string `json:"event"`
-				EventData struct {
-					Task string `json:"task"`
-				} `json:"event_data"`
-			}
-			if json.Unmarshal(raw, &ev) != nil {
-				continue
-			}
-			switch {
-			case strings.HasPrefix(ev.Event, "runner_on_"):
-				completedTasks++
-				currentTask = ev.EventData.Task
-			case ev.Event == "playbook_on_task_start" && ev.EventData.Task != "":
-				currentTask = ev.EventData.Task
-			}
-		}
-	}
-
-	total := dep.TotalTasks
-	if total == 0 {
-		total = 350
-	}
-	pct := completedTasks * 100 / total
-	if pct > 99 && dep.Status == models.TaskStatusRunning {
-		pct = 99
-	}
-	if dep.Status == models.TaskStatusSuccessful {
-		pct = 100
-	}
-
-	return models.DeploymentProgress{
-		Completed:    completedTasks,
-		Total:        total,
-		Percentage:   pct,
-		CurrentPhase: "",
-		CurrentTask:  currentTask,
-	}
-}

@@ -7,11 +7,11 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
-	"sort"
 	"time"
 
 	"github.com/danielgtaylor/huma/v2"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/config"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/deploy"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/models"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/runner"
@@ -179,7 +179,7 @@ func (h *TasksHandler) Register(api huma.API) {
 // --- Handlers ---
 
 func (h *TasksHandler) startDeploy(ctx context.Context, _ *StartDeployInput) (*StartTaskOutput, error) {
-	addonPlugins := h.addonPluginsFromConfig()
+	addonPlugins := deploy.AddonPluginsFromConfig(h.configReader, h.registry)
 
 	run, err := h.runner.Start(runner.StartRequest{
 		Type:     models.TaskTypeDeploy,
@@ -198,36 +198,6 @@ func (h *TasksHandler) startDeploy(ctx context.Context, _ *StartDeployInput) (*S
 	}
 
 	return &StartTaskOutput{Body: *run}, nil
-}
-
-func (h *TasksHandler) addonPluginsFromConfig() []string {
-	if h.configReader == nil {
-		return nil
-	}
-	cfg, err := h.configReader.ReadAll()
-	if err != nil {
-		return nil
-	}
-	type addonInfo struct {
-		name  string
-		order int
-	}
-	var addons []addonInfo
-	for _, name := range cfg.Global.EnabledPlugins {
-		p, ok := h.registry.Get(name)
-		if !ok {
-			continue
-		}
-		if p.Type == models.PluginTypeAddon {
-			addons = append(addons, addonInfo{name: p.Name, order: p.Order})
-		}
-	}
-	sort.Slice(addons, func(i, j int) bool { return addons[i].order < addons[j].order })
-	result := make([]string, len(addons))
-	for i, a := range addons {
-		result[i] = a.name
-	}
-	return result
 }
 
 func (h *TasksHandler) chainAddonPlugins(mainRunID string, pluginNames []string) {

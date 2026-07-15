@@ -1,6 +1,7 @@
 package api
 
 import (
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
@@ -94,5 +95,5 @@ func extractTaskID(path string) string {
 }
 
 func isNotFound(err error) bool {
-	return err != nil && strings.Contains(err.Error(), "not found")
+	return errors.Is(err, runner.ErrNotFound)
 }

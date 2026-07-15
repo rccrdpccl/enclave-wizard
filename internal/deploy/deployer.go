@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 	"os"
-	"sort"
 	"strings"
 	"time"
 
@@ -67,7 +66,7 @@ func (d *Deployer) Start() (*models.Deployment, *models.TaskRun, error) {
 		return nil, nil, fmt.Errorf("writing config: %w", err)
 	}
 
-	addonPlugins := d.addonPluginsFromConfig()
+	addonPlugins := AddonPluginsFromConfig(d.configReader, d.registry)
 
 	playbook := "playbooks/main.yaml"
 	if len(addonPlugins) > 0 {
@@ -152,51 +151,13 @@ func (d *Deployer) GetProgress(id string) (*models.DeploymentProgress, error) {
 		return nil, err
 	}
 
-	completedTasks := 0
-	currentTask := ""
-
-	events, err := d.runner.Events(dep.ID)
-	if err == nil {
-		for _, raw := range events {
-			var ev struct {
-				Event     string `json:"event"`
-				EventData struct {
-					Task string `json:"task"`
-					Play string `json:"play"`
-				} `json:"event_data"`
-			}
-			if json.Unmarshal(raw, &ev) != nil {
-				continue
-			}
-			switch {
-			case strings.HasPrefix(ev.Event, "runner_on_"):
-				completedTasks++
-				currentTask = ev.EventData.Task
-			case ev.Event == "playbook_on_task_start" && ev.EventData.Task != "":
-				currentTask = ev.EventData.Task
-			}
-		}
+	var events []json.RawMessage
+	if evts, err := d.runner.Events(dep.ID); err == nil {
+		events = evts
 	}
 
-	total := dep.TotalTasks
-	if total == 0 {
-		total = 350
-	}
-	pct := completedTasks * 100 / total
-	if pct > 99 && dep.Status == models.TaskStatusRunning {
-		pct = 99
-	}
-	if dep.Status == models.TaskStatusSuccessful {
-		pct = 100
-	}
-
-	return &models.DeploymentProgress{
-		Completed:    completedTasks,
-		Total:        total,
-		Percentage:   pct,
-		CurrentPhase: "",
-		CurrentTask:  currentTask,
-	}, nil
+	progress := CalculateProgress(dep, events)
+	return &progress, nil
 }
 
 func (d *Deployer) watchDeploy(depID string) {
@@ -230,35 +191,6 @@ func (d *Deployer) watchDeploy(depID string) {
 	}
 }
 
-func (d *Deployer) addonPluginsFromConfig() []string {
-	if d.configReader == nil {
-		return nil
-	}
-	cfg, err := d.configReader.ReadAll()
-	if err != nil {
-		return nil
-	}
-	type addonInfo struct {
-		name  string
-		order int
-	}
-	var addons []addonInfo
-	for _, name := range cfg.Global.EnabledPlugins {
-		p, ok := d.registry.Get(name)
-		if !ok {
-			continue
-		}
-		if p.Type == models.PluginTypeAddon {
-			addons = append(addons, addonInfo{name: p.Name, order: p.Order})
-		}
-	}
-	sort.Slice(addons, func(i, j int) bool { return addons[i].order < addons[j].order })
-	result := make([]string, len(addons))
-	for i, a := range addons {
-		result[i] = a.name
-	}
-	return result
-}
 
 func (d *Deployer) generateDeployPlaybook(addonPlugins []string) (string, error) {
 	var buf strings.Builder
