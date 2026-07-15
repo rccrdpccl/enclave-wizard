@@ -54,19 +54,21 @@ func (w *Writer) WriteAll(cfg *models.EnclaveConfig) error {
 			return fmt.Errorf("creating plugins config directory: %w", err)
 		}
 	}
+	if osacCfg == nil {
+		removeIfExists(filepath.Join(pluginsDir, "osac.yaml"))
+	}
 	if osacCfg != nil {
 		if err := writeYAMLFile(filepath.Join(pluginsDir, "osac.yaml"), osacCfg); err != nil {
 			return fmt.Errorf("writing osac.yaml: %w", err)
 		}
-	} else {
-		removeIfExists(filepath.Join(pluginsDir, "osac.yaml"))
+	}
+	if rhbkCfg == nil {
+		removeIfExists(filepath.Join(pluginsDir, "rhbk.yaml"))
 	}
 	if rhbkCfg != nil {
 		if err := writeYAMLFile(filepath.Join(pluginsDir, "rhbk.yaml"), rhbkCfg); err != nil {
 			return fmt.Errorf("writing rhbk.yaml: %w", err)
 		}
-	} else {
-		removeIfExists(filepath.Join(pluginsDir, "rhbk.yaml"))
 	}
 
 	return nil
