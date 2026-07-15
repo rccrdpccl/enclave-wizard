@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -22,20 +23,20 @@ type Validator struct {
 
 func NewValidator(enclaveDir string, runner runner.Runner) *Validator {
 	if runner == nil {
-		fmt.Println("WARNING: schema validation unavailable (task runner not available)")
+		slog.Warn("schema validation unavailable", "reason", "task runner not available")
 		return &Validator{enclaveDir: enclaveDir}
 	}
 
 	playbook := filepath.Join(enclaveDir, "playbooks", "validation", "validate-schema.yaml")
 	if _, err := os.Stat(playbook); err != nil {
-		fmt.Println("WARNING: schema validation unavailable (playbook not found)")
+		slog.Warn("schema validation unavailable", "reason", "playbook not found")
 		return &Validator{enclaveDir: enclaveDir}
 	}
 
 	patchValidationNoLog(enclaveDir)
 	writePluginValidationPlaybook(enclaveDir)
 
-	fmt.Println("Schema validation enabled")
+	slog.Info("schema validation enabled")
 	return &Validator{enclaveDir: enclaveDir, runner: runner, available: true}
 }
 
@@ -50,7 +51,7 @@ func patchValidationNoLog(enclaveDir string) {
 		return
 	}
 	os.WriteFile(taskFile, []byte(patched), 0640)
-	fmt.Println("Patched validation playbook: disabled no_log for error visibility")
+	slog.Info("patched validation playbook", "change", "disabled no_log for error visibility")
 }
 
 const pluginValidationPlaybook = `---
@@ -74,7 +75,7 @@ func writePluginValidationPlaybook(enclaveDir string) {
 	}
 	path := filepath.Join(enclaveDir, "playbooks", "validate-plugins.yaml")
 	os.WriteFile(path, []byte(pluginValidationPlaybook), 0640)
-	fmt.Println("Created plugin validation playbook wrapper")
+	slog.Info("created plugin validation playbook wrapper")
 }
 
 func (v *Validator) Available() bool {

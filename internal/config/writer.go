@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -58,14 +59,16 @@ func (w *Writer) WriteAll(cfg *models.EnclaveConfig) error {
 		if err := writeYAMLFile(filepath.Join(pluginsDir, "osac.yaml"), osacCfg); err != nil {
 			return fmt.Errorf("writing osac.yaml: %w", err)
 		}
-	} else {
+	}
+	if osacCfg == nil {
 		removeIfExists(filepath.Join(pluginsDir, "osac.yaml"))
 	}
 	if rhbkCfg != nil {
 		if err := writeYAMLFile(filepath.Join(pluginsDir, "rhbk.yaml"), rhbkCfg); err != nil {
 			return fmt.Errorf("writing rhbk.yaml: %w", err)
 		}
-	} else {
+	}
+	if rhbkCfg == nil {
 		removeIfExists(filepath.Join(pluginsDir, "rhbk.yaml"))
 	}
 
@@ -74,7 +77,7 @@ func (w *Writer) WriteAll(cfg *models.EnclaveConfig) error {
 
 func removeIfExists(path string) {
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
-		fmt.Printf("WARNING: failed to remove %s: %v\n", filepath.Base(path), err)
+		slog.Warn("failed to remove plugin config file", "file", filepath.Base(path), "error", err)
 	}
 }
 
