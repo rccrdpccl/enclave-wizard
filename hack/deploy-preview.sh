@@ -35,15 +35,7 @@ ${SCP} "$BINARY" "${TARGET}:/tmp/enclave-wizard-${PORT}"
 echo "[2/3] Setting up remote..."
 ${SSH} "${TARGET}" "
 set -e
-mkdir -p ${REMOTE_DIR}/config ${REMOTE_DIR}/tls
-
-# Generate TLS certs if missing
-if [ ! -f ${REMOTE_DIR}/tls/server.crt ]; then
-  openssl req -x509 -newkey rsa:2048 \
-    -keyout ${REMOTE_DIR}/tls/server.key \
-    -out ${REMOTE_DIR}/tls/server.crt \
-    -days 365 -nodes -subj '/CN=${TARGET_HOST}' 2>/dev/null
-fi
+mkdir -p ${REMOTE_DIR}/config
 
 # Stop existing instance on this port
 pkill -f 'enclave-wizard.*--https-port ${PORT}' 2>/dev/null || true
