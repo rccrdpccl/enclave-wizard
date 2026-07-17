@@ -9,6 +9,7 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
+	"strings"
 	"testing"
 )
 
@@ -17,7 +18,7 @@ func TestEnsureCert_GeneratesFiles(t *testing.T) {
 	certPath := filepath.Join(dir, "server.crt")
 	keyPath := filepath.Join(dir, "server.key")
 
-	if err := EnsureCert(certPath, keyPath); err != nil {
+	if err := EnsureCert(certPath, keyPath, true); err != nil {
 		t.Fatalf("EnsureCert() error = %v", err)
 	}
 
@@ -86,14 +87,14 @@ func TestEnsureCert_SkipsIfExists(t *testing.T) {
 	certPath := filepath.Join(dir, "server.crt")
 	keyPath := filepath.Join(dir, "server.key")
 
-	if err := EnsureCert(certPath, keyPath); err != nil {
+	if err := EnsureCert(certPath, keyPath, true); err != nil {
 		t.Fatalf("first EnsureCert() error = %v", err)
 	}
 
 	certBefore, _ := os.ReadFile(certPath)
 	keyBefore, _ := os.ReadFile(keyPath)
 
-	if err := EnsureCert(certPath, keyPath); err != nil {
+	if err := EnsureCert(certPath, keyPath, true); err != nil {
 		t.Fatalf("second EnsureCert() error = %v", err)
 	}
 
@@ -114,7 +115,7 @@ func TestEnsureCert_CreatesDirectory(t *testing.T) {
 	certPath := filepath.Join(nested, "server.crt")
 	keyPath := filepath.Join(nested, "server.key")
 
-	if err := EnsureCert(certPath, keyPath); err != nil {
+	if err := EnsureCert(certPath, keyPath, true); err != nil {
 		t.Fatalf("EnsureCert() error = %v", err)
 	}
 
@@ -135,7 +136,7 @@ func TestEnsureCert_KeyPermissions(t *testing.T) {
 	certPath := filepath.Join(dir, "server.crt")
 	keyPath := filepath.Join(dir, "server.key")
 
-	if err := EnsureCert(certPath, keyPath); err != nil {
+	if err := EnsureCert(certPath, keyPath, true); err != nil {
 		t.Fatalf("EnsureCert() error = %v", err)
 	}
 
@@ -146,6 +147,57 @@ func TestEnsureCert_KeyPermissions(t *testing.T) {
 	perm := info.Mode().Perm()
 	if perm != 0600 {
 		t.Errorf("key file permissions = %o, want 0600", perm)
+	}
+}
+
+func TestEnsureCert_UserProvidedCertsUsed(t *testing.T) {
+	dir := t.TempDir()
+	certPath := filepath.Join(dir, "server.crt")
+	keyPath := filepath.Join(dir, "server.key")
+
+	if err := EnsureCert(certPath, keyPath, true); err != nil {
+		t.Fatalf("generating initial certs: %v", err)
+	}
+
+	certBefore, _ := os.ReadFile(certPath)
+
+	if err := EnsureCert(certPath, keyPath, false); err != nil {
+		t.Fatalf("EnsureCert(selfSigned=false) with existing files: %v", err)
+	}
+
+	certAfter, _ := os.ReadFile(certPath)
+	if string(certBefore) != string(certAfter) {
+		t.Error("cert file was modified when user-provided certs should be left alone")
+	}
+}
+
+func TestEnsureCert_UserProvidedCertMissing(t *testing.T) {
+	dir := t.TempDir()
+	certPath := filepath.Join(dir, "server.crt")
+	keyPath := filepath.Join(dir, "server.key")
+
+	err := EnsureCert(certPath, keyPath, false)
+	if err == nil {
+		t.Fatal("expected error when cert file does not exist with selfSigned=false")
+	}
+	if !strings.Contains(err.Error(), "TLS certificate not found") {
+		t.Errorf("unexpected error: %v", err)
+	}
+}
+
+func TestEnsureCert_UserProvidedKeyMissing(t *testing.T) {
+	dir := t.TempDir()
+	certPath := filepath.Join(dir, "server.crt")
+	keyPath := filepath.Join(dir, "server.key")
+
+	os.WriteFile(certPath, []byte("cert"), 0644)
+
+	err := EnsureCert(certPath, keyPath, false)
+	if err == nil {
+		t.Fatal("expected error when key file does not exist with selfSigned=false")
+	}
+	if !strings.Contains(err.Error(), "TLS key not found") {
+		t.Errorf("unexpected error: %v", err)
 	}
 }
 

@@ -42,6 +42,7 @@ type Options struct {
 	HTTPSPort    int    `help:"HTTPS port" default:"3443"`
 	TLSCert      string `help:"Path to TLS certificate" default:"/etc/enclave-wizard/tls/server.crt"`
 	TLSKey       string `help:"Path to TLS key" default:"/etc/enclave-wizard/tls/server.key"`
+	TLSSelfSign  bool   `help:"Generate a self-signed certificate if none exists" default:"true"`
 	EnclaveDir   string `help:"Path to the Enclave repository root" default:"../enclave"`
 	PasswordFile string `help:"Path to the password file" default:"/etc/enclave-wizard/password"`
 	LogLevel     string `help:"Log level (trace, debug, info, warn, error)" default:"info"`
@@ -181,7 +182,7 @@ func main() {
 		}
 		setupUIHandler(mux)
 
-		if err := tlscert.EnsureCert(opts.TLSCert, opts.TLSKey); err != nil {
+		if err := tlscert.EnsureCert(opts.TLSCert, opts.TLSKey, opts.TLSSelfSign); err != nil {
 			slog.Error("failed to ensure TLS certificate", "error", err)
 			os.Exit(1)
 		}

@@ -15,13 +15,21 @@ import (
 	"time"
 )
 
-// EnsureCert generates a self-signed ECDSA P-256 TLS certificate and key at
-// the given paths if either file does not already exist.
-func EnsureCert(certPath, keyPath string) error {
+// EnsureCert ensures TLS cert and key files exist at the given paths.
+// When selfSigned is true, missing files are generated as self-signed certs.
+// When selfSigned is false, both files must already exist.
+func EnsureCert(certPath, keyPath string, selfSigned bool) error {
 	_, certErr := os.Stat(certPath)
 	_, keyErr := os.Stat(keyPath)
 	if certErr == nil && keyErr == nil {
 		return nil
+	}
+
+	if !selfSigned {
+		if certErr != nil {
+			return fmt.Errorf("TLS certificate not found: %s", certPath)
+		}
+		return fmt.Errorf("TLS key not found: %s", keyPath)
 	}
 
 	hostname, err := os.Hostname()
