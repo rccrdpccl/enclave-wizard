@@ -25,6 +25,7 @@ import (
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/logger"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/runner"
+	inttls "github.com/rh-ecosystem-edge/enclave-wizard/internal/tls"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/validation"
 )
 
@@ -170,6 +171,11 @@ func main() {
 			fmt.Println("  └────────────────────────────────────────────┘")
 			fmt.Println("")
 			os.WriteFile("/tmp/enclave-wizard-init-pass", []byte(generatedPass+"\n"), 0644)
+		}
+
+		if err := inttls.EnsureCert(opts.TLSCert, opts.TLSKey); err != nil {
+			slog.Error("failed to ensure TLS certificate", "error", err)
+			os.Exit(1)
 		}
 
 		mux := http.NewServeMux()

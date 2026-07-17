@@ -24,16 +24,6 @@ stop_existing() {
     sleep 0.5
 }
 
-ensure_tls() {
-    local cert="$1" key="$2"
-    [[ -f "$cert" ]] && return 0
-    mkdir -p "$(dirname "$cert")"
-    openssl req -new -x509 -nodes -days 365 \
-        -subj "/CN=localhost" \
-        -keyout "$key" -out "$cert" 2>/dev/null
-    echo "Generated self-signed TLS certificate"
-}
-
 wait_for_ready() {
     local port="$1"
     local i
@@ -58,7 +48,6 @@ main() {
 
     [[ -x "$binary" ]] || die "binary not found at $binary — run 'make demo-build' first"
 
-    ensure_tls "$tls_cert" "$tls_key"
     stop_existing
 
     printf 'Starting demo environment...\n'
