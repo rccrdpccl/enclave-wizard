@@ -25,6 +25,7 @@ import (
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/logger"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/runner"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tlscert"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/validation"
 )
 
@@ -41,6 +42,7 @@ type Options struct {
 	HTTPSPort    int    `help:"HTTPS port" default:"3443"`
 	TLSCert      string `help:"Path to TLS certificate" default:"/etc/enclave-wizard/tls/server.crt"`
 	TLSKey       string `help:"Path to TLS key" default:"/etc/enclave-wizard/tls/server.key"`
+	TLSSelfSign  bool   `help:"Generate a self-signed certificate if none exists" default:"true"`
 	EnclaveDir   string `help:"Path to the Enclave repository root" default:"../enclave"`
 	PasswordFile string `help:"Path to the password file" default:"/etc/enclave-wizard/password"`
 	LogLevel     string `help:"Log level (trace, debug, info, warn, error)" default:"info"`
@@ -179,6 +181,11 @@ func main() {
 			os.Exit(1)
 		}
 		setupUIHandler(mux)
+
+		if err := tlscert.EnsureCert(opts.TLSCert, opts.TLSKey, opts.TLSSelfSign); err != nil {
+			slog.Error("failed to ensure TLS certificate", "error", err)
+			os.Exit(1)
+		}
 
 		handler := api.LoggingMiddleware(api.BearerAuthMiddleware(authStore, opts.NoAuth)(mux))
 
