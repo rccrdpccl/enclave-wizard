@@ -147,9 +147,6 @@ run-mock: build
 		--tls-cert hack/tls/server.crt --tls-key hack/tls/server.key
 
 dev: build-ui ## Build and run dev mode (no-auth, enclave-mock, foreground).
-	@mkdir -p hack/tls
-	@test -f hack/tls/server.crt || openssl req -new -x509 -nodes -days 365 \
-		-subj "/CN=localhost" -keyout hack/tls/server.key -out hack/tls/server.crt 2>/dev/null
 	$(GO) build -ldflags="$(LDFLAGS)" -tags dev -o $(BINARY) .
 	./$(BINARY) --no-auth --enclave-dir enclave-mock \
 		--password-file /tmp/enclave-wizard-dev-pass \

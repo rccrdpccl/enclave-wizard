@@ -25,6 +25,7 @@ import (
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/logger"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/runner"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tlscert"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/validation"
 )
 
@@ -179,6 +180,11 @@ func main() {
 			os.Exit(1)
 		}
 		setupUIHandler(mux)
+
+		if err := tlscert.EnsureCert(opts.TLSCert, opts.TLSKey); err != nil {
+			slog.Error("failed to ensure TLS certificate", "error", err)
+			os.Exit(1)
+		}
 
 		handler := api.LoggingMiddleware(api.BearerAuthMiddleware(authStore, opts.NoAuth)(mux))
 
