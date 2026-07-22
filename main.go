@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"embed"
+	"flag"
 	"fmt"
 	"io/fs"
 	"log/slog"
@@ -25,6 +26,7 @@ import (
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/logger"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/plugins"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/runner"
+	"github.com/rh-ecosystem-edge/enclave-wizard/internal/tlscert"
 	"github.com/rh-ecosystem-edge/enclave-wizard/internal/validation"
 )
 
@@ -135,6 +137,21 @@ func setupUIHandler(mux *http.ServeMux) {
 }
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "generate-cert" {
+		fs := flag.NewFlagSet("generate-cert", flag.ExitOnError)
+		certFlag := fs.String("cert", "/etc/enclave-wizard/tls/server.crt", "Path to write TLS certificate")
+		keyFlag := fs.String("key", "/etc/enclave-wizard/tls/server.key", "Path to write TLS key")
+		fs.Parse(os.Args[2:])
+
+		if err := tlscert.GenerateSelfSigned(*certFlag, *keyFlag); err != nil {
+			fmt.Fprintf(os.Stderr, "Error: %v\n", err)
+			os.Exit(1)
+		}
+		hostname, _ := os.Hostname()
+		fmt.Printf("Generated self-signed TLS certificate\n  cert: %s\n  key:  %s\n  SANs: localhost, 127.0.0.1, %s\n", *certFlag, *keyFlag, hostname)
+		return
+	}
+
 	if len(os.Args) > 1 && os.Args[1] == "hash-password" {
 		if len(os.Args) < 3 {
 			fmt.Fprintln(os.Stderr, "Usage: enclave-wizard hash-password <password>")
@@ -188,6 +205,11 @@ func main() {
 		}
 
 		hooks.OnStart(func() {
+			if err := tlscert.EnsureCert(opts.TLSCert, opts.TLSKey); err != nil {
+				slog.Error("TLS certificate error", "error", err)
+				os.Exit(1)
+			}
+
 			fmt.Printf("Enclave Wizard listening on https://localhost:%d (enclave-dir: %s)\n", opts.HTTPSPort, opts.EnclaveDir)
 
 			// HTTP → HTTPS redirect
