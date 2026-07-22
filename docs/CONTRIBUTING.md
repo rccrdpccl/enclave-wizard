@@ -1,0 +1,128 @@
+# Contributing to Enclave Wizard
+
+## Prerequisites
+
+| Tool | Version | Notes |
+|------|---------|-------|
+| Go | 1.22+ | `go version` |
+| Node | 22 | **Not installed on host** — use `distrobox enter osac` for all Node/yarn/tsc commands |
+| Podman (or Docker) | latest | Used for UI builds, RPM packaging, and container-based cross-compilation |
+| make | any | GNU Make |
+
+## Project Structure
+
+```
+enclave-wizard/
+  main.go                          # Entry point, huma API wiring
+  internal/
+    api/                           # HTTP handlers (huma framework)
+    models/                        # Go structs -> OpenAPI -> TypeScript
+    config/                        # YAML reader/writer for enclave config
+    plugins/                       # Plugin discovery and registry
+    experience/                    # Experience loader
+    deploy/                        # Deployer + state machine
+    runner/                        # ansible-runner integration
+    validation/                    # Config validation via Ansible
+  ui/
+    apps/wizard/                   # React SPA (PatternFly 6, Vite)
+      src/schema/                  # Schema-driven form rendering
+      src/wizard/                  # Wizard steps, experiences, flavors
+      e2e/                         # Playwright browser tests
+    packages/api-client/           # Generated TypeScript API client
+  enclave-mock/                    # Fake enclave directory for local dev
+  hack/                            # Scripts: deploy, RPM, e2e, infra
+```
+
+## Running Locally
+
+All three modes serve the wizard at `https://localhost:3443`.
+
+### Demo mode (recorded ansible-runner replay)
+
+```bash
+make demo
+```
+
+Builds with the `dev` tag, starts with `--demo-deploy` serving a pre-recorded deployment. Background process; stop with `make demo-stop`. Tune speed with `SPEED=10`.
+
+### Dev mode (no auth, enclave-mock)
+
+```bash
+make dev
+```
+
+Builds with the `dev` tag, runs against `enclave-mock/` with `--no-auth`. Generates self-signed TLS certs if missing. Foreground process — Ctrl-C to stop.
+
+### Real mode (needs real enclave directory)
+
+```bash
+make run
+```
+
+Builds the UI and Go binary, runs against `../enclave`. Requires a real enclave directory with schemas, playbooks, and config.
+
+## Running Tests
+
+### Go unit tests
+
+```bash
+make test
+# or
+go test ./...
+```
+
+### UI unit tests
+
+Node is not available on the host. Use distrobox:
+
+```bash
+distrobox enter osac
+cd ui
+yarn install
+yarn workspace @enclave-wizard-ui/wizard test
+```
+
+### E2E tests (API-level, against a remote host)
+
+```bash
+# Full run: build RPM, deploy to VM, run tests
+make e2e TARGET=root@myhost
+
+# Rerun tests without redeploying
+make e2e-rerun TARGET=root@myhost
+
+# Browser-based UI tests (Playwright)
+make e2e-browser WIZARD_URL=https://myhost:3443
+```
+
+## Building
+
+```bash
+make build          # Build UI + Go binary (host arch)
+make build-linux    # Cross-compile for linux/amd64 in a container
+make rpm            # Build RPM package (calls build-linux)
+```
+
+## Deploying
+
+```bash
+make deploy TARGET=root@myhost            # Deploy with auth
+make deploy TARGET=root@myhost AUTH=none   # Deploy without auth
+```
+
+See [deployment.md](deployment.md) for details on the RPM structure, systemd service, and VM provisioning.
+
+## How-To Guides
+
+- [Adding a wizard field](howto-add-field.md) — add a new config field end-to-end
+- [Adding an experience](howto-add-experience.md) — create a new deployable experience
+- [Adding a plugin](howto-add-plugin.md) — create a new enclave plugin
+- [Adding an API endpoint](howto-add-api-endpoint.md) — add a new REST endpoint
+
+## Other Documentation
+
+- [Enclave config reference](enclave-config.md) — config file format and fields
+- [OSAC configuration](OSAC_CONFIGURATION.md) — OSAC-specific settings
+- [Deployment](deployment.md) — RPM packaging and remote deployment
+- [Testing patterns](enclave-testing-patterns.md) — test strategy and patterns
+- [Recording deployments](recording-deployment.md) — recording ansible-runner output for demo mode
