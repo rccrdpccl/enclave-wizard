@@ -10,16 +10,6 @@ ENCLAVE_DIR="${ENCLAVE_DIR:-$ROOT_DIR/../enclave}"
 TLS_DIR="$ROOT_DIR/hack/tls"
 PASSWORD_FILE="/tmp/enclave-wizard-preview-${PORT}.pass"
 
-# Generate self-signed TLS certs if missing
-if [[ ! -f "$TLS_DIR/server.crt" || ! -f "$TLS_DIR/server.key" ]]; then
-  mkdir -p "$TLS_DIR"
-  echo "Generating self-signed TLS certificate..."
-  openssl req -x509 -newkey rsa:2048 \
-    -keyout "$TLS_DIR/server.key" \
-    -out "$TLS_DIR/server.crt" \
-    -days 365 -nodes -subj '/CN=localhost' 2>/dev/null
-fi
-
 # Kill any existing instance on this port
 existing_pid=$(lsof -ti :"$PORT" 2>/dev/null || true)
 if [[ -n "$existing_pid" ]]; then
