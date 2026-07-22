@@ -37,20 +37,17 @@ ${SSH} "${TARGET}" "
 set -e
 mkdir -p ${REMOTE_DIR}/config ${REMOTE_DIR}/tls
 
-# Generate TLS certs if missing
-if [ ! -f ${REMOTE_DIR}/tls/server.crt ]; then
-  openssl req -x509 -newkey rsa:2048 \
-    -keyout ${REMOTE_DIR}/tls/server.key \
-    -out ${REMOTE_DIR}/tls/server.crt \
-    -days 365 -nodes -subj '/CN=${TARGET_HOST}' 2>/dev/null
-fi
-
 # Stop existing instance on this port
 pkill -f 'enclave-wizard.*--https-port ${PORT}' 2>/dev/null || true
 sleep 1
 
 mv /tmp/enclave-wizard-${PORT} ${REMOTE_DIR}/enclave-wizard
 chmod +x ${REMOTE_DIR}/enclave-wizard
+
+# Generate TLS certs using the wizard binary
+${REMOTE_DIR}/enclave-wizard generate-cert \
+  --cert ${REMOTE_DIR}/tls/server.crt \
+  --key ${REMOTE_DIR}/tls/server.key
 
 # Open firewall ports
 if command -v firewall-cmd &>/dev/null; then
