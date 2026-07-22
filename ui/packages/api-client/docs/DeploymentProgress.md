@@ -1,5 +1,5 @@
 
-# TaskEventsOutputBody
+# DeploymentProgress
 
 
 ## Properties
@@ -7,18 +7,26 @@
 Name | Type
 ------------ | -------------
 `$schema` | string
-`events` | Array&lt;object&gt;
+`completed` | number
+`currentPhase` | string
+`currentTask` | string
+`percentage` | number
+`total` | number
 
 ## Example
 
 ```typescript
-import type { TaskEventsOutputBody } from '@enclave-wizard-ui/api-client'
+import type { DeploymentProgress } from '@enclave-wizard-ui/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
   "$schema": null,
-  "events": null,
-} satisfies TaskEventsOutputBody
+  "completed": null,
+  "currentPhase": null,
+  "currentTask": null,
+  "percentage": null,
+  "total": null,
+} satisfies DeploymentProgress
 
 console.log(example)
 
@@ -27,7 +35,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as TaskEventsOutputBody
+const exampleParsed = JSON.parse(exampleJSON) as DeploymentProgress
 console.log(exampleParsed)
 ```
 

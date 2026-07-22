@@ -1,28 +1,26 @@
 
-# Plugin
+# VersionOutputBody
 
 
 ## Properties
 
 Name | Type
 ------------ | -------------
-`defaults` | { [key: string]: any; }
-`name` | string
-`order` | number
-`type` | string
+`$schema` | string
+`enclaveVersion` | string
+`wizardVersion` | string
 
 ## Example
 
 ```typescript
-import type { Plugin } from '@enclave-wizard-ui/api-client'
+import type { VersionOutputBody } from '@enclave-wizard-ui/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "defaults": null,
-  "name": null,
-  "order": null,
-  "type": null,
-} satisfies Plugin
+  "$schema": null,
+  "enclaveVersion": null,
+  "wizardVersion": null,
+} satisfies VersionOutputBody
 
 console.log(example)
 
@@ -31,7 +29,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as Plugin
+const exampleParsed = JSON.parse(exampleJSON) as VersionOutputBody
 console.log(exampleParsed)
 ```
 

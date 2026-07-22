@@ -18,7 +18,7 @@ Name | Type
 `masterMaxPods` | number
 `pullSecret` | any
 `rendezvousIP` | string
-`sshPubPath` | string
+`sshPubKey` | string
 
 ## Example
 
@@ -39,7 +39,7 @@ const example = {
   "masterMaxPods": null,
   "pullSecret": null,
   "rendezvousIP": null,
-  "sshPubPath": null,
+  "sshPubKey": null,
 } satisfies ClusterConfig
 
 console.log(example)

@@ -26,11 +26,11 @@ export interface LandingZoneConfig {
      */
     readonly $schema?: string;
     /**
-     * Air-gapped deployment mode (default: true)
+     * Air-gapped deployment mode
      * @type {boolean}
      * @memberof LandingZoneConfig
      */
-    disconnected?: boolean;
+    disconnected: boolean | null;
     /**
      * DNS hostname for landing zone BMC interface
      * @type {string}
@@ -55,6 +55,7 @@ export interface LandingZoneConfig {
  * Check if a given object implements the LandingZoneConfig interface.
  */
 export function instanceOfLandingZoneConfig(value: object): value is LandingZoneConfig {
+    if (!('disconnected' in value) || value['disconnected'] === undefined) return false;
     if (!('lzBmcIP' in value) || value['lzBmcIP'] === undefined) return false;
     if (!('workingDir' in value) || value['workingDir'] === undefined) return false;
     return true;
@@ -71,7 +72,7 @@ export function LandingZoneConfigFromJSONTyped(json: any, ignoreDiscriminator: b
     return {
         
         '$schema': json['$schema'] == null ? undefined : json['$schema'],
-        'disconnected': json['disconnected'] == null ? undefined : json['disconnected'],
+        'disconnected': json['disconnected'],
         'lzBmcHostname': json['lzBmcHostname'] == null ? undefined : json['lzBmcHostname'],
         'lzBmcIP': json['lzBmcIP'],
         'workingDir': json['workingDir'],

@@ -9,12 +9,10 @@ Name | Type
 `$schema` | string
 `disconnected` | boolean
 `diskEncryption` | boolean
-`lvmsDefaults` | [LVMSConfig](LVMSConfig.md)
 `masterMaxPods` | number
 `ocMirrorLogLevel` | string
-`odfDefaults` | [ODFConfig](ODFConfig.md)
+`pluginDefaults` | { [key: string]: any; }
 `storagePlugin` | string
-`vastDefaults` | [VASTConfig](VASTConfig.md)
 
 ## Example
 
@@ -26,12 +24,10 @@ const example = {
   "$schema": null,
   "disconnected": null,
   "diskEncryption": null,
-  "lvmsDefaults": null,
   "masterMaxPods": null,
   "ocMirrorLogLevel": null,
-  "odfDefaults": null,
+  "pluginDefaults": null,
   "storagePlugin": null,
-  "vastDefaults": null,
 } satisfies Defaults
 
 console.log(example)

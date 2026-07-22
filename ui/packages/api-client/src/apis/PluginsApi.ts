@@ -34,6 +34,10 @@ import {
     PluginsOutputBodyToJSON,
 } from '../models/index.js';
 
+export interface GetPluginSchemaRequest {
+    name: string;
+}
+
 export interface ValidatePluginCombinationRequest {
     pluginValidateInputBody: Omit<PluginValidateInputBody, '$schema'>;
 }
@@ -62,6 +66,22 @@ export interface PluginsApiInterface {
      * Load Enabled plugins configuration
      */
     getConfigPlugins(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PluginsConfig>;
+
+    /**
+     * Returns the JSON schema for the named plugin\'s configuration. Used by the frontend for dynamic form rendering.
+     * @summary Get plugin config schema
+     * @param {string} name Plugin name
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof PluginsApiInterface
+     */
+    getPluginSchemaRaw(requestParameters: GetPluginSchemaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<any>>;
+
+    /**
+     * Returns the JSON schema for the named plugin\'s configuration. Used by the frontend for dynamic form rendering.
+     * Get plugin config schema
+     */
+    getPluginSchema(requestParameters: GetPluginSchemaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<any>;
 
     /**
      * Returns all known plugins and their types.
@@ -142,6 +162,49 @@ export class PluginsApi extends runtime.BaseAPI implements PluginsApiInterface {
      */
     async getConfigPlugins(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<PluginsConfig> {
         const response = await this.getConfigPluginsRaw(initOverrides);
+        return await response.value();
+    }
+
+    /**
+     * Returns the JSON schema for the named plugin\'s configuration. Used by the frontend for dynamic form rendering.
+     * Get plugin config schema
+     */
+    async getPluginSchemaRaw(requestParameters: GetPluginSchemaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<any>> {
+        if (requestParameters['name'] == null) {
+            throw new runtime.RequiredError(
+                'name',
+                'Required parameter "name" was null or undefined when calling getPluginSchema().'
+            );
+        }
+
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/v1/plugins/{name}/schema`;
+        urlPath = urlPath.replace(`{${"name"}}`, encodeURIComponent(String(requestParameters['name'])));
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        if (this.isJsonMime(response.headers.get('content-type'))) {
+            return new runtime.JSONApiResponse<any>(response);
+        } else {
+            return new runtime.TextApiResponse(response) as any;
+        }
+    }
+
+    /**
+     * Returns the JSON schema for the named plugin\'s configuration. Used by the frontend for dynamic form rendering.
+     * Get plugin config schema
+     */
+    async getPluginSchema(requestParameters: GetPluginSchemaRequest, initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<any> {
+        const response = await this.getPluginSchemaRaw(requestParameters, initOverrides);
         return await response.value();
     }
 

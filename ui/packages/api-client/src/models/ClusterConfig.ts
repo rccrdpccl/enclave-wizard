@@ -100,11 +100,11 @@ export interface ClusterConfig {
      */
     rendezvousIP: string;
     /**
-     * Path to SSH public key file
+     * SSH public key content (e.g. ssh-rsa AAAA...)
      * @type {string}
      * @memberof ClusterConfig
      */
-    sshPubKey: string;
+    sshPubKey?: string;
 }
 
 /**
@@ -119,7 +119,6 @@ export function instanceOfClusterConfig(value: object): value is ClusterConfig {
     if (!('machineNetwork' in value) || value['machineNetwork'] === undefined) return false;
     if (!('pullSecret' in value) || value['pullSecret'] === undefined) return false;
     if (!('rendezvousIP' in value) || value['rendezvousIP'] === undefined) return false;
-    if (!('sshPubKey' in value) || value['sshPubKey'] === undefined) return false;
     return true;
 }
 
@@ -145,7 +144,7 @@ export function ClusterConfigFromJSONTyped(json: any, ignoreDiscriminator: boole
         'masterMaxPods': json['masterMaxPods'] == null ? undefined : json['masterMaxPods'],
         'pullSecret': json['pullSecret'],
         'rendezvousIP': json['rendezvousIP'],
-        'sshPubKey': json['sshPubKey'],
+        'sshPubKey': json['sshPubKey'] == null ? undefined : json['sshPubKey'],
     };
 }
 

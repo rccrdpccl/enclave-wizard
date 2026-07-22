@@ -79,6 +79,24 @@ func (r *Reader) mergePluginConfigs(cfg *models.EnclaveConfig) {
 		if osac.OsacDatabaseUrl != "" {
 			cfg.Global.OsacDatabaseUrl = &osac.OsacDatabaseUrl
 		}
+		if osac.OsacBcmEnabled {
+			cfg.Global.OsacBcmEnabled = &osac.OsacBcmEnabled
+		}
+		if osac.OsacBcmApiUrl != "" {
+			cfg.Global.OsacBcmApiUrl = &osac.OsacBcmApiUrl
+		}
+		if osac.OsacBcmClientCert != "" {
+			cfg.Global.OsacBcmClientCert = &osac.OsacBcmClientCert
+		}
+		if osac.OsacBcmClientKey != "" {
+			cfg.Global.OsacBcmClientKey = &osac.OsacBcmClientKey
+		}
+		if osac.OsacBcmValidateCerts {
+			cfg.Global.OsacBcmValidateCerts = &osac.OsacBcmValidateCerts
+		}
+		if osac.OsacBcmDisableBmcCertVerification {
+			cfg.Global.OsacBcmDisableBmcCertVerification = &osac.OsacBcmDisableBmcCertVerification
+		}
 		if len(osac.ClusterFulfillmentConfig) > 0 {
 			cfg.Global.ClusterFulfillmentConfig = osac.ClusterFulfillmentConfig
 		}
@@ -99,11 +117,17 @@ func (r *Reader) mergePluginConfigs(cfg *models.EnclaveConfig) {
 }
 
 type osacPluginConfig struct {
-	OsacProfile              string            `yaml:"osacProfile,omitempty"`
-	OsacAapLicenseFile       string            `yaml:"osacAapLicenseFile,omitempty"`
-	OsacBYODatabase          bool              `yaml:"osacBYODatabase,omitempty"`
-	OsacDatabaseUrl          string            `yaml:"osacDatabaseUrl,omitempty"`
-	ClusterFulfillmentConfig map[string]string `yaml:"clusterFulfillmentConfig,omitempty"`
+	OsacProfile                       string            `yaml:"osacProfile,omitempty"`
+	OsacAapLicenseFile                string            `yaml:"osacAapLicenseFile,omitempty"`
+	OsacBYODatabase                   bool              `yaml:"osacBYODatabase,omitempty"`
+	OsacDatabaseUrl                   string            `yaml:"osacDatabaseUrl,omitempty"`
+	OsacBcmEnabled                    bool              `yaml:"osacBcmEnabled,omitempty"`
+	OsacBcmApiUrl                     string            `yaml:"osacBcmApiUrl,omitempty"`
+	OsacBcmClientCert                 string            `yaml:"osacBcmClientCert,omitempty"`
+	OsacBcmClientKey                  string            `yaml:"osacBcmClientKey,omitempty"`
+	OsacBcmValidateCerts              bool              `yaml:"osacBcmValidateCerts,omitempty"`
+	OsacBcmDisableBmcCertVerification bool              `yaml:"osacBcmDisableBmcCertVerification,omitempty"`
+	ClusterFulfillmentConfig          map[string]string `yaml:"clusterFulfillmentConfig,omitempty"`
 }
 
 type rhbkPluginConfig struct {

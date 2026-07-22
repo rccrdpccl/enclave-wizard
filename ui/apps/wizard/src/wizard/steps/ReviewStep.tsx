@@ -60,6 +60,12 @@ const OSAC_PLUGIN_KEYS = [
   "osacAapLicenseFile",
   "osacBYODatabase",
   "osacDatabaseUrl",
+  "osacBcmEnabled",
+  "osacBcmApiUrl",
+  "osacBcmClientCert",
+  "osacBcmClientKey",
+  "osacBcmValidateCerts",
+  "osacBcmDisableBmcCertVerification",
   "clusterFulfillmentConfig",
 ];
 
@@ -76,13 +82,9 @@ function extractPluginConfig(
   const result: Record<string, unknown> = {};
   let hasValue = false;
   for (const key of keys) {
-    if (
-      globalData[key] != null &&
-      globalData[key] !== "" &&
-      globalData[key] !== false
-    ) {
+    if (globalData[key] != null && globalData[key] !== "") {
       result[key] = globalData[key];
-      hasValue = true;
+      if (globalData[key] !== false) hasValue = true;
     }
   }
   return hasValue ? result : null;

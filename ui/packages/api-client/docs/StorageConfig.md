@@ -7,7 +7,6 @@
 Name | Type
 ------------ | -------------
 `$schema` | string
-`blockStorageBackend` | string
 `lvmsConfig` | [LVMSStorageConfig](LVMSStorageConfig.md)
 `odfExternalConfig` | string
 `storagePlugin` | string
@@ -24,7 +23,6 @@ import type { StorageConfig } from '@enclave-wizard-ui/api-client'
 // TODO: Update the object below with actual values
 const example = {
   "$schema": null,
-  "blockStorageBackend": null,
   "lvmsConfig": null,
   "odfExternalConfig": null,
   "storagePlugin": null,

@@ -3,8 +3,10 @@ export interface FieldMeta {
   label: string;
   description: string | undefined;
   type: string;
+  format: string | undefined;
   required: boolean;
   enum: string[] | undefined;
+  enumLabels: Record<string, string> | undefined;
   pattern: string | undefined;
   minimum: number | undefined;
   maximum: number | undefined;
@@ -127,11 +129,13 @@ export function extractFieldMeta(
 
   return {
     path: dotPath,
-    label: humanizeFieldName(fieldName),
+    label: (schema.title as string | undefined) ?? humanizeFieldName(fieldName),
     description: (schema.doc ?? schema.description) as string | undefined,
     type: (schema.type as string) ?? "string",
+    format: schema.format as string | undefined,
     required: requiredList.includes(fieldName),
     enum: schema.enum,
+    enumLabels: schema.enumLabels as Record<string, string> | undefined,
     pattern: schema.pattern,
     minimum: schema.minimum,
     maximum: schema.maximum,
@@ -240,11 +244,12 @@ export function validateHostEntries(
       if (!fieldSchema) continue;
       const meta: FieldMeta = {
         path: `${label}[${i}].${fieldName}`,
-        label: humanizeFieldName(fieldName),
+        label: (fieldSchema.title as string | undefined) ?? humanizeFieldName(fieldName),
         description: (fieldSchema.doc ?? fieldSchema.description) as
           | string
           | undefined,
         type: (fieldSchema.type as string) ?? "string",
+        format: fieldSchema.format as string | undefined,
         required: requiredFields.includes(fieldName),
         enum: fieldSchema.enum,
         pattern: fieldSchema.pattern,

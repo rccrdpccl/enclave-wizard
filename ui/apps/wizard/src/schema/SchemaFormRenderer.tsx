@@ -1,16 +1,25 @@
 import {
+  Button,
+  Card,
+  CardBody,
+  CardHeader,
+  CardTitle,
   Checkbox,
+  Flex,
+  FlexItem,
   FormGroup,
   FormHelperText,
   FormSelect,
   FormSelectOption,
   NumberInput,
+  TextArea,
   TextInput,
 } from "@patternfly/react-core";
+import { MinusCircleIcon, PlusCircleIcon } from "@patternfly/react-icons";
 import type React from "react";
 import { StringArrayField } from "../wizard/components/StringArrayField.tsx";
 import { stepStyles } from "../wizard/steps/stepStyles.ts";
-import { extractFieldMeta, type FieldMeta } from "./schemaUtils.ts";
+import { extractFieldMeta, humanizeFieldName, type FieldMeta } from "./schemaUtils.ts";
 
 const PLACEHOLDER_HINTS: Record<string, string> = {
   baseDomain: "example.com",
@@ -116,7 +125,15 @@ function renderField(
         >
           <FormSelectOption value="" label="Select..." isPlaceholder />
           {meta.enum.map((opt) => (
-            <FormSelectOption key={opt} value={opt} label={opt} />
+            <FormSelectOption
+              key={opt}
+              value={opt}
+              label={
+                (meta.enumLabels as Record<string, string> | undefined)?.[
+                  opt
+                ] ?? opt
+              }
+            />
           ))}
         </FormSelect>
         {meta.description && (
@@ -177,6 +194,137 @@ function renderField(
         onChange={(v) => onChange(meta.path, v)}
         isRequired={meta.required}
       />
+    );
+  }
+
+  if (
+    meta.type === "array" &&
+    (meta.items as Record<string, unknown>)?.type === "object"
+  ) {
+    const itemSchema = meta.items as Record<string, unknown>;
+    const itemProps = (itemSchema.properties ?? {}) as Record<string, unknown>;
+    const itemRequired = (itemSchema.required ?? []) as string[];
+    const arrayValue = Array.isArray(value)
+      ? (value as Record<string, unknown>[])
+      : [];
+
+    const fieldNames = Object.keys(itemProps);
+
+    const addItem = () => {
+      const empty: Record<string, unknown> = {};
+      for (const name of fieldNames) {
+        const prop = itemProps[name] as Record<string, unknown>;
+        if (prop?.type === "boolean") empty[name] = false;
+        else empty[name] = "";
+      }
+      onChange(meta.path, [...arrayValue, empty]);
+    };
+
+    const removeItem = (idx: number) => {
+      onChange(
+        meta.path,
+        arrayValue.filter((_, i) => i !== idx),
+      );
+    };
+
+    const updateItem = (idx: number, field: string, val: unknown) => {
+      const updated = [...arrayValue];
+      updated[idx] = { ...updated[idx], [field]: val };
+      onChange(meta.path, updated);
+    };
+
+    return (
+      <FormGroup key={meta.path} fieldId={fieldId}>
+        <Flex
+          justifyContent={{ default: "justifyContentSpaceBetween" }}
+          alignItems={{ default: "alignItemsCenter" }}
+        >
+          <FlexItem>
+            <strong>
+              {meta.label} ({arrayValue.length})
+            </strong>
+          </FlexItem>
+          <FlexItem>
+            <Button variant="link" icon={<PlusCircleIcon />} onClick={addItem}>
+              Add
+            </Button>
+          </FlexItem>
+        </Flex>
+        {meta.description && (
+          <FormHelperText>{meta.description}</FormHelperText>
+        )}
+        {arrayValue.map((item, idx) => (
+          <Card key={`${meta.path}-${idx}`} isCompact style={{ marginTop: 8 }}>
+            <CardHeader
+              actions={{
+                actions: (
+                  <Button
+                    variant="plain"
+                    aria-label={`Remove item ${idx + 1}`}
+                    onClick={() => removeItem(idx)}
+                  >
+                    <MinusCircleIcon />
+                  </Button>
+                ),
+              }}
+            >
+              <CardTitle>
+                {(item.name as string) || `${meta.label} ${idx + 1}`}
+              </CardTitle>
+            </CardHeader>
+            <CardBody>
+              {fieldNames.map((name) => {
+                const prop = itemProps[name] as Record<string, unknown>;
+                const childMeta: FieldMeta = {
+                  path: `${meta.path}[${idx}].${name}`,
+                  label: humanizeFieldName(name),
+                  type: (prop?.type as string) ?? "string",
+                  format: (prop?.format as string) ?? undefined,
+                  required: itemRequired.includes(name),
+                  description: (prop?.description as string) ?? undefined,
+                  enum: (prop?.enum as string[]) ?? undefined,
+                  enumLabels: (prop?.enumLabels as Record<string, string>) ?? undefined,
+                  pattern: (prop?.pattern as string) ?? undefined,
+                  minimum: (prop?.minimum as number) ?? undefined,
+                  maximum: (prop?.maximum as number) ?? undefined,
+                  items: prop?.items as Record<string, unknown> | undefined,
+                };
+                return renderField(
+                  childMeta,
+                  item[name],
+                  (_path, val) => updateItem(idx, name, val),
+                  showValidation,
+                );
+              })}
+            </CardBody>
+          </Card>
+        ))}
+      </FormGroup>
+    );
+  }
+
+  if (meta.type === "string" && meta.format === "textarea") {
+    return (
+      <FormGroup
+        key={meta.path}
+        label={meta.label}
+        isRequired={meta.required}
+        fieldId={fieldId}
+      >
+        <TextArea
+          id={fieldId}
+          aria-label={meta.label}
+          value={(value as string) ?? ""}
+          onChange={(_e, v) => onChange(meta.path, v)}
+          rows={6}
+          resizeOrientation="vertical"
+          isRequired={meta.required}
+          validated={validated}
+        />
+        {meta.description && (
+          <FormHelperText>{meta.description}</FormHelperText>
+        )}
+      </FormGroup>
     );
   }
 

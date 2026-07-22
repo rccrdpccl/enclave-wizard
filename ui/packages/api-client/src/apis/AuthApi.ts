@@ -15,6 +15,7 @@
 
 import * as runtime from '../runtime.js';
 import type {
+  AuthModeOutputBody,
   ChangePasswordInputBody,
   ChangePasswordOutputBody,
   ErrorModel,
@@ -22,6 +23,8 @@ import type {
   LoginOutputBody,
 } from '../models/index.js';
 import {
+    AuthModeOutputBodyFromJSON,
+    AuthModeOutputBodyToJSON,
     ChangePasswordInputBodyFromJSON,
     ChangePasswordInputBodyToJSON,
     ChangePasswordOutputBodyFromJSON,
@@ -49,6 +52,20 @@ export interface LoginRequest {
  * @interface AuthApiInterface
  */
 export interface AuthApiInterface {
+    /**
+     * 
+     * @summary Check authentication mode
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof AuthApiInterface
+     */
+    authModeRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AuthModeOutputBody>>;
+
+    /**
+     * Check authentication mode
+     */
+    authMode(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AuthModeOutputBody>;
+
     /**
      * 
      * @summary Change admin password
@@ -85,6 +102,35 @@ export interface AuthApiInterface {
  * 
  */
 export class AuthApi extends runtime.BaseAPI implements AuthApiInterface {
+
+    /**
+     * Check authentication mode
+     */
+    async authModeRaw(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<runtime.ApiResponse<AuthModeOutputBody>> {
+        const queryParameters: any = {};
+
+        const headerParameters: runtime.HTTPHeaders = {};
+
+
+        let urlPath = `/api/v1/auth/mode`;
+
+        const response = await this.request({
+            path: urlPath,
+            method: 'GET',
+            headers: headerParameters,
+            query: queryParameters,
+        }, initOverrides);
+
+        return new runtime.JSONApiResponse(response, (jsonValue) => AuthModeOutputBodyFromJSON(jsonValue));
+    }
+
+    /**
+     * Check authentication mode
+     */
+    async authMode(initOverrides?: RequestInit | runtime.InitOverrideFunction): Promise<AuthModeOutputBody> {
+        const response = await this.authModeRaw(initOverrides);
+        return await response.value();
+    }
 
     /**
      * Change admin password

@@ -1,103 +1,45 @@
-# PluginsApi
+# DeploymentsApi
 
 All URIs are relative to *http://localhost*
 
 | Method | HTTP request | Description |
 |------------- | ------------- | -------------|
-| [**getConfigPlugins**](PluginsApi.md#getconfigplugins) | **GET** /api/v1/config/plugins | Load Enabled plugins configuration |
-| [**getPluginSchema**](PluginsApi.md#getpluginschema) | **GET** /api/v1/plugins/{name}/schema | Get plugin config schema |
-| [**listPlugins**](PluginsApi.md#listplugins) | **GET** /api/v1/plugins | List available plugins |
-| [**validatePluginCombination**](PluginsApi.md#validateplugincombination) | **POST** /api/v1/plugins/validate | Validate plugin combination |
-| [**writeConfigPlugins**](PluginsApi.md#writeconfigplugins) | **PUT** /api/v1/config/plugins | Update Enabled plugins configuration |
+| [**cancelDeployment**](DeploymentsApi.md#canceldeployment) | **DELETE** /api/v1/deployments/{id} | Cancel deployment |
+| [**getCurrentDeployment**](DeploymentsApi.md#getcurrentdeployment) | **GET** /api/v1/deployments/current | Get current deployment |
+| [**getDeploymentById**](DeploymentsApi.md#getdeploymentbyid) | **GET** /api/v1/deployments/{id} | Get deployment by ID |
+| [**getDeploymentProgressById**](DeploymentsApi.md#getdeploymentprogressbyid) | **GET** /api/v1/deployments/{id}/progress | Get deployment progress |
+| [**startDeployment**](DeploymentsApi.md#startdeployment) | **POST** /api/v1/deployments | Start deployment |
 
 
 
-## getConfigPlugins
+## cancelDeployment
 
-> PluginsConfig getConfigPlugins()
+> cancelDeployment(id)
 
-Load Enabled plugins configuration
+Cancel deployment
 
-### Example
-
-```ts
-import {
-  Configuration,
-  PluginsApi,
-} from '@enclave-wizard-ui/api-client';
-import type { GetConfigPluginsRequest } from '@enclave-wizard-ui/api-client';
-
-async function example() {
-  console.log("🚀 Testing @enclave-wizard-ui/api-client SDK...");
-  const api = new PluginsApi();
-
-  try {
-    const data = await api.getConfigPlugins();
-    console.log(data);
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-// Run the test
-example().catch(console.error);
-```
-
-### Parameters
-
-This endpoint does not need any parameter.
-
-### Return type
-
-[**PluginsConfig**](PluginsConfig.md)
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
-- **Content-Type**: Not defined
-- **Accept**: `application/json`, `application/problem+json`
-
-
-### HTTP response details
-| Status code | Description | Response headers |
-|-------------|-------------|------------------|
-| **200** | OK |  -  |
-| **0** | Error |  -  |
-
-[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
-
-
-## getPluginSchema
-
-> any getPluginSchema(name)
-
-Get plugin config schema
-
-Returns the JSON schema for the named plugin\&#39;s configuration. Used by the frontend for dynamic form rendering.
+Cancels a running deployment.
 
 ### Example
 
 ```ts
 import {
   Configuration,
-  PluginsApi,
+  DeploymentsApi,
 } from '@enclave-wizard-ui/api-client';
-import type { GetPluginSchemaRequest } from '@enclave-wizard-ui/api-client';
+import type { CancelDeploymentRequest } from '@enclave-wizard-ui/api-client';
 
 async function example() {
   console.log("🚀 Testing @enclave-wizard-ui/api-client SDK...");
-  const api = new PluginsApi();
+  const api = new DeploymentsApi();
 
   const body = {
-    // string | Plugin name
-    name: name_example,
-  } satisfies GetPluginSchemaRequest;
+    // string | Deployment identifier
+    id: id_example,
+  } satisfies CancelDeploymentRequest;
 
   try {
-    const data = await api.getPluginSchema(body);
+    const data = await api.cancelDeployment(body);
     console.log(data);
   } catch (error) {
     console.error(error);
@@ -113,201 +55,7 @@ example().catch(console.error);
 
 | Name | Type | Description  | Notes |
 |------------- | ------------- | ------------- | -------------|
-| **name** | `string` | Plugin name | [Defaults to `undefined`] |
-
-### Return type
-
-**any**
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
-- **Content-Type**: Not defined
-- **Accept**: `application/json`, `application/problem+json`
-
-
-### HTTP response details
-| Status code | Description | Response headers |
-|-------------|-------------|------------------|
-| **200** | OK |  -  |
-| **0** | Error |  -  |
-
-[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
-
-
-## listPlugins
-
-> PluginsOutputBody listPlugins()
-
-List available plugins
-
-Returns all known plugins and their types.
-
-### Example
-
-```ts
-import {
-  Configuration,
-  PluginsApi,
-} from '@enclave-wizard-ui/api-client';
-import type { ListPluginsRequest } from '@enclave-wizard-ui/api-client';
-
-async function example() {
-  console.log("🚀 Testing @enclave-wizard-ui/api-client SDK...");
-  const api = new PluginsApi();
-
-  try {
-    const data = await api.listPlugins();
-    console.log(data);
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-// Run the test
-example().catch(console.error);
-```
-
-### Parameters
-
-This endpoint does not need any parameter.
-
-### Return type
-
-[**PluginsOutputBody**](PluginsOutputBody.md)
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
-- **Content-Type**: Not defined
-- **Accept**: `application/json`, `application/problem+json`
-
-
-### HTTP response details
-| Status code | Description | Response headers |
-|-------------|-------------|------------------|
-| **200** | OK |  -  |
-| **0** | Error |  -  |
-
-[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
-
-
-## validatePluginCombination
-
-> PluginValidateOutputBody validatePluginCombination(pluginValidateInputBody)
-
-Validate plugin combination
-
-Checks whether the given set of plugins forms a valid deployment combination.
-
-### Example
-
-```ts
-import {
-  Configuration,
-  PluginsApi,
-} from '@enclave-wizard-ui/api-client';
-import type { ValidatePluginCombinationRequest } from '@enclave-wizard-ui/api-client';
-
-async function example() {
-  console.log("🚀 Testing @enclave-wizard-ui/api-client SDK...");
-  const api = new PluginsApi();
-
-  const body = {
-    // PluginValidateInputBody
-    pluginValidateInputBody: ...,
-  } satisfies ValidatePluginCombinationRequest;
-
-  try {
-    const data = await api.validatePluginCombination(body);
-    console.log(data);
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-// Run the test
-example().catch(console.error);
-```
-
-### Parameters
-
-
-| Name | Type | Description  | Notes |
-|------------- | ------------- | ------------- | -------------|
-| **pluginValidateInputBody** | [PluginValidateInputBody](PluginValidateInputBody.md) |  | |
-
-### Return type
-
-[**PluginValidateOutputBody**](PluginValidateOutputBody.md)
-
-### Authorization
-
-No authorization required
-
-### HTTP request headers
-
-- **Content-Type**: `application/json`
-- **Accept**: `application/json`, `application/problem+json`
-
-
-### HTTP response details
-| Status code | Description | Response headers |
-|-------------|-------------|------------------|
-| **200** | OK |  -  |
-| **0** | Error |  -  |
-
-[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
-
-
-## writeConfigPlugins
-
-> writeConfigPlugins(pluginsConfig)
-
-Update Enabled plugins configuration
-
-### Example
-
-```ts
-import {
-  Configuration,
-  PluginsApi,
-} from '@enclave-wizard-ui/api-client';
-import type { WriteConfigPluginsRequest } from '@enclave-wizard-ui/api-client';
-
-async function example() {
-  console.log("🚀 Testing @enclave-wizard-ui/api-client SDK...");
-  const api = new PluginsApi();
-
-  const body = {
-    // PluginsConfig
-    pluginsConfig: ...,
-  } satisfies WriteConfigPluginsRequest;
-
-  try {
-    const data = await api.writeConfigPlugins(body);
-    console.log(data);
-  } catch (error) {
-    console.error(error);
-  }
-}
-
-// Run the test
-example().catch(console.error);
-```
-
-### Parameters
-
-
-| Name | Type | Description  | Notes |
-|------------- | ------------- | ------------- | -------------|
-| **pluginsConfig** | [PluginsConfig](PluginsConfig.md) |  | |
+| **id** | `string` | Deployment identifier | [Defaults to `undefined`] |
 
 ### Return type
 
@@ -319,7 +67,7 @@ No authorization required
 
 ### HTTP request headers
 
-- **Content-Type**: `application/json`
+- **Content-Type**: Not defined
 - **Accept**: `application/problem+json`
 
 
@@ -327,6 +75,262 @@ No authorization required
 | Status code | Description | Response headers |
 |-------------|-------------|------------------|
 | **204** | No Content |  -  |
+| **0** | Error |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## getCurrentDeployment
+
+> Deployment getCurrentDeployment()
+
+Get current deployment
+
+Returns the most recent deployment. Use this for reconnection after page reload.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  DeploymentsApi,
+} from '@enclave-wizard-ui/api-client';
+import type { GetCurrentDeploymentRequest } from '@enclave-wizard-ui/api-client';
+
+async function example() {
+  console.log("🚀 Testing @enclave-wizard-ui/api-client SDK...");
+  const api = new DeploymentsApi();
+
+  try {
+    const data = await api.getCurrentDeployment();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**Deployment**](Deployment.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`, `application/problem+json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | OK |  -  |
+| **0** | Error |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## getDeploymentById
+
+> Deployment getDeploymentById(id)
+
+Get deployment by ID
+
+Returns the deployment state with phases for the given deployment ID.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  DeploymentsApi,
+} from '@enclave-wizard-ui/api-client';
+import type { GetDeploymentByIdRequest } from '@enclave-wizard-ui/api-client';
+
+async function example() {
+  console.log("🚀 Testing @enclave-wizard-ui/api-client SDK...");
+  const api = new DeploymentsApi();
+
+  const body = {
+    // string | Deployment identifier
+    id: id_example,
+  } satisfies GetDeploymentByIdRequest;
+
+  try {
+    const data = await api.getDeploymentById(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` | Deployment identifier | [Defaults to `undefined`] |
+
+### Return type
+
+[**Deployment**](Deployment.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`, `application/problem+json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | OK |  -  |
+| **0** | Error |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## getDeploymentProgressById
+
+> DeploymentProgress getDeploymentProgressById(id)
+
+Get deployment progress
+
+Returns live progress with completed task count, percentage, and current phase/task.
+
+### Example
+
+```ts
+import {
+  Configuration,
+  DeploymentsApi,
+} from '@enclave-wizard-ui/api-client';
+import type { GetDeploymentProgressByIdRequest } from '@enclave-wizard-ui/api-client';
+
+async function example() {
+  console.log("🚀 Testing @enclave-wizard-ui/api-client SDK...");
+  const api = new DeploymentsApi();
+
+  const body = {
+    // string | Deployment identifier
+    id: id_example,
+  } satisfies GetDeploymentProgressByIdRequest;
+
+  try {
+    const data = await api.getDeploymentProgressById(body);
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+
+| Name | Type | Description  | Notes |
+|------------- | ------------- | ------------- | -------------|
+| **id** | `string` | Deployment identifier | [Defaults to `undefined`] |
+
+### Return type
+
+[**DeploymentProgress**](DeploymentProgress.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`, `application/problem+json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | OK |  -  |
+| **0** | Error |  -  |
+
+[[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)
+
+
+## startDeployment
+
+> Deployment startDeployment()
+
+Start deployment
+
+Starts the full deployment chain (main playbook + addon plugins).
+
+### Example
+
+```ts
+import {
+  Configuration,
+  DeploymentsApi,
+} from '@enclave-wizard-ui/api-client';
+import type { StartDeploymentRequest } from '@enclave-wizard-ui/api-client';
+
+async function example() {
+  console.log("🚀 Testing @enclave-wizard-ui/api-client SDK...");
+  const api = new DeploymentsApi();
+
+  try {
+    const data = await api.startDeployment();
+    console.log(data);
+  } catch (error) {
+    console.error(error);
+  }
+}
+
+// Run the test
+example().catch(console.error);
+```
+
+### Parameters
+
+This endpoint does not need any parameter.
+
+### Return type
+
+[**Deployment**](Deployment.md)
+
+### Authorization
+
+No authorization required
+
+### HTTP request headers
+
+- **Content-Type**: Not defined
+- **Accept**: `application/json`, `application/problem+json`
+
+
+### HTTP response details
+| Status code | Description | Response headers |
+|-------------|-------------|------------------|
+| **200** | OK |  -  |
 | **0** | Error |  -  |
 
 [[Back to top]](#) [[Back to API list]](../README.md#api-endpoints) [[Back to Model list]](../README.md#models) [[Back to README]](../README.md)

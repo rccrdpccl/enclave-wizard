@@ -1,28 +1,32 @@
 
-# Plugin
+# Deployment
 
 
 ## Properties
 
 Name | Type
 ------------ | -------------
-`defaults` | { [key: string]: any; }
-`name` | string
-`order` | number
-`type` | string
+`$schema` | string
+`id` | string
+`phases` | [Array&lt;DeploymentPhase&gt;](DeploymentPhase.md)
+`startedAt` | Date
+`status` | string
+`totalTasks` | number
 
 ## Example
 
 ```typescript
-import type { Plugin } from '@enclave-wizard-ui/api-client'
+import type { Deployment } from '@enclave-wizard-ui/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-  "defaults": null,
-  "name": null,
-  "order": null,
-  "type": null,
-} satisfies Plugin
+  "$schema": null,
+  "id": null,
+  "phases": null,
+  "startedAt": null,
+  "status": null,
+  "totalTasks": null,
+} satisfies Deployment
 
 console.log(example)
 
@@ -31,7 +35,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as Plugin
+const exampleParsed = JSON.parse(exampleJSON) as Deployment
 console.log(exampleParsed)
 ```
 

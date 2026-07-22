@@ -13,28 +13,6 @@
  */
 
 import { mapValues } from '../runtime.js';
-import type { VASTConfig } from './VASTConfig.js';
-import {
-    VASTConfigFromJSON,
-    VASTConfigFromJSONTyped,
-    VASTConfigToJSON,
-    VASTConfigToJSONTyped,
-} from './VASTConfig.js';
-import type { ODFConfig } from './ODFConfig.js';
-import {
-    ODFConfigFromJSON,
-    ODFConfigFromJSONTyped,
-    ODFConfigToJSON,
-    ODFConfigToJSONTyped,
-} from './ODFConfig.js';
-import type { LVMSConfig } from './LVMSConfig.js';
-import {
-    LVMSConfigFromJSON,
-    LVMSConfigFromJSONTyped,
-    LVMSConfigToJSON,
-    LVMSConfigToJSONTyped,
-} from './LVMSConfig.js';
-
 /**
  * 
  * @export
@@ -61,12 +39,6 @@ export interface Defaults {
     diskEncryption: boolean;
     /**
      * 
-     * @type {LVMSConfig}
-     * @memberof Defaults
-     */
-    lvmsDefaults?: LVMSConfig;
-    /**
-     * 
      * @type {number}
      * @memberof Defaults
      */
@@ -79,22 +51,16 @@ export interface Defaults {
     ocMirrorLogLevel: string;
     /**
      * 
-     * @type {ODFConfig}
+     * @type {{ [key: string]: any; }}
      * @memberof Defaults
      */
-    odfDefaults?: ODFConfig;
+    pluginDefaults?: { [key: string]: any; };
     /**
      * 
      * @type {string}
      * @memberof Defaults
      */
     storagePlugin: string;
-    /**
-     * 
-     * @type {VASTConfig}
-     * @memberof Defaults
-     */
-    vastDefaults?: VASTConfig;
 }
 
 /**
@@ -122,12 +88,10 @@ export function DefaultsFromJSONTyped(json: any, ignoreDiscriminator: boolean): 
         '$schema': json['$schema'] == null ? undefined : json['$schema'],
         'disconnected': json['disconnected'],
         'diskEncryption': json['diskEncryption'],
-        'lvmsDefaults': json['lvmsDefaults'] == null ? undefined : LVMSConfigFromJSON(json['lvmsDefaults']),
         'masterMaxPods': json['masterMaxPods'],
         'ocMirrorLogLevel': json['ocMirrorLogLevel'],
-        'odfDefaults': json['odfDefaults'] == null ? undefined : ODFConfigFromJSON(json['odfDefaults']),
+        'pluginDefaults': json['pluginDefaults'] == null ? undefined : json['pluginDefaults'],
         'storagePlugin': json['storagePlugin'],
-        'vastDefaults': json['vastDefaults'] == null ? undefined : VASTConfigFromJSON(json['vastDefaults']),
     };
 }
 
@@ -144,12 +108,10 @@ export function DefaultsToJSONTyped(value?: Omit<Defaults, '$schema'> | null, ig
         
         'disconnected': value['disconnected'],
         'diskEncryption': value['diskEncryption'],
-        'lvmsDefaults': LVMSConfigToJSON(value['lvmsDefaults']),
         'masterMaxPods': value['masterMaxPods'],
         'ocMirrorLogLevel': value['ocMirrorLogLevel'],
-        'odfDefaults': ODFConfigToJSON(value['odfDefaults']),
+        'pluginDefaults': value['pluginDefaults'],
         'storagePlugin': value['storagePlugin'],
-        'vastDefaults': VASTConfigToJSON(value['vastDefaults']),
     };
 }
 

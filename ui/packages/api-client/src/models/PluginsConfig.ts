@@ -13,6 +13,13 @@
  */
 
 import { mapValues } from '../runtime.js';
+import type { AAPConfig } from './AAPConfig.js';
+import {
+    AAPConfigFromJSON,
+    AAPConfigFromJSONTyped,
+    AAPConfigToJSON,
+    AAPConfigToJSONTyped,
+} from './AAPConfig.js';
 import type { VASTConfig } from './VASTConfig.js';
 import {
     VASTConfigFromJSON,
@@ -34,6 +41,13 @@ import {
     LVMSConfigToJSON,
     LVMSConfigToJSONTyped,
 } from './LVMSConfig.js';
+import type { TrustManagerConfig } from './TrustManagerConfig.js';
+import {
+    TrustManagerConfigFromJSON,
+    TrustManagerConfigFromJSONTyped,
+    TrustManagerConfigToJSON,
+    TrustManagerConfigToJSONTyped,
+} from './TrustManagerConfig.js';
 
 /**
  * 
@@ -47,6 +61,18 @@ export interface PluginsConfig {
      * @memberof PluginsConfig
      */
     readonly $schema?: string;
+    /**
+     * AAP deployment configuration
+     * @type {AAPConfig}
+     * @memberof PluginsConfig
+     */
+    aapDefaults?: AAPConfig;
+    /**
+     * Cluster fulfillment configuration (passed through to osac-installer Helm values)
+     * @type {{ [key: string]: string; }}
+     * @memberof PluginsConfig
+     */
+    clusterFulfillmentConfig?: { [key: string]: string; };
     /**
      * Plugins to deploy
      * @type {Array<string>}
@@ -66,12 +92,109 @@ export interface PluginsConfig {
      */
     odfDefaults?: ODFConfig;
     /**
+     * Path to AAP license manifest.zip on the landing zone
+     * @type {string}
+     * @memberof PluginsConfig
+     */
+    osacAapLicenseFile?: string;
+    /**
+     * Use external PostgreSQL instead of built-in
+     * @type {boolean}
+     * @memberof PluginsConfig
+     */
+    osacBYODatabase?: boolean;
+    /**
+     * BCM API endpoint
+     * @type {string}
+     * @memberof PluginsConfig
+     */
+    osacBcmApiUrl?: string;
+    /**
+     * BCM client certificate (PEM)
+     * @type {string}
+     * @memberof PluginsConfig
+     */
+    osacBcmClientCert?: string;
+    /**
+     * BCM client key (PEM)
+     * @type {string}
+     * @memberof PluginsConfig
+     */
+    osacBcmClientKey?: string;
+    /**
+     * Skip BMC cert verification
+     * @type {boolean}
+     * @memberof PluginsConfig
+     */
+    osacBcmDisableBmcCertVerification?: boolean;
+    /**
+     * Enable BCM inventory backend
+     * @type {boolean}
+     * @memberof PluginsConfig
+     */
+    osacBcmEnabled?: boolean;
+    /**
+     * Verify BCM TLS certificates
+     * @type {boolean}
+     * @memberof PluginsConfig
+     */
+    osacBcmValidateCerts?: boolean;
+    /**
+     * PostgreSQL connection URL when using BYO database
+     * @type {string}
+     * @memberof PluginsConfig
+     */
+    osacDatabaseUrl?: string;
+    /**
+     * OSAC deployment profile
+     * @type {string}
+     * @memberof PluginsConfig
+     */
+    osacProfile?: PluginsConfigOsacProfileEnum;
+    /**
+     * PVC size for Keycloak PostgreSQL
+     * @type {string}
+     * @memberof PluginsConfig
+     */
+    rhbkDbSize?: string;
+    /**
+     * Deploy PostgreSQL alongside Keycloak
+     * @type {boolean}
+     * @memberof PluginsConfig
+     */
+    rhbkDeployDatabase?: boolean;
+    /**
+     * Number of Keycloak replicas
+     * @type {number}
+     * @memberof PluginsConfig
+     */
+    rhbkInstances?: number;
+    /**
+     * Trust-manager CA issuer configuration
+     * @type {TrustManagerConfig}
+     * @memberof PluginsConfig
+     */
+    trustManagerDefaults?: TrustManagerConfig;
+    /**
      * VAST CSI deployment defaults
      * @type {VASTConfig}
      * @memberof PluginsConfig
      */
     vastDefaults?: VASTConfig;
 }
+
+
+/**
+ * @export
+ */
+export const PluginsConfigOsacProfileEnum = {
+    Development: 'development',
+    Caas: 'caas',
+    Vmaas: 'vmaas',
+    Bmaas: 'bmaas'
+} as const;
+export type PluginsConfigOsacProfileEnum = typeof PluginsConfigOsacProfileEnum[keyof typeof PluginsConfigOsacProfileEnum];
+
 
 /**
  * Check if a given object implements the PluginsConfig interface.
@@ -91,9 +214,25 @@ export function PluginsConfigFromJSONTyped(json: any, ignoreDiscriminator: boole
     return {
         
         '$schema': json['$schema'] == null ? undefined : json['$schema'],
+        'aapDefaults': json['aapDefaults'] == null ? undefined : AAPConfigFromJSON(json['aapDefaults']),
+        'clusterFulfillmentConfig': json['clusterFulfillmentConfig'] == null ? undefined : json['clusterFulfillmentConfig'],
         'enabledPlugins': json['enabled_plugins'] == null ? undefined : json['enabled_plugins'],
         'lvmsDefaults': json['lvmsDefaults'] == null ? undefined : LVMSConfigFromJSON(json['lvmsDefaults']),
         'odfDefaults': json['odfDefaults'] == null ? undefined : ODFConfigFromJSON(json['odfDefaults']),
+        'osacAapLicenseFile': json['osacAapLicenseFile'] == null ? undefined : json['osacAapLicenseFile'],
+        'osacBYODatabase': json['osacBYODatabase'] == null ? undefined : json['osacBYODatabase'],
+        'osacBcmApiUrl': json['osacBcmApiUrl'] == null ? undefined : json['osacBcmApiUrl'],
+        'osacBcmClientCert': json['osacBcmClientCert'] == null ? undefined : json['osacBcmClientCert'],
+        'osacBcmClientKey': json['osacBcmClientKey'] == null ? undefined : json['osacBcmClientKey'],
+        'osacBcmDisableBmcCertVerification': json['osacBcmDisableBmcCertVerification'] == null ? undefined : json['osacBcmDisableBmcCertVerification'],
+        'osacBcmEnabled': json['osacBcmEnabled'] == null ? undefined : json['osacBcmEnabled'],
+        'osacBcmValidateCerts': json['osacBcmValidateCerts'] == null ? undefined : json['osacBcmValidateCerts'],
+        'osacDatabaseUrl': json['osacDatabaseUrl'] == null ? undefined : json['osacDatabaseUrl'],
+        'osacProfile': json['osacProfile'] == null ? undefined : json['osacProfile'],
+        'rhbkDbSize': json['rhbk_db_size'] == null ? undefined : json['rhbk_db_size'],
+        'rhbkDeployDatabase': json['rhbk_deploy_database'] == null ? undefined : json['rhbk_deploy_database'],
+        'rhbkInstances': json['rhbk_instances'] == null ? undefined : json['rhbk_instances'],
+        'trustManagerDefaults': json['trustManagerDefaults'] == null ? undefined : TrustManagerConfigFromJSON(json['trustManagerDefaults']),
         'vastDefaults': json['vastDefaults'] == null ? undefined : VASTConfigFromJSON(json['vastDefaults']),
     };
 }
@@ -109,9 +248,25 @@ export function PluginsConfigToJSONTyped(value?: Omit<PluginsConfig, '$schema'> 
 
     return {
         
+        'aapDefaults': AAPConfigToJSON(value['aapDefaults']),
+        'clusterFulfillmentConfig': value['clusterFulfillmentConfig'],
         'enabled_plugins': value['enabledPlugins'],
         'lvmsDefaults': LVMSConfigToJSON(value['lvmsDefaults']),
         'odfDefaults': ODFConfigToJSON(value['odfDefaults']),
+        'osacAapLicenseFile': value['osacAapLicenseFile'],
+        'osacBYODatabase': value['osacBYODatabase'],
+        'osacBcmApiUrl': value['osacBcmApiUrl'],
+        'osacBcmClientCert': value['osacBcmClientCert'],
+        'osacBcmClientKey': value['osacBcmClientKey'],
+        'osacBcmDisableBmcCertVerification': value['osacBcmDisableBmcCertVerification'],
+        'osacBcmEnabled': value['osacBcmEnabled'],
+        'osacBcmValidateCerts': value['osacBcmValidateCerts'],
+        'osacDatabaseUrl': value['osacDatabaseUrl'],
+        'osacProfile': value['osacProfile'],
+        'rhbk_db_size': value['rhbkDbSize'],
+        'rhbk_deploy_database': value['rhbkDeployDatabase'],
+        'rhbk_instances': value['rhbkInstances'],
+        'trustManagerDefaults': TrustManagerConfigToJSON(value['trustManagerDefaults']),
         'vastDefaults': VASTConfigToJSON(value['vastDefaults']),
     };
 }

@@ -1,21 +1,24 @@
 
-# TaskStatus
+# TrustManagerConfig
 
-Current execution status of a task
 
 ## Properties
 
 Name | Type
 ------------ | -------------
+`trustManagerCaIssuerDuration` | string
+`trustManagerCaIssuerRenewBefore` | string
 
 ## Example
 
 ```typescript
-import type { TaskStatus } from '@enclave-wizard-ui/api-client'
+import type { TrustManagerConfig } from '@enclave-wizard-ui/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
-} satisfies TaskStatus
+  "trustManagerCaIssuerDuration": null,
+  "trustManagerCaIssuerRenewBefore": null,
+} satisfies TrustManagerConfig
 
 console.log(example)
 
@@ -24,7 +27,7 @@ const exampleJSON: string = JSON.stringify(example)
 console.log(exampleJSON)
 
 // Parse the JSON string back to an object
-const exampleParsed = JSON.parse(exampleJSON) as TaskStatus
+const exampleParsed = JSON.parse(exampleJSON) as TrustManagerConfig
 console.log(exampleParsed)
 ```
 

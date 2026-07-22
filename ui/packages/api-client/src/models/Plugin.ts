@@ -20,17 +20,23 @@ import { mapValues } from '../runtime.js';
  */
 export interface Plugin {
     /**
-     * Human-readable description
-     * @type {string}
+     * Plugin default configuration values
+     * @type {{ [key: string]: any; }}
      * @memberof Plugin
      */
-    description: string;
+    defaults?: { [key: string]: any; };
     /**
      * Plugin identifier
      * @type {string}
      * @memberof Plugin
      */
     name: string;
+    /**
+     * Deployment order within type
+     * @type {number}
+     * @memberof Plugin
+     */
+    order?: number;
     /**
      * Plugin type
      * @type {string}
@@ -54,7 +60,6 @@ export type PluginTypeEnum = typeof PluginTypeEnum[keyof typeof PluginTypeEnum];
  * Check if a given object implements the Plugin interface.
  */
 export function instanceOfPlugin(value: object): value is Plugin {
-    if (!('description' in value) || value['description'] === undefined) return false;
     if (!('name' in value) || value['name'] === undefined) return false;
     if (!('type' in value) || value['type'] === undefined) return false;
     return true;
@@ -70,8 +75,9 @@ export function PluginFromJSONTyped(json: any, ignoreDiscriminator: boolean): Pl
     }
     return {
         
-        'description': json['description'],
+        'defaults': json['defaults'] == null ? undefined : json['defaults'],
         'name': json['name'],
+        'order': json['order'] == null ? undefined : json['order'],
         'type': json['type'],
     };
 }
@@ -87,8 +93,9 @@ export function PluginToJSONTyped(value?: Plugin | null, ignoreDiscriminator: bo
 
     return {
         
-        'description': value['description'],
+        'defaults': value['defaults'],
         'name': value['name'],
+        'order': value['order'],
         'type': value['type'],
     };
 }

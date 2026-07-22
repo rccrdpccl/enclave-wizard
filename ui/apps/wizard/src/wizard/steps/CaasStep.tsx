@@ -8,7 +8,10 @@ import {
 } from "@patternfly/react-core";
 import { MinusCircleIcon, PlusCircleIcon } from "@patternfly/react-icons";
 import type React from "react";
+import { useCallback } from "react";
+import { usePluginSchema } from "../../api/usePluginSchema.ts";
 import { type HostEntry, HostEntryCard } from "../components/HostEntryCard.tsx";
+import { ToggleFieldGroup } from "../components/ToggleFieldGroup.tsx";
 import { useWizard } from "../WizardContext.tsx";
 import { stepStyles } from "./stepStyles.ts";
 
@@ -22,8 +25,57 @@ const EMPTY_HOST: HostEntry = {
   rootDisk: "",
 };
 
+const BCM_TOGGLE = "global.osacBcmEnabled";
+
+const BCM_DETAIL_FIELDS = [
+  "global.osacBcmApiUrl",
+  "global.osacBcmClientCert",
+  "global.osacBcmClientKey",
+  "global.osacBcmValidateCerts",
+  "global.osacBcmDisableBmcCertVerification",
+];
+
+function buildMergedSchema(
+  pluginSchema: Record<string, unknown>,
+  fieldPaths: string[],
+): unknown {
+  const root: Record<string, unknown> = {
+    type: "object",
+    properties: {},
+  };
+
+  for (const path of fieldPaths) {
+    const segments = path.split(".");
+    let current = root;
+
+    for (let i = 0; i < segments.length - 1; i++) {
+      const seg = segments[i];
+      const props = current.properties as Record<
+        string,
+        Record<string, unknown>
+      >;
+      if (!props[seg]) {
+        props[seg] = { type: "object", properties: {} };
+      }
+      current = props[seg];
+    }
+
+    const leafName = segments[segments.length - 1];
+    const props = current.properties as Record<string, unknown>;
+    const pluginProps = pluginSchema.properties as
+      | Record<string, unknown>
+      | undefined;
+    if (pluginProps?.[leafName]) {
+      props[leafName] = pluginProps[leafName];
+    }
+  }
+
+  return root;
+}
+
 export const CaasStep: React.FC = () => {
   const { state, dispatch } = useWizard();
+  const { schema: pluginSchema } = usePluginSchema("osac");
 
   const configData = state.configData as Record<string, unknown>;
   const discoveryHosts: HostEntry[] = Array.isArray(
@@ -39,6 +91,17 @@ export const CaasStep: React.FC = () => {
       path: "cloudInfra.discovery_hosts",
       value: hosts,
     });
+
+  const onChange = useCallback(
+    (path: string, value: unknown) =>
+      dispatch({ type: "SET_FIELD", path, value }),
+    [dispatch],
+  );
+
+  const allBcmFields = [BCM_TOGGLE, ...BCM_DETAIL_FIELDS];
+  const bcmSchema = pluginSchema
+    ? buildMergedSchema(pluginSchema as Record<string, unknown>, allBcmFields)
+    : null;
 
   return (
     <Form>
@@ -123,6 +186,26 @@ export const CaasStep: React.FC = () => {
           </FlexItem>
         ))}
       </Flex>
+
+      <Title headingLevel="h2" size="xl" style={{ marginTop: 32 }}>
+        BCM Inventory
+      </Title>
+      <Content component="p">
+        Optionally enable NVIDIA Base Command Manager as an additional bare
+        metal inventory source. BCM-discovered servers are imported alongside
+        any hosts defined above.
+      </Content>
+
+      {bcmSchema && (
+        <ToggleFieldGroup
+          schema={bcmSchema}
+          toggleField={BCM_TOGGLE}
+          dependentFields={BCM_DETAIL_FIELDS}
+          values={configData}
+          onChange={onChange}
+          showValidation={state.showValidation}
+        />
+      )}
     </Form>
   );
 };

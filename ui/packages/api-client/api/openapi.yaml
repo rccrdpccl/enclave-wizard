@@ -1,5 +1,75 @@
 components:
   schemas:
+    AAPConfig:
+      additionalProperties: false
+      properties:
+        aapLicenseFile:
+          description: Path to AAP license manifest.zip on the Landing Zone
+          minLength: 1
+          type: string
+        aap_controller_disabled:
+          description: Disable the Automation Controller component
+          type: boolean
+        aap_eda_disabled:
+          description: Disable the Event-Driven Ansible component
+          type: boolean
+        aap_hub_disabled:
+          description: Disable the Automation Hub component
+          type: boolean
+        aap_image_pull_policy:
+          description: Image pull policy for AAP pods
+          enum:
+            - Always
+            - IfNotPresent
+            - Never
+          type: string
+        aap_license_secret:
+          description: Name of the Kubernetes secret holding the AAP license
+          type: string
+        aap_lightspeed_disabled:
+          description: Disable the Ansible Lightspeed component
+          type: boolean
+        aap_name:
+          description: Name of the AAP instance
+          type: string
+        aap_no_log:
+          description: Suppress sensitive log output
+          type: boolean
+        aap_ns:
+          description: Namespace for the AAP deployment
+          type: string
+        aap_redis_mode:
+          description: Redis deployment mode
+          enum:
+            - standalone
+            - cluster
+          type: string
+        aap_route_tls_termination:
+          description: TLS termination type for AAP routes
+          enum:
+            - Edge
+            - Passthrough
+            - Reencrypt
+          type: string
+      required:
+        - aapLicenseFile
+      type: object
+    AuthModeOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/AuthModeOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        noAuth:
+          description: True if authentication is disabled
+          type: boolean
+      required:
+        - noAuth
+      type: object
     CertificatesConfig:
       additionalProperties: false
       properties:
@@ -150,8 +220,8 @@ components:
           description: IP of first control-plane node
           pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$
           type: string
-        sshPubPath:
-          description: Path to SSH public key file
+        sshPubKey:
+          description: SSH public key content (e.g. ssh-rsa AAAA...)
           minLength: 1
           type: string
       required:
@@ -162,7 +232,6 @@ components:
         - ingressVIP
         - rendezvousIP
         - pullSecret
-        - sshPubPath
         - agent_hosts
       type: object
     Defaults:
@@ -179,25 +248,116 @@ components:
           type: boolean
         diskEncryption:
           type: boolean
-        lvmsDefaults:
-          $ref: "#/components/schemas/LVMSConfig"
         masterMaxPods:
           format: int64
           type: integer
         ocMirrorLogLevel:
           type: string
-        odfDefaults:
-          $ref: "#/components/schemas/ODFConfig"
+        pluginDefaults:
+          additionalProperties: {}
+          type: object
         storagePlugin:
           type: string
-        vastDefaults:
-          $ref: "#/components/schemas/VASTConfig"
       required:
         - disconnected
         - masterMaxPods
         - diskEncryption
         - ocMirrorLogLevel
         - storagePlugin
+      type: object
+    Deployment:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/Deployment.json
+          format: uri
+          readOnly: true
+          type: string
+        id:
+          description: Deployment identifier
+          type: string
+        phases:
+          description: Ordered list of deployment phases
+          items:
+            $ref: "#/components/schemas/DeploymentPhase"
+          type:
+            - array
+            - "null"
+        startedAt:
+          description: When the deployment was started
+          format: date-time
+          type: string
+        status:
+          description: Overall deployment status
+          type: string
+        totalTasks:
+          description: Estimated total ansible tasks across all phases
+          format: int64
+          type: integer
+      required:
+        - id
+        - status
+        - phases
+        - totalTasks
+        - startedAt
+      type: object
+    DeploymentPhase:
+      additionalProperties: false
+      properties:
+        name:
+          description: Phase name (main, trust-manager, osac, etc.)
+          type: string
+        status:
+          description: Phase status
+          enum:
+            - pending
+            - running
+            - successful
+            - failed
+          type: string
+        taskId:
+          description: Task run ID for this phase
+          type: string
+      required:
+        - name
+        - status
+      type: object
+    DeploymentProgress:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/DeploymentProgress.json
+          format: uri
+          readOnly: true
+          type: string
+        completed:
+          description: Number of completed ansible tasks
+          format: int64
+          type: integer
+        currentPhase:
+          description: Name of the currently running phase
+          type: string
+        currentTask:
+          description: Name of the currently running ansible task
+          type: string
+        percentage:
+          description: Completion percentage (0-100)
+          format: int64
+          type: integer
+        total:
+          description: Estimated total tasks
+          format: int64
+          type: integer
+      required:
+        - completed
+        - total
+        - percentage
+        - currentPhase
+        - currentTask
       type: object
     EnclaveConfig:
       additionalProperties: false
@@ -282,6 +442,74 @@ components:
           format: uri
           type: string
       type: object
+    Experience:
+      additionalProperties: false
+      properties:
+        description:
+          type: string
+        id:
+          type: string
+        name:
+          type: string
+        plugins:
+          items:
+            $ref: "#/components/schemas/ExperiencePlugin"
+          type:
+            - array
+            - "null"
+      required:
+        - id
+        - name
+        - description
+        - plugins
+      type: object
+    ExperiencePlugin:
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+        order:
+          format: int64
+          type: integer
+      required:
+        - name
+      type: object
+    ExperiencesOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/ExperiencesOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        experiences:
+          description: Available experience definitions
+          items:
+            $ref: "#/components/schemas/Experience"
+          type:
+            - array
+            - "null"
+      required:
+        - experiences
+      type: object
+    FileUploadOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/FileUploadOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        path:
+          description: Absolute path where the file was written
+          type: string
+      required:
+        - path
+      type: object
     GetTaskEventsOutputBody:
       additionalProperties: false
       properties:
@@ -304,6 +532,9 @@ components:
     GlobalConfig:
       additionalProperties: false
       properties:
+        aapDefaults:
+          $ref: "#/components/schemas/AAPConfig"
+          description: AAP deployment configuration
         agent_hosts:
           description: Control plane nodes (exactly 3)
           items:
@@ -321,6 +552,11 @@ components:
           description: Base DNS domain for the cluster
           minLength: 1
           type: string
+        clusterFulfillmentConfig:
+          additionalProperties:
+            type: string
+          description: Cluster fulfillment configuration (passed through to osac-installer Helm values)
+          type: object
         clusterName:
           description: OpenShift cluster name
           minLength: 1
@@ -347,8 +583,10 @@ components:
           minimum: 1
           type: integer
         disconnected:
-          description: "Air-gapped deployment mode (default: true)"
-          type: boolean
+          description: Air-gapped deployment mode
+          type:
+            - boolean
+            - "null"
         diskEncryption:
           description: Enable TPM v2 disk encryption
           type: boolean
@@ -396,6 +634,41 @@ components:
         odfExternalConfig:
           description: ODF external Ceph cluster config JSON (required when storage_plugin is odf)
           type: string
+        osacAapLicenseFile:
+          description: Path to AAP license manifest.zip on the landing zone
+          type: string
+        osacBYODatabase:
+          description: Use external PostgreSQL instead of built-in
+          type: boolean
+        osacBcmApiUrl:
+          description: BCM API endpoint
+          type: string
+        osacBcmClientCert:
+          description: BCM client certificate (PEM)
+          type: string
+        osacBcmClientKey:
+          description: BCM client key (PEM)
+          type: string
+        osacBcmDisableBmcCertVerification:
+          description: Skip BMC cert verification
+          type: boolean
+        osacBcmEnabled:
+          description: Enable BCM inventory backend
+          type: boolean
+        osacBcmValidateCerts:
+          description: Verify BCM TLS certificates
+          type: boolean
+        osacDatabaseUrl:
+          description: PostgreSQL connection URL when using BYO database
+          type: string
+        osacProfile:
+          description: OSAC deployment profile
+          enum:
+            - development
+            - caas
+            - vmaas
+            - bmaas
+          type: string
         pullSecret:
           description: OpenShift pull secret object
         quayBackend:
@@ -419,8 +692,19 @@ components:
           description: IP of first control-plane node
           pattern: ^((25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$
           type: string
-        sshPubPath:
-          description: Path to SSH public key file
+        rhbk_db_size:
+          description: PVC size for Keycloak PostgreSQL
+          type: string
+        rhbk_deploy_database:
+          description: Deploy PostgreSQL alongside Keycloak
+          type: boolean
+        rhbk_instances:
+          description: Number of Keycloak replicas
+          format: int64
+          minimum: 1
+          type: integer
+        sshPubKey:
+          description: SSH public key content (e.g. ssh-rsa AAAA...)
           minLength: 1
           type: string
         storage_plugin:
@@ -430,6 +714,9 @@ components:
             - odf
             - vast-csi
           type: string
+        trustManagerDefaults:
+          $ref: "#/components/schemas/TrustManagerConfig"
+          description: Trust-manager CA issuer configuration
         vastAdminPassword:
           description: VAST management API password
           type: string
@@ -452,6 +739,7 @@ components:
       required:
         - lzBmcIP
         - workingDir
+        - disconnected
         - baseDomain
         - clusterName
         - machineNetwork
@@ -459,7 +747,6 @@ components:
         - ingressVIP
         - rendezvousIP
         - pullSecret
-        - sshPubPath
         - agent_hosts
         - defaultDNS
         - defaultGateway
@@ -586,8 +873,10 @@ components:
           readOnly: true
           type: string
         disconnected:
-          description: "Air-gapped deployment mode (default: true)"
-          type: boolean
+          description: Air-gapped deployment mode
+          type:
+            - boolean
+            - "null"
         lzBmcHostname:
           description: DNS hostname for landing zone BMC interface
           type: string
@@ -602,6 +891,7 @@ components:
       required:
         - lzBmcIP
         - workingDir
+        - disconnected
       type: object
     ListTasksOutputBody:
       additionalProperties: false
@@ -706,12 +996,17 @@ components:
     Plugin:
       additionalProperties: false
       properties:
-        description:
-          description: Human-readable description
-          type: string
+        defaults:
+          additionalProperties: {}
+          description: Plugin default configuration values
+          type: object
         name:
           description: Plugin identifier
           type: string
+        order:
+          description: Deployment order within type
+          format: int64
+          type: integer
         type:
           description: Plugin type
           enum:
@@ -721,7 +1016,6 @@ components:
       required:
         - name
         - type
-        - description
       type: object
     PluginValidateInputBody:
       additionalProperties: false
@@ -777,6 +1071,14 @@ components:
           format: uri
           readOnly: true
           type: string
+        aapDefaults:
+          $ref: "#/components/schemas/AAPConfig"
+          description: AAP deployment configuration
+        clusterFulfillmentConfig:
+          additionalProperties:
+            type: string
+          description: Cluster fulfillment configuration (passed through to osac-installer Helm values)
+          type: object
         enabled_plugins:
           description: Plugins to deploy
           items:
@@ -790,6 +1092,55 @@ components:
         odfDefaults:
           $ref: "#/components/schemas/ODFConfig"
           description: ODF deployment configuration
+        osacAapLicenseFile:
+          description: Path to AAP license manifest.zip on the landing zone
+          type: string
+        osacBYODatabase:
+          description: Use external PostgreSQL instead of built-in
+          type: boolean
+        osacBcmApiUrl:
+          description: BCM API endpoint
+          type: string
+        osacBcmClientCert:
+          description: BCM client certificate (PEM)
+          type: string
+        osacBcmClientKey:
+          description: BCM client key (PEM)
+          type: string
+        osacBcmDisableBmcCertVerification:
+          description: Skip BMC cert verification
+          type: boolean
+        osacBcmEnabled:
+          description: Enable BCM inventory backend
+          type: boolean
+        osacBcmValidateCerts:
+          description: Verify BCM TLS certificates
+          type: boolean
+        osacDatabaseUrl:
+          description: PostgreSQL connection URL when using BYO database
+          type: string
+        osacProfile:
+          description: OSAC deployment profile
+          enum:
+            - development
+            - caas
+            - vmaas
+            - bmaas
+          type: string
+        rhbk_db_size:
+          description: PVC size for Keycloak PostgreSQL
+          type: string
+        rhbk_deploy_database:
+          description: Deploy PostgreSQL alongside Keycloak
+          type: boolean
+        rhbk_instances:
+          description: Number of Keycloak replicas
+          format: int64
+          minimum: 1
+          type: integer
+        trustManagerDefaults:
+          $ref: "#/components/schemas/TrustManagerConfig"
+          description: Trust-manager CA issuer configuration
         vastDefaults:
           $ref: "#/components/schemas/VASTConfig"
           description: VAST CSI deployment defaults
@@ -1030,6 +1381,16 @@ components:
         - playbook
         - startedAt
       type: object
+    TrustManagerConfig:
+      additionalProperties: false
+      properties:
+        trust_manager_ca_issuer_duration:
+          description: CA certificate lifetime (e.g. 87600h for 10 years)
+          type: string
+        trust_manager_ca_issuer_renew_before:
+          description: How long before expiry to renew the CA (e.g. 8760h for 1 year)
+          type: string
+      type: object
     VASTConfig:
       additionalProperties: false
       properties:
@@ -1140,6 +1501,26 @@ components:
         - field
         - message
       type: object
+    VersionOutputBody:
+      additionalProperties: false
+      properties:
+        $schema:
+          description: A URL to the JSON Schema for this object.
+          examples:
+            - https://example.com/schemas/VersionOutputBody.json
+          format: uri
+          readOnly: true
+          type: string
+        enclaveVersion:
+          description: Enclave version or git hash
+          type: string
+        wizardVersion:
+          description: Enclave Wizard version or git hash
+          type: string
+      required:
+        - wizardVersion
+        - enclaveVersion
+      type: object
   securitySchemes:
     bearer:
       bearerFormat: opaque
@@ -1174,6 +1555,25 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       summary: Authenticate and get a bearer token
+      tags:
+        - auth
+  /api/v1/auth/mode:
+    get:
+      operationId: authMode
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthModeOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Check authentication mode
       tags:
         - auth
   /api/v1/auth/password:
@@ -1628,6 +2028,183 @@ paths:
       summary: Get default configuration values
       tags:
         - Defaults
+  /api/v1/deployments:
+    post:
+      description: Starts the full deployment chain (main playbook + addon plugins).
+      operationId: start-deployment
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deployment"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Start deployment
+      tags:
+        - Deployments
+  /api/v1/deployments/current:
+    get:
+      description: Returns the most recent deployment. Use this for reconnection after page reload.
+      operationId: get-current-deployment
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deployment"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get current deployment
+      tags:
+        - Deployments
+  /api/v1/deployments/{id}:
+    delete:
+      description: Cancels a running deployment.
+      operationId: cancel-deployment
+      parameters:
+        - description: Deployment identifier
+          in: path
+          name: id
+          required: true
+          schema:
+            description: Deployment identifier
+            minLength: 1
+            type: string
+      responses:
+        "204":
+          description: No Content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Cancel deployment
+      tags:
+        - Deployments
+    get:
+      description: Returns the deployment state with phases for the given deployment ID.
+      operationId: get-deployment-by-id
+      parameters:
+        - description: Deployment identifier
+          in: path
+          name: id
+          required: true
+          schema:
+            description: Deployment identifier
+            minLength: 1
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deployment"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get deployment by ID
+      tags:
+        - Deployments
+  /api/v1/deployments/{id}/progress:
+    get:
+      description: Returns live progress with completed task count, percentage, and current phase/task.
+      operationId: get-deployment-progress-by-id
+      parameters:
+        - description: Deployment identifier
+          in: path
+          name: id
+          required: true
+          schema:
+            description: Deployment identifier
+            minLength: 1
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeploymentProgress"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get deployment progress
+      tags:
+        - Deployments
+  /api/v1/experiences:
+    get:
+      description: Returns experience definitions loaded from the enclave directory.
+      operationId: list-experiences
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ExperiencesOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: List available experiences
+      tags:
+        - Experiences
+  /api/v1/files:
+    post:
+      description: Upload a file to the enclave config directory. The file is written to config/<dest>/<filename>.
+      operationId: upload-file
+      requestBody:
+        content:
+          multipart/form-data:
+            schema:
+              properties:
+                filename:
+                  contentMediaType: application/octet-stream
+                  description: filename of the file being uploaded
+                  format: binary
+                  type: string
+                name:
+                  description: general purpose name for multipart form value
+                  type: string
+              type: object
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FileUploadOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Upload a file
+      tags:
+        - Files
   /api/v1/plugins:
     get:
       description: Returns all known plugins and their types.
@@ -1672,6 +2249,34 @@ paths:
                 $ref: "#/components/schemas/ErrorModel"
           description: Error
       summary: Validate plugin combination
+      tags:
+        - Plugins
+  /api/v1/plugins/{name}/schema:
+    get:
+      description: Returns the JSON schema for the named plugin's configuration. Used by the frontend for dynamic form rendering.
+      operationId: get-plugin-schema
+      parameters:
+        - description: Plugin name
+          in: path
+          name: name
+          required: true
+          schema:
+            description: Plugin name
+            minLength: 1
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema: {}
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get plugin config schema
       tags:
         - Plugins
   /api/v1/tasks:
@@ -1905,3 +2510,22 @@ paths:
       summary: Get task output logs
       tags:
         - Tasks
+  /api/v1/version:
+    get:
+      operationId: getVersion
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VersionOutputBody"
+          description: OK
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/ErrorModel"
+          description: Error
+      summary: Get wizard and enclave versions
+      tags:
+        - version

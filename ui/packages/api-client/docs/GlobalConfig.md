@@ -6,10 +6,11 @@
 
 Name | Type
 ------------ | -------------
+`aapDefaults` | [AAPConfig](AAPConfig.md)
 `agentHosts` | [Array&lt;HostEntry&gt;](HostEntry.md)
 `apiVIP` | string
 `baseDomain` | string
-`blockStorageBackend` | string
+`clusterFulfillmentConfig` | { [key: string]: string; }
 `clusterName` | string
 `defaultDNS` | string
 `defaultGateway` | string
@@ -27,14 +28,28 @@ Name | Type
 `ocMirrorLogLevel` | string
 `odfDefaults` | [ODFConfig](ODFConfig.md)
 `odfExternalConfig` | string
+`osacAapLicenseFile` | string
+`osacBYODatabase` | boolean
+`osacBcmApiUrl` | string
+`osacBcmClientCert` | string
+`osacBcmClientKey` | string
+`osacBcmDisableBmcCertVerification` | boolean
+`osacBcmEnabled` | boolean
+`osacBcmValidateCerts` | boolean
+`osacDatabaseUrl` | string
+`osacProfile` | string
 `pullSecret` | any
 `quayBackend` | string
 `quayBackendRGWConfiguration` | [QuayBackendRGWConfiguration](QuayBackendRGWConfiguration.md)
 `quayPassword` | string
 `quayUser` | string
 `rendezvousIP` | string
-`sshPubPath` | string
+`rhbkDbSize` | string
+`rhbkDeployDatabase` | boolean
+`rhbkInstances` | number
+`sshPubKey` | string
 `storagePlugin` | string
+`trustManagerDefaults` | [TrustManagerConfig](TrustManagerConfig.md)
 `vastAdminPassword` | string
 `vastAdminUsername` | string
 `vastDefaults` | [VASTConfig](VASTConfig.md)
@@ -49,10 +64,11 @@ import type { GlobalConfig } from '@enclave-wizard-ui/api-client'
 
 // TODO: Update the object below with actual values
 const example = {
+  "aapDefaults": null,
   "agentHosts": null,
   "apiVIP": null,
   "baseDomain": null,
-  "blockStorageBackend": null,
+  "clusterFulfillmentConfig": null,
   "clusterName": null,
   "defaultDNS": null,
   "defaultGateway": null,
@@ -70,14 +86,28 @@ const example = {
   "ocMirrorLogLevel": null,
   "odfDefaults": null,
   "odfExternalConfig": null,
+  "osacAapLicenseFile": null,
+  "osacBYODatabase": null,
+  "osacBcmApiUrl": null,
+  "osacBcmClientCert": null,
+  "osacBcmClientKey": null,
+  "osacBcmDisableBmcCertVerification": null,
+  "osacBcmEnabled": null,
+  "osacBcmValidateCerts": null,
+  "osacDatabaseUrl": null,
+  "osacProfile": null,
   "pullSecret": null,
   "quayBackend": null,
   "quayBackendRGWConfiguration": null,
   "quayPassword": null,
   "quayUser": null,
   "rendezvousIP": null,
-  "sshPubPath": null,
+  "rhbkDbSize": null,
+  "rhbkDeployDatabase": null,
+  "rhbkInstances": null,
+  "sshPubKey": null,
   "storagePlugin": null,
+  "trustManagerDefaults": null,
   "vastAdminPassword": null,
   "vastAdminUsername": null,
   "vastDefaults": null,

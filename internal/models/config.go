@@ -66,7 +66,13 @@ type PluginsConfig struct {
 	OsacProfile        *string             `json:"osacProfile,omitempty" yaml:"osacProfile,omitempty" doc:"OSAC deployment profile" enum:"development,caas,vmaas,bmaas"`
 	OsacAapLicenseFile *string             `json:"osacAapLicenseFile,omitempty" yaml:"osacAapLicenseFile,omitempty" doc:"Path to AAP license manifest.zip on the landing zone"`
 	OsacBYODatabase    *bool               `json:"osacBYODatabase,omitempty" yaml:"osacBYODatabase,omitempty" doc:"Use external PostgreSQL instead of built-in"`
-	OsacDatabaseUrl    *string             `json:"osacDatabaseUrl,omitempty" yaml:"osacDatabaseUrl,omitempty" doc:"PostgreSQL connection URL when using BYO database"`
+	OsacDatabaseUrl              *string  `json:"osacDatabaseUrl,omitempty" yaml:"osacDatabaseUrl,omitempty" doc:"PostgreSQL connection URL when using BYO database"`
+	OsacBcmEnabled               *bool   `json:"osacBcmEnabled,omitempty" yaml:"osacBcmEnabled,omitempty" doc:"Enable BCM inventory backend"`
+	OsacBcmApiUrl                *string `json:"osacBcmApiUrl,omitempty" yaml:"osacBcmApiUrl,omitempty" doc:"BCM API endpoint"`
+	OsacBcmClientCert            *string `json:"osacBcmClientCert,omitempty" yaml:"osacBcmClientCert,omitempty" doc:"BCM client certificate (PEM)"`
+	OsacBcmClientKey             *string `json:"osacBcmClientKey,omitempty" yaml:"osacBcmClientKey,omitempty" doc:"BCM client key (PEM)"`
+	OsacBcmValidateCerts         *bool   `json:"osacBcmValidateCerts,omitempty" yaml:"osacBcmValidateCerts,omitempty" doc:"Verify BCM TLS certificates"`
+	OsacBcmDisableBmcCertVerification *bool `json:"osacBcmDisableBmcCertVerification,omitempty" yaml:"osacBcmDisableBmcCertVerification,omitempty" doc:"Skip BMC cert verification"`
 	RhbkInstances      *int                `json:"rhbk_instances,omitempty" yaml:"rhbk_instances,omitempty" doc:"Number of Keycloak replicas" minimum:"1"`
 	RhbkDeployDatabase *bool               `json:"rhbk_deploy_database,omitempty" yaml:"rhbk_deploy_database,omitempty" doc:"Deploy PostgreSQL alongside Keycloak"`
 	RhbkDbSize                   *string             `json:"rhbk_db_size,omitempty" yaml:"rhbk_db_size,omitempty" doc:"PVC size for Keycloak PostgreSQL"`

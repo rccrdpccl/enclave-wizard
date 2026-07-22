@@ -80,7 +80,7 @@ func removeIfExists(path string) {
 
 // buildOsacConfig reads OSAC fields without mutating the source.
 func buildOsacConfig(pc *models.PluginsConfig) *osacPluginConfig {
-	if pc.OsacProfile == nil && pc.OsacAapLicenseFile == nil && len(pc.ClusterFulfillmentConfig) == 0 {
+	if pc.OsacProfile == nil && pc.OsacAapLicenseFile == nil && pc.OsacBcmEnabled == nil && len(pc.ClusterFulfillmentConfig) == 0 {
 		return nil
 	}
 	cfg := &osacPluginConfig{}
@@ -95,6 +95,24 @@ func buildOsacConfig(pc *models.PluginsConfig) *osacPluginConfig {
 	}
 	if pc.OsacDatabaseUrl != nil {
 		cfg.OsacDatabaseUrl = *pc.OsacDatabaseUrl
+	}
+	if pc.OsacBcmEnabled != nil {
+		cfg.OsacBcmEnabled = *pc.OsacBcmEnabled
+	}
+	if pc.OsacBcmApiUrl != nil {
+		cfg.OsacBcmApiUrl = *pc.OsacBcmApiUrl
+	}
+	if pc.OsacBcmClientCert != nil {
+		cfg.OsacBcmClientCert = *pc.OsacBcmClientCert
+	}
+	if pc.OsacBcmClientKey != nil {
+		cfg.OsacBcmClientKey = *pc.OsacBcmClientKey
+	}
+	if pc.OsacBcmValidateCerts != nil {
+		cfg.OsacBcmValidateCerts = *pc.OsacBcmValidateCerts
+	}
+	if pc.OsacBcmDisableBmcCertVerification != nil {
+		cfg.OsacBcmDisableBmcCertVerification = *pc.OsacBcmDisableBmcCertVerification
 	}
 	if len(pc.ClusterFulfillmentConfig) > 0 {
 		cfg.ClusterFulfillmentConfig = pc.ClusterFulfillmentConfig
