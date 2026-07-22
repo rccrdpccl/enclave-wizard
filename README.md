@@ -111,3 +111,5 @@ make test     # run tests
 make lint     # go vet
 make tidy     # go mod tidy
 ```
+
+See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for the full developer guide.
