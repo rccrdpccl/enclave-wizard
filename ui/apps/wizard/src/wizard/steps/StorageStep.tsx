@@ -145,6 +145,14 @@ export const StorageStep: React.FC = () => {
   const vastAdminUsername = (globalData.vastAdminUsername as string) ?? "";
   const vastAdminPassword = (globalData.vastAdminPassword as string) ?? "";
   const vastVipPool = globalData.vastVipPool as VipPool | undefined;
+  const lvmsConfig = (globalData.lvmsConfig ?? {}) as Record<string, unknown>;
+  const deviceSelector = (lvmsConfig.deviceSelector ?? {}) as Record<
+    string,
+    unknown
+  >;
+  const optionalPaths: string[] = Array.isArray(deviceSelector.optionalPaths)
+    ? (deviceSelector.optionalPaths as string[])
+    : [];
   const quayUser = (globalData.quayUser as string) ?? "";
   const quayPassword = (globalData.quayPassword as string) ?? "";
   const rgwConfig = (globalData.quayBackendRGWConfiguration ?? {}) as Record<
@@ -161,11 +169,24 @@ export const StorageStep: React.FC = () => {
     if (next !== "odf") {
       onChange("global.odfExternalConfig", undefined);
     }
+    if (next !== "lvms") {
+      onChange("global.lvmsConfig", undefined);
+    }
     if (next !== "vast-csi") {
       onChange("global.vastEndpoint", undefined);
       onChange("global.vastAdminUsername", undefined);
       onChange("global.vastAdminPassword", undefined);
       onChange("global.vastVipPool", undefined);
+    }
+  };
+
+  const setOptionalPaths = (paths: string[]) => {
+    if (paths.length === 0) {
+      onChange("global.lvmsConfig", undefined);
+    } else {
+      onChange("global.lvmsConfig", {
+        deviceSelector: { optionalPaths: paths },
+      });
     }
   };
 
@@ -212,6 +233,61 @@ export const StorageStep: React.FC = () => {
         isChecked={backend === "lvms"}
         onChange={() => selectBackend("lvms")}
       />
+
+      {backend === "lvms" && (
+        <FormGroup
+          label="Disk device paths"
+          fieldId="lvms-optional-paths"
+          style={subFormStyle}
+        >
+          <FormHelperText>
+            Optional. Specify disk device paths for LVMS to use. Leave empty to
+            auto-discover all available block devices.
+          </FormHelperText>
+          {optionalPaths.map((path, i) => (
+            <Flex
+              key={i}
+              gap={{ default: "gapSm" }}
+              alignItems={{ default: "alignItemsCenter" }}
+              style={{ marginBottom: "0.5rem", marginTop: i === 0 ? "0.5rem" : undefined }}
+            >
+              <FlexItem grow={{ default: "grow" }}>
+                <TextInput
+                  id={`lvms-path-${i}`}
+                  value={path}
+                  onChange={(_e, v) =>
+                    setOptionalPaths(
+                      optionalPaths.map((p, idx) => (idx === i ? v : p)),
+                    )
+                  }
+                  placeholder="/dev/sdb or /dev/disk/by-path/..."
+                  aria-label="Disk device path"
+                />
+              </FlexItem>
+              <FlexItem>
+                <Button
+                  variant="plain"
+                  aria-label="Remove disk path"
+                  onClick={() =>
+                    setOptionalPaths(
+                      optionalPaths.filter((_, idx) => idx !== i),
+                    )
+                  }
+                >
+                  <MinusCircleIcon />
+                </Button>
+              </FlexItem>
+            </Flex>
+          ))}
+          <Button
+            variant="link"
+            icon={<PlusCircleIcon />}
+            onClick={() => setOptionalPaths([...optionalPaths, ""])}
+          >
+            Add disk path
+          </Button>
+        </FormGroup>
+      )}
 
       <Radio
         id="storage-odf"
