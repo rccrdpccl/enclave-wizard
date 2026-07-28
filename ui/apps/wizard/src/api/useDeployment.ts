@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { EnclaveConfig, TaskRun } from "@enclave-wizard-ui/api-client";
+import { useAuth } from "../auth/AuthContext.tsx";
 import { useEnclaveApi } from "./useEnclaveApi.ts";
 import { useTasksApi } from "./useTasksApi.ts";
 
@@ -50,9 +51,16 @@ const INITIAL_STATE: DeploymentState = {
 /** Try a fetch; return the Response on success, null on 404. Throws on other errors. */
 async function fetchWithFallback(
   url: string,
+  token: string | null,
   init?: RequestInit,
 ): Promise<Response | null> {
-  const resp = await fetch(url, init);
+  const headers: Record<string, string> = {
+    ...(init?.headers as Record<string, string>),
+  };
+  if (token) {
+    headers["Authorization"] = `Bearer ${token}`;
+  }
+  const resp = await fetch(url, { ...init, headers });
   if (resp.status === 404) return null;
   if (!resp.ok) {
     const text = await resp.text().catch(() => "");
@@ -91,6 +99,7 @@ async function extractErrorDetails(err: unknown): Promise<DeploymentError> {
 export function useDeployment(): UseDeploymentReturn {
   const api = useEnclaveApi();
   const tasksApi = useTasksApi();
+  const { token } = useAuth();
   const [state, setState] = useState<DeploymentState>(INITIAL_STATE);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
@@ -128,6 +137,7 @@ export function useDeployment(): UseDeploymentReturn {
             try {
               const resp = await fetchWithFallback(
                 `/api/v1/deployments/${deploymentId}/progress`,
+                token,
               );
               if (resp) {
                 const body = await resp.json();
@@ -178,7 +188,7 @@ export function useDeployment(): UseDeploymentReturn {
       tick();
       pollRef.current = setInterval(tick, 3000);
     },
-    [tasksApi, stopPolling],
+    [tasksApi, stopPolling, token],
   );
 
   const start = useCallback(
@@ -199,7 +209,7 @@ export function useDeployment(): UseDeploymentReturn {
         let deploymentId: string | null = null;
         let taskId: string | null = null;
 
-        const resp = await fetchWithFallback("/api/v1/deployments", {
+        const resp = await fetchWithFallback("/api/v1/deployments", token, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
@@ -235,7 +245,7 @@ export function useDeployment(): UseDeploymentReturn {
         }));
       }
     },
-    [api, tasksApi, pollDeployment],
+    [api, tasksApi, pollDeployment, token],
   );
 
   const cancel = useCallback(async () => {
@@ -246,6 +256,7 @@ export function useDeployment(): UseDeploymentReturn {
       if (deploymentId) {
         const resp = await fetchWithFallback(
           `/api/v1/deployments/${deploymentId}`,
+          token,
           { method: "DELETE" },
         );
         if (resp) {
@@ -271,14 +282,16 @@ export function useDeployment(): UseDeploymentReturn {
         },
       }));
     }
-  }, [state, tasksApi, stopPolling]);
+  }, [state, tasksApi, stopPolling, token]);
 
   // Reconnect to an in-progress deployment on mount
   useEffect(() => {
+    if (!token) return;
+
     const reconnect = async () => {
       try {
         // Try new endpoint first
-        const resp = await fetchWithFallback("/api/v1/deployments/current");
+        const resp = await fetchWithFallback("/api/v1/deployments/current", token);
         if (resp) {
           const body = await resp.json();
           const deploymentId = body.id ?? null;
@@ -300,7 +313,11 @@ export function useDeployment(): UseDeploymentReturn {
 
       // Fall back: check old deployment endpoint
       try {
-        const resp = await fetch("/api/v1/deployment");
+        const headers: Record<string, string> = {};
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+        const resp = await fetch("/api/v1/deployment", { headers });
         if (resp.ok) {
           const body = await resp.json();
           if (body.taskId && body.status === "running") {
@@ -318,8 +335,7 @@ export function useDeployment(): UseDeploymentReturn {
     };
 
     reconnect();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [token, pollDeployment]);
 
   return useMemo(
     () => ({ state, start, cancel }),
