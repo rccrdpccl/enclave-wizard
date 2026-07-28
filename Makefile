@@ -60,8 +60,10 @@ clean: ## Remove build artifacts.
 tidy: ## Run go mod tidy.
 	$(GO) mod tidy
 
+ENCLAVE_DIR ?= ../enclave
+
 generate-schema: ## Generate Go types from enclave JSON schemas.
-	$(GO) run ./cmd/schemagen --enclave-dir ../enclave --output internal/schema/
+	$(GO) run ./cmd/schemagen --enclave-dir $(ENCLAVE_DIR) --output internal/schema/
 
 generate: generate-schema ## Run all code generation.
 	$(GO) generate ./...

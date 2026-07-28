@@ -257,9 +257,9 @@ func StripPrefix(propName, prefix string) string {
 	return propName
 }
 
-// SnakeToPascal converts snake_case to PascalCase.
-// Example: "deploy_database" -> "DeployDatabase"
+// SnakeToPascal converts snake_case or kebab-case to PascalCase.
 func SnakeToPascal(s string) string {
+	s = strings.ReplaceAll(s, "-", "_")
 	parts := strings.Split(s, "_")
 	for i, p := range parts {
 		if p == "" {
