@@ -151,10 +151,10 @@ function buildConfigSubSteps(selectedFlavors: Set<string>, enabledPlugins: strin
     subs.push({ id: "trust-manager", label: "Trust Manager" });
   }
   if (selectedFlavors.has("vmaas")) {
-    subs.push({ id: "gpu-ai", label: "Virtual Machines" });
+    subs.push({ id: "gpu-ai", label: "VMaaS" });
   }
   if (selectedFlavors.has("caas")) {
-    subs.push({ id: "caas", label: "Bare Metal Hosts" });
+    subs.push({ id: "caas", label: "CaaS" });
   }
   return subs;
 }

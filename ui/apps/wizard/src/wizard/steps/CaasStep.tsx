@@ -43,7 +43,7 @@ export const CaasStep: React.FC = () => {
   return (
     <Form>
       <Title headingLevel="h2" size="xl">
-        Bare Metal Hosts
+        CaaS
       </Title>
       <Content component="p">
         Register bare metal machines that form the resource pool for CaaS. The

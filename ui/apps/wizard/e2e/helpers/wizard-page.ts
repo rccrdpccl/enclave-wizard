@@ -200,7 +200,7 @@ export class WizardPage {
     }
   }
 
-  // --- Step: GPU / Virtual Machines ---
+  // --- Step: GPU / VMaaS ---
 
   async enableGpuPassthrough() {
     const checkbox = this.page.locator("#enable-gpu");
