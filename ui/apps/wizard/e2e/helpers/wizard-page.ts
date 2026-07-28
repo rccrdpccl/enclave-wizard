@@ -67,7 +67,7 @@ export class WizardPage {
   // --- Auth: Login & Change Password ---
 
   async login(password: string) {
-    await this.page.fill("#password", password);
+    await this.page.fill("#login-password", password);
     await this.page.getByRole("button", { name: "Sign in" }).click();
   }
 
