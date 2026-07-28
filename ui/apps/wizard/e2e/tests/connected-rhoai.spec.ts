@@ -83,7 +83,7 @@ test.describe("Connected + VMaaS + GPU scenario", () => {
     await wizard.fillOsac({});
     await wizard.clickNext();
 
-    // Virtual Machines step — enable GPU passthrough
+    // VMaaS step — enable GPU passthrough
     await wizard.clickNext();
     await wizard.enableGpuPassthrough();
     const gpuCheckbox = page.locator("#enable-gpu");

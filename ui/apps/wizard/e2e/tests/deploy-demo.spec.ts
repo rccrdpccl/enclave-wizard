@@ -41,7 +41,7 @@ test.describe("Deploy flow (demo mode)", () => {
     await wizard.fillOsac({ rhbkInstances: 3, rhbkDbSize: "10Gi" });
     await wizard.clickNext();
 
-    // Bare Metal Hosts — skip
+    // CaaS — skip
     await wizard.clickNext();
 
     // Review — skip validation, go to Deploy
