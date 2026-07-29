@@ -355,10 +355,8 @@ function WizardContent(): React.ReactElement {
     dispatch({ type: "SET_STEP", step: Math.max(0, state.currentStep - 1) });
   };
 
-  const skipValidation = new URLSearchParams(window.location.search).has("skip_validation");
-
   const validateCurrentSubStep = useCallback((): StepValidationError[] => {
-    if (skipValidation || !state.schema || !currentSubStepId) return [];
+    if (!state.schema || !currentSubStepId) return [];
 
     const fieldsToValidate = STEP_REQUIRED_FIELDS[currentSubStepId];
     let errors: StepValidationError[] = [];
@@ -430,7 +428,7 @@ function WizardContent(): React.ReactElement {
     }
 
     return errors;
-  }, [currentSubStepId, state.schema, state.configData, skipValidation]);
+  }, [currentSubStepId, state.schema, state.configData]);
 
   const goNext = useCallback(() => {
     if (isConfigure) {

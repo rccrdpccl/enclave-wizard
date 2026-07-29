@@ -14,12 +14,8 @@ export function useStepValidation(
   const { state: config } = useConfig();
   const { state: catalog } = useCatalog();
 
-  const skipValidation = new URLSearchParams(window.location.search).has(
-    "skip_validation",
-  );
-
   return useCallback((): StepValidationError[] => {
-    if (skipValidation || !catalog.schema || !currentSubStepId) return [];
+    if (!catalog.schema || !currentSubStepId) return [];
 
     const fieldsToValidate = STEP_REQUIRED_FIELDS[currentSubStepId];
     let errors: StepValidationError[] = [];
@@ -170,5 +166,5 @@ export function useStepValidation(
     }
 
     return errors;
-  }, [currentSubStepId, catalog.schema, config.configData, skipValidation]);
+  }, [currentSubStepId, catalog.schema, config.configData]);
 }
