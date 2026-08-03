@@ -20,11 +20,24 @@ This will:
 1. Build RPMs with dev tags (`--record` flag enabled)
 2. Deploy the wizard VM via the e2e infrastructure
 3. Set up bare metal emulation (sushy-tools + 3 UEFI VMs)
-4. Write config with real pull secret and Redfish BMC endpoints
-5. Trigger full deployment and record all ansible output
-6. Download recordings to `fixtures/recordings/`
+4. Update `demo-params.json` with infra parameters and wizard credentials
+5. Fill the wizard via Playwright (using `fill-demo-params.spec.ts`)
+6. Trigger deployment and record all ansible output
+7. Download recordings to `fixtures/recordings/`
 
 Takes 60-90 minutes for a full run.
+
+## Interactive mode
+
+Use `--interactive` to open a headed browser and pause at the Review step,
+so you can inspect the config and click Deploy manually:
+
+```bash
+hack/infra/deploy-with-recording.sh \
+  --host root@rdu-infra-edge-03.infra-edge.lab.eng.rdu2.redhat.com \
+  --pull-secret ~/pull-secret.json \
+  --interactive
+```
 
 ## Skip flags
 
