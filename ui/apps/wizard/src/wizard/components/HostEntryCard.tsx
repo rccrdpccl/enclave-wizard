@@ -19,6 +19,7 @@ interface HostEntry {
   redfishUser: string;
   redfishPassword: string;
   rootDisk: string;
+  bmcSystemId?: string;
 }
 
 interface HostEntryCardProps {
@@ -160,6 +161,26 @@ export const HostEntryCard: React.FC<HostEntryCardProps> = ({
                   <HelperTextItem>
                     Block device path for OS installation (e.g. /dev/sda,
                     /dev/disk/by-path/...)
+                  </HelperTextItem>
+                </HelperText>
+              </FormHelperText>
+            </FormGroup>
+          </div>
+          <div className={styles.fullWidth}>
+            <FormGroup
+              label="BMC System ID"
+              fieldId={`${prefix}-bmcsystemid`}
+            >
+              <TextInput
+                id={`${prefix}-bmcsystemid`}
+                value={host.bmcSystemId ?? ""}
+                onChange={(_e, v) => update("bmcSystemId", v)}
+                placeholder="Auto-detected if empty"
+              />
+              <FormHelperText>
+                <HelperText>
+                  <HelperTextItem>
+                    Redfish System ID (UUID). Leave empty for single-system BMCs.
                   </HelperTextItem>
                 </HelperText>
               </FormHelperText>

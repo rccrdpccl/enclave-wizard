@@ -48,7 +48,7 @@ const INITIAL_STATE: DeploymentState = {
   error: null,
 };
 
-/** Try a fetch; return the Response on success, null on 404. Throws on other errors. */
+/** Try a fetch with auth; return the Response on success, null on 404. Throws on other errors. */
 async function fetchWithFallback(
   url: string,
   token: string | null,
@@ -58,7 +58,7 @@ async function fetchWithFallback(
     ...(init?.headers as Record<string, string>),
   };
   if (token) {
-    headers["Authorization"] = `Bearer ${token}`;
+    headers.Authorization = `Bearer ${token}`;
   }
   const resp = await fetch(url, { ...init, headers });
   if (resp.status === 404) return null;
@@ -76,7 +76,8 @@ async function extractErrorDetails(err: unknown): Promise<DeploymentError> {
       const body = await (err as { response: Response }).response.json();
       if (body.errors && Array.isArray(body.errors)) {
         for (const e of body.errors) {
-          details.push(e.message ?? String(e));
+          const field = e.field ? `${e.field}: ` : "";
+          details.push(`${field}${e.message ?? String(e)}`);
         }
       } else if (body.detail) {
         details.push(body.detail);
@@ -97,12 +98,15 @@ async function extractErrorDetails(err: unknown): Promise<DeploymentError> {
 }
 
 export function useDeployment(): UseDeploymentReturn {
+  const { token } = useAuth();
   const api = useEnclaveApi();
   const tasksApi = useTasksApi();
-  const { token } = useAuth();
   const [state, setState] = useState<DeploymentState>(INITIAL_STATE);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const mountedRef = useRef(true);
+  const tokenRef = useRef(token);
+  tokenRef.current = token;
+  const reconnectedRef = useRef(false);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -128,6 +132,8 @@ export function useDeployment(): UseDeploymentReturn {
         if (!mountedRef.current) return;
 
         try {
+          const currentToken = tokenRef.current;
+
           // Always get task metadata (status, startedAt, etc.)
           const task = await tasksApi.getTask(taskId);
 
@@ -137,7 +143,7 @@ export function useDeployment(): UseDeploymentReturn {
             try {
               const resp = await fetchWithFallback(
                 `/api/v1/deployments/${deploymentId}/progress`,
-                token,
+                currentToken,
               );
               if (resp) {
                 const body = await resp.json();
@@ -209,7 +215,7 @@ export function useDeployment(): UseDeploymentReturn {
         let deploymentId: string | null = null;
         let taskId: string | null = null;
 
-        const resp = await fetchWithFallback("/api/v1/deployments", token, {
+        const resp = await fetchWithFallback("/api/v1/deployments", tokenRef.current, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({}),
@@ -256,7 +262,7 @@ export function useDeployment(): UseDeploymentReturn {
       if (deploymentId) {
         const resp = await fetchWithFallback(
           `/api/v1/deployments/${deploymentId}`,
-          token,
+          tokenRef.current,
           { method: "DELETE" },
         );
         if (resp) {
@@ -284,14 +290,14 @@ export function useDeployment(): UseDeploymentReturn {
     }
   }, [state, tasksApi, stopPolling, token]);
 
-  // Reconnect to an in-progress deployment on mount
+  // Reconnect to an in-progress deployment on mount (runs once after auth)
   useEffect(() => {
-    if (!token) return;
+    if (!token || reconnectedRef.current) return;
+    reconnectedRef.current = true;
 
     const reconnect = async () => {
       try {
-        // Try new endpoint first
-        const resp = await fetchWithFallback("/api/v1/deployments/current", token);
+        const resp = await fetchWithFallback("/api/v1/deployments/current", tokenRef.current);
         if (resp) {
           const body = await resp.json();
           const deploymentId = body.id ?? null;
@@ -311,13 +317,10 @@ export function useDeployment(): UseDeploymentReturn {
         // New endpoint not available
       }
 
-      // Fall back: check old deployment endpoint
       try {
-        const headers: Record<string, string> = {};
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
-        const resp = await fetch("/api/v1/deployment", { headers });
+        const resp = await fetch("/api/v1/deployment", {
+          headers: tokenRef.current ? { Authorization: `Bearer ${tokenRef.current}` } : {},
+        });
         if (resp.ok) {
           const body = await resp.json();
           if (body.taskId && body.status === "running") {

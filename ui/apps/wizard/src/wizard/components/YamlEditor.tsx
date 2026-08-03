@@ -40,6 +40,7 @@ export const YamlEditor: React.FC<YamlEditorProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const onChangeRef = useRef(onChange);
+  const suppressOnChangeRef = useRef(false);
   onChangeRef.current = onChange;
 
   useEffect(() => {
@@ -52,7 +53,7 @@ export const YamlEditor: React.FC<YamlEditorProps> = ({
         yaml(),
         EditorState.readOnly.of(readOnly),
         EditorView.updateListener.of((update) => {
-          if (update.docChanged) {
+          if (update.docChanged && !suppressOnChangeRef.current) {
             onChangeRef.current(update.state.doc.toString());
           }
         }),
@@ -76,9 +77,11 @@ export const YamlEditor: React.FC<YamlEditorProps> = ({
     if (!view) return;
     const current = view.state.doc.toString();
     if (current !== value) {
+      suppressOnChangeRef.current = true;
       view.dispatch({
         changes: { from: 0, to: current.length, insert: value },
       });
+      suppressOnChangeRef.current = false;
     }
   }, [value]);
 

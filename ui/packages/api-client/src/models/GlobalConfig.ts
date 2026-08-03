@@ -441,7 +441,7 @@ export function GlobalConfigToJSONTyped(value?: GlobalConfig | null, ignoreDiscr
         'defaultPrefix': value['defaultPrefix'],
         'disconnected': value['disconnected'],
         'diskEncryption': value['diskEncryption'],
-        'enabled_plugins': value['enabledPlugins'],
+        'enabled_plugins': value['enabledPlugins'] ?? [],
         'osacProfile': value['osacProfile'],
         'osacAapLicenseFile': value['osacAapLicenseFile'],
         'osacBYODatabase': value['osacBYODatabase'],

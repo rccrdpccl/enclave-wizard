@@ -495,6 +495,90 @@ func TestWriteAll_RemovesPluginFilesWhenFieldsCleared(t *testing.T) {
 	}
 }
 
+func TestWriteAllThenReadAll_EnabledPluginsRoundTrips(t *testing.T) {
+	root := t.TempDir()
+
+	want := &models.EnclaveConfig{}
+	want.Global.EnabledPlugins = []string{"lvms", "trust-manager", "rhbk", "authorino", "aap", "osac"}
+
+	if err := NewWriter(root).WriteAll(want); err != nil {
+		t.Fatalf("WriteAll: %v", err)
+	}
+
+	// Verify the YAML file explicitly contains enabled_plugins
+	data, _ := os.ReadFile(filepath.Join(root, "config", "global.yaml"))
+	var raw map[string]any
+	yaml.Unmarshal(data, &raw)
+	if _, ok := raw["enabled_plugins"]; !ok {
+		t.Fatal("enabled_plugins key missing from global.yaml")
+	}
+
+	got, err := NewReader(root).ReadAll()
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+
+	if len(got.Global.EnabledPlugins) != 6 {
+		t.Fatalf("expected 6 enabled plugins, got %d: %v", len(got.Global.EnabledPlugins), got.Global.EnabledPlugins)
+	}
+	if got.Global.EnabledPlugins[0] != "lvms" {
+		t.Errorf("first plugin: want lvms, got %q", got.Global.EnabledPlugins[0])
+	}
+	if got.Global.EnabledPlugins[5] != "osac" {
+		t.Errorf("last plugin: want osac, got %q", got.Global.EnabledPlugins[5])
+	}
+}
+
+func TestWriteAllThenReadAll_EmptyEnabledPluginsPreserved(t *testing.T) {
+	root := t.TempDir()
+
+	want := &models.EnclaveConfig{}
+	want.Global.EnabledPlugins = []string{}
+
+	if err := NewWriter(root).WriteAll(want); err != nil {
+		t.Fatalf("WriteAll: %v", err)
+	}
+
+	// The key must still exist in YAML even when empty
+	data, _ := os.ReadFile(filepath.Join(root, "config", "global.yaml"))
+	var raw map[string]any
+	yaml.Unmarshal(data, &raw)
+	if _, ok := raw["enabled_plugins"]; !ok {
+		t.Fatal("enabled_plugins key missing from global.yaml even for empty slice")
+	}
+
+	got, err := NewReader(root).ReadAll()
+	if err != nil {
+		t.Fatalf("ReadAll: %v", err)
+	}
+
+	if got.Global.EnabledPlugins == nil {
+		t.Fatal("enabled_plugins should be empty slice, not nil")
+	}
+	if len(got.Global.EnabledPlugins) != 0 {
+		t.Errorf("expected 0 plugins, got %d", len(got.Global.EnabledPlugins))
+	}
+}
+
+func TestWriteAllThenReadAll_NilEnabledPluginsWritesEmptyList(t *testing.T) {
+	root := t.TempDir()
+
+	want := &models.EnclaveConfig{}
+	// EnabledPlugins is nil (zero value)
+
+	if err := NewWriter(root).WriteAll(want); err != nil {
+		t.Fatalf("WriteAll: %v", err)
+	}
+
+	// Even with nil input, the key must appear in YAML
+	data, _ := os.ReadFile(filepath.Join(root, "config", "global.yaml"))
+	var raw map[string]any
+	yaml.Unmarshal(data, &raw)
+	if _, ok := raw["enabled_plugins"]; !ok {
+		t.Fatal("enabled_plugins key must always be present in global.yaml")
+	}
+}
+
 func TestWriteAll_FilePermsAre0640(t *testing.T) {
 	root := t.TempDir()
 	if err := NewWriter(root).WriteAll(&models.EnclaveConfig{}); err != nil {

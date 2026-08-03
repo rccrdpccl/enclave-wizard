@@ -5,11 +5,16 @@
 #
 # Usage:
 #   ./hack/infra/deploy-with-recording.sh --host root@hypervisor --pull-secret /path/to/pull-secret.json
+#   ./hack/infra/deploy-with-recording.sh --host root@hypervisor --pull-secret /path/to/pull-secret.json --interactive
+#
+# Flags:
+#   --interactive   Open a headed browser and pause at Review so you can deploy manually
 #
 # Prerequisites:
 #   - SSH key access to the hypervisor host
 #   - A valid OpenShift pull secret (from console.redhat.com)
 #   - podman, libvirt, virt-install on the host
+#   - Node.js with npx and Playwright installed (for filling the wizard)
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -24,6 +29,7 @@ INGRESS_VIP="${INGRESS_VIP:-192.168.223.201}"
 SKIP_BUILD="${SKIP_BUILD:-false}"
 SKIP_DEPLOY="${SKIP_DEPLOY:-false}"
 SKIP_INFRA="${SKIP_INFRA:-false}"
+INTERACTIVE="${INTERACTIVE:-false}"
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -34,6 +40,7 @@ while [ $# -gt 0 ]; do
     --skip-build) SKIP_BUILD=true; shift ;;
     --skip-deploy) SKIP_DEPLOY=true; shift ;;
     --skip-infra) SKIP_INFRA=true; shift ;;
+    --interactive) INTERACTIVE=true; shift ;;
     *) echo "Unknown option: $1"; exit 1 ;;
   esac
 done
@@ -70,7 +77,8 @@ fi
 # =============================================================================
 if [ "${SKIP_DEPLOY}" != "true" ]; then
   info "[2/8] Deploying wizard VM..."
-  "${REPO_DIR}/hack/e2e/run-e2e.sh" --host "${TARGET}" --skip-teardown
+  "${REPO_DIR}/hack/e2e/run-e2e.sh" --host "${TARGET}" --skip-teardown || \
+    info "  E2E tests had failures (non-fatal — wizard VM is deployed)"
 else
   info "[2/8] Skipping wizard deploy (--skip-deploy)"
 fi
@@ -98,12 +106,15 @@ fi
 # =============================================================================
 info "[4/8] Configuring wizard VM networking..."
 
-# Check if already has enclave-bmc NIC
-HAS_BMC_NIC=$(${SSH} "${TARGET}" "virsh domiflist enclave-wizard-lz | grep -c enclave-bmc" 2>/dev/null || echo "0")
-if [ "${HAS_BMC_NIC}" = "0" ]; then
-  ${SSH} "${TARGET}" "virsh attach-interface enclave-wizard-lz network enclave-bmc --model virtio --config --live"
-  sleep 5
-fi
+# Attach enclave-bmc NIC if not already present
+${SSH} "${TARGET}" "
+  if ! virsh domiflist enclave-wizard-lz | grep -q enclave-bmc; then
+    virsh attach-interface enclave-wizard-lz network enclave-bmc --model virtio --config --live
+    echo 'BMC NIC attached'
+  else
+    echo 'BMC NIC already attached'
+  fi
+"
 
 # Expand disk if needed
 DISK_AVAIL=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "df --output=avail / | tail -1" 2>/dev/null | tr -d ' ')
@@ -113,16 +124,33 @@ if [ "${DISK_AVAIL:-0}" -lt 20000000 ]; then
   ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "sudo growpart /dev/vda 1 2>/dev/null; sudo xfs_growfs / 2>/dev/null || sudo resize2fs /dev/vda1 2>/dev/null" || true
 fi
 
-# Configure DNS on the BMC interface (priority -10 so enclave-bmc DNS
-# resolves *.apps routes before the default network's NXDOMAIN)
+# Activate the BMC NIC inside the VM and configure DNS
 ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
-  sudo nmcli con mod 'Wired connection 2' ipv4.dns '192.168.223.1' ipv4.dns-priority -10 2>/dev/null || true
-  sudo nmcli con up 'Wired connection 2' 2>/dev/null || true
+  # Find the BMC interface (second ethernet device, not eth0)
+  BMC_DEV=\$(nmcli -t -f DEVICE,TYPE dev status | grep ethernet | grep -v eth0 | head -1 | cut -d: -f1)
+  if [ -n \"\$BMC_DEV\" ]; then
+    sudo nmcli dev connect \"\$BMC_DEV\" 2>/dev/null || true
+    sleep 3
+    CON=\$(nmcli -t -f NAME,DEVICE con show --active | grep \"\$BMC_DEV\" | cut -d: -f1)
+    if [ -n \"\$CON\" ]; then
+      sudo nmcli con mod \"\$CON\" ipv4.dns '192.168.223.1' ipv4.dns-priority -10
+      sudo nmcli con up \"\$CON\"
+    fi
+  fi
 " 2>/dev/null || true
 
-# Get the VM's IP on the BMC network
-BMC_VM_IP=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "ip -4 addr show eth1 2>/dev/null | grep -oP 'inet \K[0-9.]+'" 2>/dev/null || echo "")
+# Get the VM's IP on the BMC network (retry — DHCP may need time)
+BMC_VM_IP=""
+for attempt in $(seq 1 18); do
+  BMC_VM_IP=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
+    ip -4 addr show 2>/dev/null | grep -A2 'state UP' | grep -v '192.168.122' | grep -oP 'inet \K[0-9.]+' | head -1
+  " 2>/dev/null || echo "")
+  [ -n "${BMC_VM_IP}" ] && break
+  info "  Waiting for BMC NIC IP (attempt ${attempt}/18)..."
+  sleep 5
+done
 info "  Wizard VM BMC IP: ${BMC_VM_IP:-unknown}"
+[ -z "${BMC_VM_IP}" ] && error "Wizard VM did not get a BMC network IP after 90s"
 
 # =============================================================================
 # Step 5: Install extra deps on wizard VM
@@ -133,86 +161,34 @@ ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
 " 2>/dev/null
 
 # =============================================================================
-# Step 6: Build and write config
+# Step 6: Prepare demo-params.json and wizard auth
 # =============================================================================
-info "[6/8] Writing deployment config with pull secret..."
+info "[6/8] Updating demo-params.json..."
 
-# Copy pull secret to host, then build config JSON there
+WIZARD_HOST="$(echo "${TARGET}" | cut -d@ -f2)"
+WIZARD_URL="https://${WIZARD_HOST}:3443"
+PARAMS_FILE="${REPO_DIR}/demo-params.json"
+
+# Copy pull secret to hypervisor (Ansible needs it during deploy)
 ${SCP} "${PULL_SECRET}" "${TARGET}:/tmp/enclave-pull-secret.json"
+${SSH} "${TARGET}" "scp -o StrictHostKeyChecking=no /tmp/enclave-pull-secret.json wizard@${VM_IP}:/tmp/"
 
-${SSH} "${TARGET}" "python3 -c \"
+# Discover VM UUIDs from sushy-tools on the hypervisor
+VM_UUIDS=$(${SSH} "${TARGET}" "python3 -c \"
 import json, urllib.request, ssl
-
 ctx = ssl.create_default_context()
 ctx.check_hostname = False
 ctx.verify_mode = ssl.CERT_NONE
-
-ps = json.load(open('/tmp/enclave-pull-secret.json'))
-
-# Discover VM UUIDs from sushy-tools
-name_to_uuid = {}
+result = []
 resp = urllib.request.urlopen('https://192.168.223.1:8100/redfish/v1/Systems', context=ctx)
 for m in json.loads(resp.read())['Members']:
     sid = m['@odata.id'].split('/')[-1]
     r2 = urllib.request.urlopen(f'https://192.168.223.1:8100/redfish/v1/Systems/{sid}', context=ctx)
     info = json.loads(r2.read())
     if 'enclave-cp' in info['Name']:
-        name_to_uuid[info['Name']] = sid
-
-hosts = []
-for i in range(3):
-    name = f'enclave-cp-{i}'
-    hosts.append({
-        'name': name,
-        'macAddress': f'00:60:2f:e0:c1:{i:02x}',
-        'ipAddress': f'192.168.223.{10+i}',
-        'redfish': '192.168.223.1:8100',
-        'redfishUser': 'admin',
-        'redfishPassword': 'password',
-        'rootDisk': '/dev/sda',
-    })
-
-config = {
-    'global': {
-        'workingDir': '/opt/enclave',
-        'baseDomain': '${BASE_DOMAIN}',
-        'clusterName': '${CLUSTER_NAME}',
-        'machineNetwork': '192.168.223.0/24',
-        'apiVIP': '${API_VIP}',
-        'ingressVIP': '${INGRESS_VIP}',
-        'rendezvousIP': '192.168.223.10',
-        'defaultDNS': '192.168.223.1',
-        'defaultGateway': '192.168.223.1',
-        'defaultPrefix': 24,
-        'lzBmcIP': '${BMC_VM_IP}',
-        'quayUser': 'admin',
-        'quayPassword': 'password',
-        'quayBackend': 'LocalStorage',
-        'storage_plugin': 'lvms',
-        'disconnected': False,
-        'enabled_plugins': ['lvms'],
-        'pullSecret': ps,
-        'sshPubPath': '/home/wizard/.ssh/id_rsa.pub',
-        'agent_hosts': hosts,
-    },
-    'certificates': {},
-    'cloudInfra': {'discovery_hosts': []}
-}
-json.dump(config, open('/tmp/enclave-wizard-config.json', 'w'))
-
-# Also create a version with extras for patching global.yaml
-extras = {
-    'fresh': False,
-    'openshift_versions': [{'version': '4.20.21', 'default': True}],
-    'bmcSystemIds': name_to_uuid,
-}
-json.dump(extras, open('/tmp/enclave-wizard-extras.json', 'w'))
-
-print(f'Config created with {len(ps[\"auths\"])} registries, {len(name_to_uuid)} VM UUIDs')
-\""
-
-# Copy config to VM and write via API + patch
-${SSH} "${TARGET}" "scp -o StrictHostKeyChecking=no /tmp/enclave-wizard-config.json /tmp/enclave-wizard-extras.json wizard@${VM_IP}:/tmp/"
+        result.append({'name': info['Name'], 'uuid': sid})
+print(json.dumps(sorted(result, key=lambda x: x['name'])))
+\"")
 
 # Reset wizard auth for fresh deploy
 ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
@@ -224,72 +200,112 @@ ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
 PASS=$(${SSH} -J "${TARGET}" wizard@"${VM_IP}" "sudo cat /tmp/enclave-wizard-init-pass")
 info "  Wizard password: ${PASS}"
 
-${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
-  set -euo pipefail
-  API='https://localhost:3443'
+# Write demo-params.json locally
+python3 -c "
+import json, os
 
-  # Login
-  TOKEN=\$(curl -sk -X POST \"\$API/api/v1/auth/login\" \
-    -H 'Content-Type: application/json' \
-    -d '{\"username\":\"admin\",\"password\":\"${PASS}\"}' | python3 -c 'import sys,json; print(json.load(sys.stdin)[\"token\"])')
+vm_info = json.loads('${VM_UUIDS}')
+uuid_by_name = {v['name']: v['uuid'] for v in vm_info}
 
-  # Strip non-API fields and write config
-  python3 -c '
-import json
-c = json.load(open(\"/tmp/enclave-wizard-config.json\"))
-g = c[\"global\"]
-g.pop(\"fresh\", None)
-g.pop(\"openshift_versions\", None)
-for h in g.get(\"agent_hosts\", []):
-    h.pop(\"bmcSystemId\", None)
-json.dump(c, open(\"/tmp/enclave-wizard-config-api.json\", \"w\"))
-'
+hosts = []
+for i in range(3):
+    name = f'enclave-cp-{i}'
+    hosts.append({
+        'name': name,
+        'mac': f'00:60:2f:e0:c1:{i:02x}',
+        'ip': f'192.168.223.{10+i}',
+        'disk': '/dev/sda',
+        'uuid': uuid_by_name.get(name, ''),
+    })
 
-  HTTP=\$(curl -sk -X PUT \"\$API/api/v1/config\" \
-    -H \"Authorization: Bearer \$TOKEN\" \
-    -H 'Content-Type: application/json' \
-    -d @/tmp/enclave-wizard-config-api.json -o /dev/null -w '%{http_code}')
-  echo \"API config write: HTTP \$HTTP\"
+data = {}
+path = '${PARAMS_FILE}'
+if os.path.exists(path):
+    with open(path) as f:
+        data = json.load(f)
 
-  # Patch global.yaml with extras
-  sudo python3 -c '
-import yaml, json
+data['infra'] = {
+    'machineNetwork': '192.168.223.0/24',
+    'gateway': '192.168.223.1',
+    'apiVIP': '${API_VIP}',
+    'ingressVIP': '${INGRESS_VIP}',
+    'rendezvousIP': '192.168.223.10',
+    'baseDomain': '${BASE_DOMAIN}',
+    'clusterName': '${CLUSTER_NAME}',
+    'defaultPrefix': 24,
+    'bmc': {
+        'endpoint': '192.168.223.1:8100',
+        'user': 'admin',
+        'password': 'password',
+    },
+    'hosts': hosts,
+}
+data['wizard'] = {
+    'url': '${WIZARD_URL}/wizard',
+    'password': '${PASS}',
+    'vmIP': '${VM_IP}',
+    'lzBmcIP': '${BMC_VM_IP}',
+    'target': '${TARGET}',
+    'sshJump': 'ssh -J ${TARGET} wizard@${VM_IP}',
+}
 
-with open(\"/opt/enclave/config/global.yaml\") as f:
-    d = yaml.safe_load(f)
-
-extras = json.load(open(\"/tmp/enclave-wizard-extras.json\"))
-d[\"fresh\"] = extras[\"fresh\"]
-d[\"openshift_versions\"] = extras[\"openshift_versions\"]
-
-for h in d.get(\"agent_hosts\", []):
-    if h[\"name\"] in extras[\"bmcSystemIds\"]:
-        h[\"bmcSystemId\"] = extras[\"bmcSystemIds\"][h[\"name\"]]
-
-with open(\"/opt/enclave/config/global.yaml\", \"w\") as f:
-    yaml.dump(d, f, default_flow_style=False)
-print(\"global.yaml patched\")
-'
+with open(path, 'w') as f:
+    json.dump(data, f, indent=2)
+print(f'  demo-params.json updated with {len(hosts)} hosts, {len(uuid_by_name)} UUIDs')
 "
 
 # =============================================================================
-# Step 7: Trigger deployment
+# Step 7: Fill wizard via Playwright and trigger deployment
 # =============================================================================
-info "[7/8] Starting enclave deployment..."
+E2E_DIR="${REPO_DIR}/ui/apps/wizard/e2e"
 
+run_playwright() {
+  local extra_env="$1"
+  shift
+  if command -v npx &>/dev/null; then
+    eval "${extra_env}" npx "$@"
+  else
+    distrobox enter osac -- bash -c "export PATH=~/.local/bin:\$PATH && cd ${E2E_DIR} && ${extra_env} npx $*"
+  fi
+}
+
+if [ "${INTERACTIVE}" = "true" ]; then
+  info "[7/8] Filling wizard via Playwright (interactive — headed browser)..."
+  cd "${E2E_DIR}"
+  run_playwright \
+    "WIZARD_URL=${WIZARD_URL} WIZARD_PASSWORD=${PASS} PULL_SECRET=${PULL_SECRET}" \
+    playwright test --config playwright.config.ts \
+      --headed \
+      --grep "fill wizard from demo-params" \
+      --reporter=list
+  info ""
+  info "=== Interactive mode — deploy manually in the browser ==="
+  info "Wizard URL: ${WIZARD_URL}/wizard"
+  info "Wizard password: ${PASS}"
+  exit 0
+fi
+
+info "[7/8] Filling wizard via Playwright and starting deployment..."
+cd "${E2E_DIR}"
+run_playwright \
+  "WIZARD_URL=${WIZARD_URL} WIZARD_PASSWORD=${PASS} PULL_SECRET=${PULL_SECRET} SKIP_PAUSE=1" \
+  playwright test --config playwright.config.ts \
+    --grep "fill wizard from demo-params" \
+    --reporter=list
+info "  Config written via Playwright"
+
+# Clean up stale state and trigger deploy via API
 ${SSH} -J "${TARGET}" wizard@"${VM_IP}" "
   set -euo pipefail
 
-  # Clean up any previous state
   sudo podman pod rm -f metal3-ironic 2>/dev/null || true
   sudo rm -rf /opt/enclave/ocp-cluster/
   sudo rm -f /opt/enclave/config/pull-secret.json
 
   API='https://localhost:3443'
-  PASS=\$(sudo cat /tmp/enclave-wizard-init-pass)
   TOKEN=\$(curl -sk -X POST \"\$API/api/v1/auth/login\" \
     -H 'Content-Type: application/json' \
-    -d \"{\\\"username\\\":\\\"admin\\\",\\\"password\\\":\\\"\$PASS\\\"}\" | python3 -c 'import sys,json; print(json.load(sys.stdin)[\"token\"])')
+    -d '{\"username\":\"admin\",\"password\":\"pleaseletmein\"}' | python3 -c 'import sys,json; print(json.load(sys.stdin)[\"token\"])')
 
   DEPLOY=\$(curl -sk -X POST \"\$API/api/v1/tasks/deploy\" \
     -H \"Authorization: Bearer \$TOKEN\")
@@ -328,5 +344,5 @@ done
 info ""
 info "=== Deployment recording complete ==="
 info "Recordings saved to fixtures/recordings/"
-info "Wizard URL: https://$(echo "${TARGET}" | cut -d@ -f2):3443/wizard"
+info "Wizard URL: ${WIZARD_URL}/wizard"
 info "Wizard password: ${PASS}"

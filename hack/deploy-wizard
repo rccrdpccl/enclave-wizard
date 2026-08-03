@@ -306,7 +306,7 @@ data['wizard'] = {
     'url': 'https://${TARGET_HOST}:${HTTPS_PORT}/wizard',
     'password': '${WIZARD_PASS}',
     'vmIP': '${VM_IP}',
-    'landingZoneIP': '${BMC_VM_IP}',
+    'lzBmcIP': '${BMC_VM_IP}',
     'target': '${TARGET}',
     'sshJump': 'ssh -J ${TARGET} wizard@${VM_IP}',
 }
