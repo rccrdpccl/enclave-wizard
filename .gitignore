@@ -5,3 +5,5 @@ enclave-mock/
 .superpowers/
 docs/superpowers/
 demo-params.json
+hack/tls/
+ui/apps/wizard/e2e/test-results/
