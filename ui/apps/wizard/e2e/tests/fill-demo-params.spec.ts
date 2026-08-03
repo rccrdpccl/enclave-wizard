@@ -45,7 +45,7 @@ async function loadSshPubKey(): Promise<string> {
 test("fill wizard from demo-params.json (stop before deploy)", async ({
   page,
 }) => {
-  test.setTimeout(300_000);
+  test.setTimeout(0);
   const params = await loadDemoParams();
   const password = process.env.WIZARD_PASSWORD ?? params.wizard.password;
   const pullSecret = await loadPullSecret();

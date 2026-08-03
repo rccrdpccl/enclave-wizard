@@ -303,20 +303,27 @@ function WizardContent(): React.ReactElement {
             api.getConfig(),
           ]);
 
-        if (defaults.status === "fulfilled") {
-          const d = defaults.value;
-          dispatch({ type: "SET_FIELD", path: "global.storage_plugin", value: d.storagePlugin });
-          dispatch({ type: "SET_FIELD", path: "global.defaultPrefix", value: 24 });
-          dispatch({ type: "SET_FIELD", path: "global.quayBackend", value: "LocalStorage" });
-          dispatch({ type: "SET_FIELD", path: "global.enabled_plugins", value: ["lvms"] });
-        }
-
         if (pluginsResult.status === "fulfilled") {
           dispatch({ type: "SET_PLUGINS", plugins: pluginsResult.value.plugins ?? [] });
         }
 
+        // Load existing config first, then apply defaults for missing fields
         if (existingConfig.status === "fulfilled") {
           dispatch({ type: "LOAD_CONFIG", config: EnclaveConfigToJSON(existingConfig.value) });
+        }
+
+        if (defaults.status === "fulfilled") {
+          const d = defaults.value;
+          const loaded = existingConfig.status === "fulfilled"
+            ? EnclaveConfigToJSON(existingConfig.value) as Record<string, Record<string, unknown>>
+            : null;
+          const g = loaded?.global ?? {};
+          if (!g.storage_plugin) dispatch({ type: "SET_FIELD", path: "global.storage_plugin", value: d.storagePlugin });
+          if (!g.defaultPrefix) dispatch({ type: "SET_FIELD", path: "global.defaultPrefix", value: 24 });
+          if (!g.quayBackend) dispatch({ type: "SET_FIELD", path: "global.quayBackend", value: "LocalStorage" });
+          if (!Array.isArray(g.enabled_plugins) || g.enabled_plugins.length === 0) {
+            dispatch({ type: "SET_FIELD", path: "global.enabled_plugins", value: [d.storagePlugin ?? "lvms"] });
+          }
         }
 
         // Always connected mode (disconnected greyed out in UI)

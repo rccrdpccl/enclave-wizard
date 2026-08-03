@@ -3,7 +3,9 @@ package api
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"net/http"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -228,8 +230,80 @@ func (h *DeployHandler) watchDeployment(deployID string) {
 			dep.Status = run.Status
 		}
 		h.mu.Unlock()
+
+		if run.Status == models.TaskStatusSuccessful {
+			h.chainAddonPlugins()
+		}
 		return
 	}
+}
+
+func (h *DeployHandler) addonPluginsFromConfig() []string {
+	if h.configReader == nil {
+		return nil
+	}
+	cfg, err := h.configReader.ReadAll()
+	if err != nil {
+		return nil
+	}
+	type addonInfo struct {
+		name  string
+		order int
+	}
+	var addons []addonInfo
+	for _, name := range cfg.Global.EnabledPlugins {
+		p, ok := h.registry.Get(name)
+		if !ok {
+			continue
+		}
+		if p.Type == models.PluginTypeAddon {
+			addons = append(addons, addonInfo{name: p.Name, order: p.Order})
+		}
+	}
+	sort.Slice(addons, func(i, j int) bool { return addons[i].order < addons[j].order })
+	result := make([]string, len(addons))
+	for i, a := range addons {
+		result[i] = a.name
+	}
+	return result
+}
+
+func (h *DeployHandler) chainAddonPlugins() {
+	defer func() {
+		if r := recover(); r != nil {
+			slog.Error("addon plugin chain panicked", "error", r)
+		}
+	}()
+
+	addonPlugins := h.addonPluginsFromConfig()
+	if len(addonPlugins) == 0 {
+		return
+	}
+
+	slog.Info("deploying addon plugins", "plugins", addonPlugins)
+
+	for _, name := range addonPlugins {
+		slog.Info("deploying addon plugin", "plugin", name)
+		run, _, err := h.runner.RunSync(context.Background(), runner.StartRequest{
+			Type:     models.TaskTypeDeployPlugin,
+			Playbook: "playbooks/deploy-plugin.yaml",
+			ExtraVars: map[string]string{
+				"plugin_name": name,
+				"workingDir":  h.enclaveDir,
+			},
+		})
+		if err != nil {
+			slog.Error("addon plugin deploy failed to start", "plugin", name, "error", err)
+			return
+		}
+		if run.Status != models.TaskStatusSuccessful {
+			slog.Error("addon plugin deploy failed", "plugin", name, "status", run.Status)
+			return
+		}
+		slog.Info("addon plugin deployed successfully", "plugin", name)
+	}
+
+	slog.Info("all addon plugins deployed successfully")
 }
 
 func (h *DeployHandler) calculateProgress(dep *models.Deployment) models.DeploymentProgress {
