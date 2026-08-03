@@ -2,6 +2,19 @@ import type React from "react";
 import { createContext, useContext, useReducer } from "react";
 import { FLAVORS, getFlavorPlugins, type FlavorId } from "./flavors.ts";
 import type { Experience } from "./experiences.ts";
+import { FALLBACK_EXPERIENCES } from "./experiences.ts";
+
+function deriveFlavorsFromPlugins(enabledPlugins: string[]): Set<FlavorId> {
+  const enabled = new Set(enabledPlugins);
+  const result = new Set<FlavorId>();
+  for (const flavor of FLAVORS) {
+    const required = getFlavorPlugins(flavor, FALLBACK_EXPERIENCES);
+    if (required.length > 0 && required.every((p) => enabled.has(p))) {
+      result.add(flavor.id);
+    }
+  }
+  return result;
+}
 
 export interface ValidationError {
   field: string;
@@ -119,8 +132,14 @@ export function wizardReducer(
       return { ...state, validationErrors: action.errors };
     case "SET_SHOW_VALIDATION":
       return { ...state, showValidation: action.show };
-    case "LOAD_CONFIG":
-      return { ...state, configData: action.config };
+    case "LOAD_CONFIG": {
+      const loadedPlugins = (action.config.global as Record<string, unknown> | undefined)
+        ?.enabled_plugins as string[] | undefined;
+      const derivedFlavors = loadedPlugins?.length
+        ? deriveFlavorsFromPlugins(loadedPlugins)
+        : state.selectedFlavors;
+      return { ...state, configData: action.config, selectedFlavors: derivedFlavors };
+    }
     default:
       return state;
   }
