@@ -68,8 +68,11 @@ generate-schema: ## Generate Go types from enclave JSON schemas.
 generate: generate-schema ## Run all code generation.
 	$(GO) generate ./...
 
-rpm: build-linux ## Build RPM package.
+rpm: build-linux update-enclave-overrides ## Build RPM package.
 	hack/rpm/build-rpm.sh
+
+update-enclave-overrides: ## Sync plugin defaults from enclave repo into hack/enclave/.
+	hack/update-enclave-overrides.sh
 
 ##@ Deploy
 

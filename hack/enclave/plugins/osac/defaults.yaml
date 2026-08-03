@@ -1,43 +1,97 @@
----
-# OSAC plugin defaults — enclave-wizard override
-# Pins images to versions compatible with chart 0.0.1 (no ExternalIPPool CRD).
-# This file replaces plugins/osac/defaults.yaml in the enclave RPM.
+osacChartVersion: 0.0.6
 osacProfilesList:
-  - caas
-  - vmaas
-
-# AAP settings (chart manages the instance, these configure it)
+- caas
+- vmaas
+osacTestUsers: false
+osacNetrisEnabled: false
 osac_aap_name: osac-aap
 osac_aap_operator_ns: ansible-aap
 osac_aap_api_user: admin
 osac_aap_validate_certs: false
-
-# Keycloak integration
 osac_keycloak_ns: keycloak
 osac_keycloak_name: keycloak
 osac_keycloak_svc_name: keycloak-service
 osac_keycloak_realm: osac
 osac_keycloak_client_id: osac-controller
+osac_keycloak_admin_client_id: osac-admin
 osac_keycloak_service_port: 8443
-
-# Fulfillment database (built-in dev postgres)
+osac_keycloak_validate_certs: true
+osac_keycloak_client_scopes:
+- name: groups
+  description: Group membership claim
+  protocolMappers:
+  - name: groups
+    protocol: openid-connect
+    protocolMapper: oidc-group-membership-mapper
+    consentRequired: false
+    config:
+      full.path: 'false'
+      introspection.token.claim: 'true'
+      multivalued: 'true'
+      userinfo.token.claim: 'true'
+      id.token.claim: 'true'
+      access.token.claim: 'true'
+      claim.name: groups
+- name: username
+  description: User name
+  protocolMappers:
+  - name: username
+    protocol: openid-connect
+    protocolMapper: oidc-usermodel-attribute-mapper
+    consentRequired: false
+    config:
+      user.attribute: username
+      claim.name: username
+      jsonType.label: String
+      id.token.claim: 'true'
+      access.token.claim: 'true'
+      userinfo.token.claim: 'true'
+      introspection.token.claim: 'true'
+      multivalued: 'false'
+      aggregate.attrs: 'false'
+- name: osac-api
+  description: OSAC API
+  attributes:
+    include.in.token.scope: 'false'
+    display.on.consent.screen: 'false'
+    include.in.openid.provider.metadata: 'false'
+  protocolMappers:
+  - name: osac-api-aud
+    protocol: openid-connect
+    protocolMapper: oidc-audience-mapper
+    consentRequired: false
+    config:
+      id.token.claim: 'false'
+      access.token.claim: 'true'
+      introspection.token.claim: 'true'
+      included.custom.audience: osac-api
+osac_keycloak_test_users:
+- username: admin
+  firstName: Administrator
+  lastName: User
+  email: admin@example.com
+  password: foobar
+  groups:
+  - admins
+- username: user
+  firstName: Test
+  lastName: User
+  email: user@example.com
+  password: foobar
+  groups:
+  - tenant1
 osacBYODatabase: false
 osac_db_name: postgres
-osac_db_image: "quay.io/sclorg/postgresql-15-c9s:latest"
+osac_db_image: quay.io/sclorg/postgresql-15-c9s:latest
 osac_db_size: 5Gi
 osac_db_user: service
 osac_db_database: service
-
-# AAP bootstrap
-osac_aap_project_git_uri: "https://github.com/osac-project/osac-aap"
-osac_aap_project_git_branch: "3453b544"
-
-# Container images — pinned to chart 0.0.1 (published 2026-06-11)
-# All images from the same day as the chart publication.
+osac_aap_project_git_uri: https://github.com/osac-project/osac-aap
+osac_aap_project_git_branch: main
 osac_images:
-  operator: "ghcr.io/osac-project/osac-operator"
-  operator_tag: "sha-0c69537"
-  fulfillment_service: "ghcr.io/osac-project/fulfillment-service:v0.0.64"
-  envoy: "docker.io/envoyproxy/envoy:v1.33.0"
-  aap_bootstrap: "ghcr.io/osac-project/osac-aap:sha-3453b54"
-  cli: "quay.io/openshift/origin-cli:4.20.0"
+  operator: ghcr.io/osac-project/osac-operator
+  operator_tag: sha-0c69537
+  fulfillment_service: ghcr.io/osac-project/fulfillment-service:v0.0.64
+  envoy: docker.io/envoyproxy/envoy:v1.33.0
+  aap_bootstrap: ghcr.io/osac-project/osac-aap:sha-3453b54
+  cli: quay.io/openshift/origin-cli:4.20.0
