@@ -30,6 +30,7 @@ export interface HostEntry {
   redfishUser: string;
   redfishPassword: string;
   rootDisk: string;
+  bmcSystemId?: string;
 }
 
 export interface HubClusterConfig {
@@ -48,6 +49,7 @@ export interface HubClusterConfig {
 }
 
 export interface OsacConfig {
+  aapLicenseFilePath?: string;
   aapLicenseFilename?: string;
   byoDatabase?: boolean;
   databaseUrl?: string;
@@ -72,8 +74,11 @@ export class WizardPage {
   }
 
   async changePassword(newPassword: string) {
-    await this.page.fill("#new-password", newPassword);
-    await this.page.fill("#confirm-password", newPassword);
+    await this.page.locator("#new-password").click();
+    await this.page.locator("#new-password").pressSequentially(newPassword);
+    await this.page.locator("#confirm-password").click();
+    await this.page.locator("#confirm-password").pressSequentially(newPassword);
+    await this.page.waitForTimeout(300);
     await this.page.getByRole("button", { name: "Change password" }).click();
   }
 
@@ -184,12 +189,12 @@ export class WizardPage {
       await this.page.waitForTimeout(200);
     }
 
-    for (const host of config.hosts) {
-      await this.page.getByRole("button", { name: "Add node" }).click();
-    }
-
     for (let i = 0; i < config.hosts.length; i++) {
       const host = config.hosts[i];
+      const addBtn = this.page.getByRole("button", { name: "Add node" });
+      await addBtn.scrollIntoViewIfNeeded();
+      await addBtn.click();
+      await this.page.locator(`#node-${i}-name`).waitFor();
       await this.page.fill(`#node-${i}-name`, host.name);
       await this.page.fill(`#node-${i}-mac`, host.macAddress);
       await this.page.fill(`#node-${i}-ip`, host.ipAddress);
@@ -197,6 +202,9 @@ export class WizardPage {
       await this.page.fill(`#node-${i}-rfuser`, host.redfishUser);
       await this.page.fill(`#node-${i}-rfpass`, host.redfishPassword);
       await this.page.fill(`#node-${i}-rootdisk`, host.rootDisk);
+      if (host.bmcSystemId) {
+        await this.page.fill(`#node-${i}-bmcsystemid`, host.bmcSystemId);
+      }
     }
   }
 
@@ -212,14 +220,17 @@ export class WizardPage {
   // --- Step: OSAC Platform ---
 
   async fillOsac(config: OsacConfig) {
-    // Upload AAP license manifest
-    const filename = config.aapLicenseFilename ?? "manifest.zip";
     const fileInput = this.page.locator("input[type='file']").first();
-    await fileInput.setInputFiles({
-      name: filename,
-      mimeType: "application/zip",
-      buffer: Buffer.from("PK\x03\x04fake-manifest-zip-content"),
-    });
+    if (config.aapLicenseFilePath) {
+      await fileInput.setInputFiles(config.aapLicenseFilePath);
+    } else {
+      const filename = config.aapLicenseFilename ?? "manifest.zip";
+      await fileInput.setInputFiles({
+        name: filename,
+        mimeType: "application/zip",
+        buffer: Buffer.from("PK\x03\x04fake-manifest-zip-content"),
+      });
+    }
     await this.page.getByText("Saved to:").waitFor({ timeout: 10_000 });
 
     // Database backend
