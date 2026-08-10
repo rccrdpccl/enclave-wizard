@@ -1,13 +1,21 @@
 import {
+  Alert,
   Button,
   Content,
   Flex,
   FlexItem,
   Form,
+  FormGroup,
+  FormSelect,
+  FormSelectOption,
+  HelperText,
+  HelperTextItem,
+  TextInput,
   Title,
 } from "@patternfly/react-core";
 import { MinusCircleIcon, PlusCircleIcon } from "@patternfly/react-icons";
 import type React from "react";
+import { useCallback } from "react";
 import { type HostEntry, HostEntryCard } from "../components/HostEntryCard.tsx";
 import { useWizard } from "../WizardContext.tsx";
 import { stepStyles } from "./stepStyles.ts";
@@ -22,10 +30,14 @@ const EMPTY_HOST: HostEntry = {
   rootDisk: "",
 };
 
+const AWS_KEY_PATTERN = /^AKIA[A-Z0-9]{16}$/;
+const AWS_SECRET_MIN_LENGTH = 40;
+
 export const CaasStep: React.FC = () => {
   const { state, dispatch } = useWizard();
 
   const configData = state.configData as Record<string, unknown>;
+  const globalData = (configData.global ?? {}) as Record<string, unknown>;
   const discoveryHosts: HostEntry[] = Array.isArray(
     (configData.cloudInfra as Record<string, unknown>)?.discovery_hosts,
   )
@@ -40,8 +52,158 @@ export const CaasStep: React.FC = () => {
       value: hosts,
     });
 
+  const clusterFulfillmentConfig = (globalData.clusterFulfillmentConfig ??
+    {}) as Record<string, string>;
+  const awsAccessKeyId = clusterFulfillmentConfig.AWS_ACCESS_KEY_ID ?? "";
+  const awsSecretAccessKey =
+    clusterFulfillmentConfig.AWS_SECRET_ACCESS_KEY ?? "";
+  const dnsZone = clusterFulfillmentConfig.DNS_ZONE ?? "";
+
+  const setClusterFulfillmentField = useCallback(
+    (key: string, value: string) => {
+      const updated = { ...clusterFulfillmentConfig, [key]: value };
+      if (!value) {
+        delete updated[key];
+      }
+      dispatch({
+        type: "SET_FIELD",
+        path: "global.clusterFulfillmentConfig",
+        value: updated,
+      });
+    },
+    [clusterFulfillmentConfig, dispatch],
+  );
+
   return (
     <Form>
+      {/* DNS Configuration */}
+      <Title headingLevel="h2" size="xl">
+        DNS Configuration
+      </Title>
+      <Content component="p">
+        Configure DNS backend for automated cluster DNS record management during
+        provisioning. The platform creates DNS records for cluster API endpoints
+        and ingress routes.
+      </Content>
+
+      <Alert
+        variant="info"
+        isInline
+        title="AWS Route 53 Permissions Required"
+        className={stepStyles.infoAlert}
+      >
+        <p>
+          The AWS IAM user must have permissions to create, modify, and delete
+          records in the target Route 53 hosted zone.
+        </p>
+      </Alert>
+
+      <FormGroup label="DNS Backend" isRequired fieldId="dns-backend">
+        <FormSelect
+          id="dns-backend"
+          value="dns.route53.dns"
+          isDisabled
+          aria-label="DNS Backend"
+        >
+          <FormSelectOption value="dns.route53.dns" label="Route 53" />
+        </FormSelect>
+        <HelperText>
+          <HelperTextItem>
+            DNS backend for automated cluster DNS record management
+          </HelperTextItem>
+        </HelperText>
+      </FormGroup>
+
+      <FormGroup
+        label="AWS Access Key ID"
+        isRequired
+        fieldId="aws-access-key-id"
+      >
+        <TextInput
+          id="aws-access-key-id"
+          type="password"
+          value={awsAccessKeyId}
+          onChange={(_event, value) =>
+            setClusterFulfillmentField("AWS_ACCESS_KEY_ID", value)
+          }
+          placeholder="AKIA..."
+          aria-label="AWS Access Key ID"
+          validated={
+            awsAccessKeyId && !AWS_KEY_PATTERN.test(awsAccessKeyId)
+              ? "error"
+              : "default"
+          }
+        />
+        <HelperText>
+          <HelperTextItem
+            variant={
+              awsAccessKeyId && !AWS_KEY_PATTERN.test(awsAccessKeyId)
+                ? "error"
+                : "default"
+            }
+          >
+            {awsAccessKeyId && !AWS_KEY_PATTERN.test(awsAccessKeyId)
+              ? "Invalid AWS access key format (must start with AKIA and be 20 characters)"
+              : "AWS IAM access key with Route 53 permissions"}
+          </HelperTextItem>
+        </HelperText>
+      </FormGroup>
+
+      <FormGroup
+        label="AWS Secret Access Key"
+        isRequired
+        fieldId="aws-secret-access-key"
+      >
+        <TextInput
+          id="aws-secret-access-key"
+          type="password"
+          value={awsSecretAccessKey}
+          onChange={(_event, value) =>
+            setClusterFulfillmentField("AWS_SECRET_ACCESS_KEY", value)
+          }
+          aria-label="AWS Secret Access Key"
+          validated={
+            awsSecretAccessKey &&
+            awsSecretAccessKey.length < AWS_SECRET_MIN_LENGTH
+              ? "error"
+              : "default"
+          }
+        />
+        <HelperText>
+          <HelperTextItem
+            variant={
+              awsSecretAccessKey &&
+              awsSecretAccessKey.length < AWS_SECRET_MIN_LENGTH
+                ? "error"
+                : "default"
+            }
+          >
+            {awsSecretAccessKey &&
+            awsSecretAccessKey.length < AWS_SECRET_MIN_LENGTH
+              ? "AWS secret access key must be at least 40 characters"
+              : "AWS IAM secret access key"}
+          </HelperTextItem>
+        </HelperText>
+      </FormGroup>
+
+      <FormGroup label="DNS Zone" fieldId="dns-zone">
+        <TextInput
+          id="dns-zone"
+          value={dnsZone}
+          onChange={(_event, value) =>
+            setClusterFulfillmentField("DNS_ZONE", value)
+          }
+          placeholder="example.com"
+          aria-label="DNS Zone"
+        />
+        <HelperText>
+          <HelperTextItem>
+            Route 53 hosted zone name. Leave empty to use the base domain.
+          </HelperTextItem>
+        </HelperText>
+      </FormGroup>
+
+      {/* Bare Metal Hosts */}
       <Title headingLevel="h2" size="xl">
         Bare Metal Hosts
       </Title>

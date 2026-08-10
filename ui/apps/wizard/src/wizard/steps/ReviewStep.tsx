@@ -141,6 +141,19 @@ export const ReviewStep: React.FC = () => {
     const rhbkPlugin = extractPluginConfig(globalData, RHBK_PLUGIN_KEYS);
     const strippedGlobal = stripPluginKeys(globalData);
 
+    if (osacPlugin?.clusterFulfillmentConfig) {
+      const config = {
+        ...(osacPlugin.clusterFulfillmentConfig as Record<string, string>),
+      };
+      if (config.AWS_ACCESS_KEY_ID) {
+        config.AWS_ACCESS_KEY_ID = "••••••••";
+      }
+      if (config.AWS_SECRET_ACCESS_KEY) {
+        config.AWS_SECRET_ACCESS_KEY = "••••••••";
+      }
+      osacPlugin.clusterFulfillmentConfig = config;
+    }
+
     const files: ConfigFile[] = [...BASE_CONFIG_FILES];
     if (osacPlugin) {
       files.push({ key: "osac", label: "plugins/osac.yaml", path: "osac" });

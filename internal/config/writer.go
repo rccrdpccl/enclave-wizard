@@ -97,7 +97,23 @@ func buildOsacConfig(pc *models.PluginsConfig) *osacPluginConfig {
 		cfg.OsacDatabaseUrl = *pc.OsacDatabaseUrl
 	}
 	if len(pc.ClusterFulfillmentConfig) > 0 {
-		cfg.ClusterFulfillmentConfig = pc.ClusterFulfillmentConfig
+		remaining := make(map[string]string)
+		for k, v := range pc.ClusterFulfillmentConfig {
+			switch k {
+			case "AWS_ACCESS_KEY_ID":
+				cfg.OsacDnsEnabled = true
+				cfg.OsacDnsAwsAccessKeyId = v
+			case "AWS_SECRET_ACCESS_KEY":
+				cfg.OsacDnsAwsSecretAccessKey = v
+			case "DNS_ZONE":
+				cfg.OsacDnsZone = v
+			default:
+				remaining[k] = v
+			}
+		}
+		if len(remaining) > 0 {
+			cfg.ClusterFulfillmentConfig = remaining
+		}
 	}
 	return cfg
 }

@@ -79,8 +79,21 @@ func (r *Reader) mergePluginConfigs(cfg *models.EnclaveConfig) {
 		if osac.OsacDatabaseUrl != "" {
 			cfg.Global.OsacDatabaseUrl = &osac.OsacDatabaseUrl
 		}
-		if len(osac.ClusterFulfillmentConfig) > 0 {
-			cfg.Global.ClusterFulfillmentConfig = osac.ClusterFulfillmentConfig
+		cfc := make(map[string]string)
+		for k, v := range osac.ClusterFulfillmentConfig {
+			cfc[k] = v
+		}
+		if osac.OsacDnsAwsAccessKeyId != "" {
+			cfc["AWS_ACCESS_KEY_ID"] = osac.OsacDnsAwsAccessKeyId
+		}
+		if osac.OsacDnsAwsSecretAccessKey != "" {
+			cfc["AWS_SECRET_ACCESS_KEY"] = osac.OsacDnsAwsSecretAccessKey
+		}
+		if osac.OsacDnsZone != "" {
+			cfc["DNS_ZONE"] = osac.OsacDnsZone
+		}
+		if len(cfc) > 0 {
+			cfg.Global.ClusterFulfillmentConfig = cfc
 		}
 	}
 
@@ -103,6 +116,10 @@ type osacPluginConfig struct {
 	OsacAapLicenseFile       string            `yaml:"osacAapLicenseFile,omitempty"`
 	OsacBYODatabase          bool              `yaml:"osacBYODatabase,omitempty"`
 	OsacDatabaseUrl          string            `yaml:"osacDatabaseUrl,omitempty"`
+	OsacDnsEnabled           bool              `yaml:"osacDnsEnabled,omitempty"`
+	OsacDnsAwsAccessKeyId    string            `yaml:"osacDnsAwsAccessKeyId,omitempty"`
+	OsacDnsAwsSecretAccessKey string           `yaml:"osacDnsAwsSecretAccessKey,omitempty"`
+	OsacDnsZone              string            `yaml:"osacDnsZone,omitempty"`
 	ClusterFulfillmentConfig map[string]string `yaml:"clusterFulfillmentConfig,omitempty"`
 }
 
