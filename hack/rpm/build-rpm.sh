@@ -7,13 +7,11 @@ OUT_DIR="${REPO_DIR}/out"
 
 echo "=== Building Enclave Wizard RPM ==="
 
-# --- Build wizard binary (includes embedded UI) ---
-echo ""
-echo "[1/3] Building wizard binary with embedded UI..."
-make -C "${REPO_DIR}" build-linux
-
 # --- Build enclave-wizard RPM ---
-echo "[2/3] Building enclave-wizard RPM..."
+# Expects the wizard binary (with embedded UI) to already be built — the
+# `rpm` Makefile target has `build-linux` as a prerequisite for this.
+echo ""
+echo "[1/2] Building enclave-wizard RPM..."
 mkdir -p "${OUT_DIR}"
 
 podman run --rm \
@@ -41,7 +39,7 @@ podman run --rm \
     '
 
 # --- Generate checksums ---
-echo "[3/3] Done."
+echo "[2/2] Done."
 for rpm in "${OUT_DIR}/"enclave-wizard-*.rpm; do
     sha256sum "${rpm}" > "${rpm}.sha256"
 done
